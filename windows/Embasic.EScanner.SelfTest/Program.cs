@@ -6,3 +6,25 @@ if (!ScanContract.IsSupportedVersion(1) || ScanContract.IsSupportedVersion(0) ||
 }
 Console.WriteLine("PASS: 5 contract assertions");
 return 0;
+
+var fixture = SyntheticPdf.Create();
+if (!SyntheticPdf.VerifyFixture(fixture))
+{
+    Console.Error.WriteLine("FAIL: synthetic PDF structure");
+    return 1;
+}
+var damaged = (byte[])fixture.Clone();
+damaged[0] = (byte)'X';
+if (SyntheticPdf.VerifyFixture(damaged))
+{
+    Console.Error.WriteLine("FAIL: corrupt PDF header accepted");
+    return 1;
+}
+damaged = (byte[])fixture.Clone();
+damaged[^2] = (byte)'X';
+if (SyntheticPdf.VerifyFixture(damaged))
+{
+    Console.Error.WriteLine("FAIL: corrupt PDF trailer accepted");
+    return 1;
+}
+Console.WriteLine("PASS: 3 synthetic PDF fixture assertions");
