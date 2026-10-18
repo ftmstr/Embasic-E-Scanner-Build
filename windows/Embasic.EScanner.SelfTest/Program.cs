@@ -5,7 +5,6 @@ if (!ScanContract.IsSupportedVersion(1) || ScanContract.IsSupportedVersion(0) ||
     return 1;
 }
 Console.WriteLine("PASS: 5 contract assertions");
-return 0;
 
 var fixture = SyntheticPdf.Create();
 if (!SyntheticPdf.VerifyFixture(fixture))
@@ -28,3 +27,4 @@ if (SyntheticPdf.VerifyFixture(damaged))
     return 1;
 }
 Console.WriteLine("PASS: 3 synthetic PDF fixture assertions");
+return 0;
