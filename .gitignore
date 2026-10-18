@@ -1,0 +1,32 @@
+# Local credentials and production data
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.key
+*.pem
+*.cer
+*.crt
+*.mobileprovision
+*.secret
+secrets/
+private/
+real-scans/
+**/local.properties
+**/google-services.json
+**/appsettings.Production.json
+# Generated outputs
+**/bin/
+**/obj/
+**/.gradle/
+**/build/
+.gradle/
+.idea/
+.vs/
+*.user
+*.suo
+*.log
+.DS_Store
