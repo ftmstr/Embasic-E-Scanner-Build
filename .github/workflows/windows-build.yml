@@ -1,5 +1,5 @@
 name: Windows .NET Foundation
-on:
+'on':
   push:
     paths: ['windows/**', '.github/workflows/windows-build.yml']
   pull_request:
