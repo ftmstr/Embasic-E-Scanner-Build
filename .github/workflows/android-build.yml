@@ -1,5 +1,5 @@
 name: Android Kotlin Foundation
-on:
+'on':
   push:
     paths: ['android/**', '.github/workflows/android-build.yml']
   pull_request:
