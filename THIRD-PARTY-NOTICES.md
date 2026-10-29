@@ -29,6 +29,25 @@ of the E-Scanner application or permission to relicense the user's software.
 No production documents, secret credentials or PRIVATE repository files were
 copied.
 
+
+## JUnit 4.13.2 (test-only, NOT included in production APK)
+
+- Direct dependency: `junit:junit:4.13.2`, declared exclusively with
+  Gradle `testImplementation`.
+- Declared license: Eclipse Public License 1.0 (EPL-1.0), not treated
+  as permissive Apache/MIT/BSD. *Boundary review:* JVM unit-test runner only;
+  it is not a linked/embedded runtime dependency and must not be bundled
+  in the release APK/AAB. License obligation review for any redistribution
+  of its artifact remains OPEN.
+- Direct declared compile transitive: `org.hamcrest:hamcrest-core:1.3`,
+  New BSD License (BSD-style), also scoped to the test runtime.
+- Maven POMs / license metadata:
+  https://central.sonatype.com/artifact/junit/junit/4.13.2
+  https://central.sonatype.com/artifact/org.hamcrest/hamcrest-core/1.3
+- Actual resolved dependency graph, runtime exclusion and byte-level
+  inventory must be verified from GitHub Actions before any distribution.
+  Test success by itself does not close the product license gate.
+
 ## Still missing
 
 The PUBLIC repository's owner-approved **product LICENSE**, complete Android
