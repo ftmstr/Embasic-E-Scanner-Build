@@ -75,3 +75,34 @@ third-party licensing inventory.
 **Decision:** PR #1 OPEN; do not merge automatically. main unchanged. Product
 release NO-GO. Next task: resolve licensing and Android clean-room provenance
 without weakening security checks.
+
+## 29 October clean-room Android evidence update (supersedes earlier missing-source rows)
+
+The Gradle project source files, Kotlin Activity/manifest, JDK17 options
+and SHA-256-pinned 8.14.6 distribution metadata were created independently
+in PUBLIC after the earlier table was written. No PRIVATE contents or
+wrapper binary were imported. A separate GitHub Actions workflow verifies
+the **official distribution ZIP hash before executing it**. On earlier
+PUBLIC HEAD c65caa945aee1e1335391bf4d752faac4c12ec99, run
+40922555249 (job 123619400407) reported official ZIP SHA-256 OK and
+unsigned `:app:assembleDebug :app:lintDebug` BUILD SUCCESSFUL. This is
+foundational compilation only, not Compose, CameraX, OCR, PDF or device
+verification. Runner SDK 36 was present, but SDK Terms acceptance for release
+is not verified.
+
+The original Android wrapper-required workflow remains BLOCKED because
+no approved `android/gradle/wrapper/gradle-wrapper.jar` and `android/gradlew`
+have been added. The official expected wrapper checksum is recorded
+separately; the absent JAR is not treated as verified. CI policy regressions
+at HEAD a03c27da1afcad5f5087a6ed40e0d130197429e8 ran 11/11 PASS
+on run 40922911516; they now require exact official distribution and
+JAR digests, not arbitrary self-consistent 64-hex strings. The preflight
+finding remains BLOCKED (license, notice, wrapper presence and provenance).
+
+The Android build is therefore **one validated foundation compile/lint
+gate**, not verified end-user functionality. The earlier statement that
+Gradle source files were absent is historical and no longer current.
+Root LICENSE, NOTICE/SBOM, complete dependency-transitive review, binary
+provenance and product/device/release gates remain unresolved.
+See android/README.md and docs/ANDROID-TOOLCHAIN-LICENSE-RESEARCH-20261029.md.
+PR #1 must stay OPEN; no automated merge or RELEASE.
