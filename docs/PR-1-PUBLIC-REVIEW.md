@@ -38,7 +38,7 @@ authorship attestation are NOT VERIFIED.
 - Wrapper checks assess URL and declared SHA-256, plus local JAR checksum
   consistency. They do NOT establish upstream binary authorship or license.
 
-## Blocking findings
+## Historical blocking findings (superseded by later dated updates)
 
 | Gate | Source finding | State |
 |---|---|---|
@@ -106,3 +106,48 @@ Root LICENSE, NOTICE/SBOM, complete dependency-transitive review, binary
 provenance and product/device/release gates remain unresolved.
 See android/README.md and docs/ANDROID-TOOLCHAIN-LICENSE-RESEARCH-20261029.md.
 PR #1 must stay OPEN; no automated merge or RELEASE.
+
+## 29 October evening: wrapper/JUnit RED-GREEN evidence update
+
+Source-only security fix, not release approval:
+
+- PUBLIC wrapper import commit `c6a1521f200596e603ba505f581df73abf85ab89`:
+  Gradle 8.14.6 JAR (44,309 bytes) independently hashed with SHA-256,
+  equals official release digest
+  `ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0`.
+  Upstream immutable Gradle commit
+  `c27417f274bd1cf2f36e1f93d54e3de840d54e43`,
+  original `gradlew`, `gradlew.bat`, JAR and Gradle Apache-2.0
+  upstream license retained as exact Git blobs, with 0755 Unix wrapper.
+  Source tag `v8.14.6` itself contains an older bootstrap JAR. See
+  `docs/GRADLE-WRAPPER-PROVENANCE-20261029.md`.
+- Android wrapper CI now verifies JAR SHA-256 and pinned distribution hash
+  **before** invoking the wrapper. Both independent wrapper-based and
+  verified-ZIP Android foundation builds can be evaluated.
+- RED CI on workflow commit `3f93400701a0520561b0349cc99a7f8b16731400`:
+  job 123639082164, run 40928140967, assembled/linted successfully
+  but `:app:testDebugUnitTest NO-SOURCE`; new XML gate intentionally
+  failed with `BLOCKED: JUnit XML absent`. Prior build-only workflow
+  success was not evidence of executed JUnit tests.
+- GREEN CI on workflow commit `3d980decd9f9b5a49f3ef6fe5db5781c0afc01c4`:
+  run 40928606110 job 123640715845 completed/success. Log includes
+  `JUnit cases=6, failures=0, errors=0, skipped=0`,
+  `BUILD SUCCESSFUL`, `lintDebug`, `assembleDebug`, and
+  `PASS: 2 reviewed test-only modules isolated from debugRuntimeClasspath`.
+  The six tests concern pure version/order/canonical SHA-256 contract
+  boundaries; **not** camera/OCR/PDF/full feature parity.
+- `junit:junit:4.13.2` EPL-1.0 is `testImplementation` only;
+  transitive Hamcrest Core 1.3 is New BSD. The GREEN job verified both
+  on JVM test classpath and absent from Android debug runtime. This is a
+  documented test-only copyleft boundary, not rights approval to ship
+  either dependency with an APK, nor full dependency-tree SBOM.
+- `THIRD-PARTY-NOTICES.md` is now present but explicitly PARTIAL;
+  upstream Gradle source license is preserved. The PUBLIC product ROOT
+  LICENSE remains ABSENT and needs explicit rights-holder selection.
+  Direct/transitive build plugin inventories, signing and device acceptance
+  are still NOT VERIFIED. Do not mark PR #1 ready to merge automatically.
+
+**Current blockers:** owner-approved source LICENSE, complete per-artifact
+SBOM/LICENSES/NOTICE, WinUI3 and Android native user feature parity, security
+and offline export, two-device smoke, signed package verification and rollback.
+PR #1 stays open and release remains **NO-GO**.
