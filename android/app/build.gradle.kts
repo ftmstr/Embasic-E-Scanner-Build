@@ -29,3 +29,10 @@ kotlin {
 
 // No CameraX, Compose, OCR, ads or network runtime dependencies yet:
 // direct/transitive licenses and real device acceptance have not been cleared.
+
+// Test-only dependency (never part of release APK): JUnit 4.13.2, EPL-1.0.
+// Direct POM compile transitive: hamcrest-core 1.3, BSD-style license.
+// See docs/ANDROID-TOOLCHAIN-LICENSE-RESEARCH-20261029.md; not runtime license clearance.
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}
