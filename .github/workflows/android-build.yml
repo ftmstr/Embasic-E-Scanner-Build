@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -21,13 +23,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f android/gradle/wrapper/gradle-wrapper.jar ]]; then
-            echo 'BLOCKED: Android wrapper provenance not approved; no downloaded or private wrapper binary is trusted.'
-            exit 1
-          fi
+          test -x android/gradlew || { echo '::error::Android gradlew missing or not executable'; exit 2; }
+          cd android
+          test -f gradle/wrapper/gradle-wrapper.jar || { echo '::error::Missing reviewed wrapper JAR'; exit 2; }
+          grep -Fx 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.6-bin.zip' gradle/wrapper/gradle-wrapper.properties
+          grep -Fx 'distributionSha256Sum=7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24' gradle/wrapper/gradle-wrapper.properties
+          grep -Fx 'ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0' gradle/wrapper/gradle-wrapper.jar.sha256
+          sha256sum --check <<'SHA256'
+          ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0  gradle/wrapper/gradle-wrapper.jar
+          SHA256
       - name: Android unit tests and lint (after source audit)
         shell: bash
         run: |
           set -euo pipefail
           cd android
           ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+      - name: Require executed JUnit test cases (not NO-SOURCE)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          xmls = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          if not xmls:
+              raise SystemExit("BLOCKED: JUnit XML absent; task may have been NO-SOURCE")
+          tests = failures = errors = skipped = 0
+          for xml in xmls:
+              root = ET.parse(xml).getroot()
+              tests += int(root.get("tests", "0"))
+              failures += int(root.get("failures", "0"))
+              errors += int(root.get("errors", "0"))
+              skipped += int(root.get("skipped", "0"))
+          print(f"JUnit cases={tests}, failures={failures}, errors={errors}, skipped={skipped}")
+          if tests == 0 or failures or errors or skipped:
+              raise SystemExit("BLOCKED: JUnit not fully executed or not passing")
+          PY
