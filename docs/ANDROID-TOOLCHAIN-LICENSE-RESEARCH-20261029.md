@@ -14,8 +14,8 @@ artifacts remain entirely outside this repository.
 | JDK | 17 | AGP 8.13 compatibility | RUNNER VERIFIED / runtime terms REVIEW OPEN |
 | Android compile/target SDK | 36/36 | Supported by AGP 8.13.x | CI SDK36 PRESENT; SDK Terms acceptance NOT VERIFIED |
 | Android minSdk | 26 | PUBLIC clean-room product choice | SOURCE CONFIGURED |
-| Gradle wrapper JAR | 8.14.6 | Expected official SHA-256 recorded | **NOT PRESENT / NOT VERIFIED** |
-| Gradle wrapper script | gradlew | Must be generated from trusted Gradle distribution then independently reviewed | **NOT PRESENT / BLOCKED** |
+| Gradle wrapper JAR | 8.14.6 | Official SHA-256 and exact upstream Git blob confirmed | PRESENT / HASH VERIFIED; release NOT APPROVED |
+| Gradle wrapper scripts | gradlew, gradlew.bat | Exact unmodified scripts at pinned Gradle c27417f commit | PRESENT / SOURCE VERIFIED |
 
 **Authoritative Gradle 8.14.6 SHA-256 pins:**
 - gradle-8.14.6-bin.zip:
@@ -32,6 +32,40 @@ artifacts remain entirely outside this repository.
   upstream third-party notices to review:
   https://kotlinlang.org/docs/faq.html
   https://github.com/JetBrains/kotlin/tree/master/license
+
+
+## Update: upstream verified build-tool wrapper, 2026-10-29
+
+The public Gradle 8.14.6 JAR (44,309 bytes) was independently SHA-256
+verified against the official release checksum and then staged with its
+upstream Git blob SHA identical. The executable Unix and Windows wrapper
+scripts and Gradle LICENSE were copied without modification from immutable
+public upstream commit `c27417f274bd1cf2f36e1f93d54e3de840d54e43`.
+See `docs/GRADLE-WRAPPER-PROVENANCE-20261029.md` and
+`THIRD-PARTY-NOTICES.md` for provenance, hash evidence and Apache-2.0
+attribution. The Gradle v8.14.6 source tag itself contains a different
+bootstrap JAR; do not trust that tag as a released wrapper. The original
+PUBLIC Android wrapper CI now validates the official JAR SHA-256 and
+pinned Gradle ZIP SHA-256 before invoking the script.
+
+## Update: JUnit test-only license boundary
+
+A minimal `junit:junit:4.13.2` JUnit4 runner was introduced through
+`testImplementation` to require actual JVM test case execution rather
+than a silent NO-SOURCE task. Its Maven POM declares EPL-1.0 (not
+permissive) and `org.hamcrest:hamcrest-core:1.3` as a compile
+transitive, with Hamcrest New BSD license. These two modules must remain
+isolated to **JVM local tests** and absent from debug/release APK
+runtime dependencies. See:
+- https://central.sonatype.com/artifact/junit/junit/4.13.2
+- https://central.sonatype.com/artifact/org.hamcrest/hamcrest-core/1.3
+
+The Android CI now checks JUnit XML case count >0 and will audit the
+debugRuntimeClasspath against debugUnitTestRuntimeClasspath; it fails
+closed on missing test output or runtime leakage. This is a documented
+test-scope boundary, not owner-approved EPL runtime redistribution and
+not a completed SBOM or transitive copyright audit. The project's own
+root LICENSE remains to be selected by the rights holder.
 
 ## Proposed, NOT ADDED runtime dependencies
 
