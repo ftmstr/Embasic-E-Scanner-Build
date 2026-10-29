@@ -12,10 +12,12 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from urllib.parse import urlparse
 
 CHECKSUM = re.compile(r"[0-9a-fA-F]{64}\Z")
-WRAPPER_URL = re.compile(r"https://services\.gradle\.org/distributions/gradle-[0-9][0-9A-Za-z.\-]*-bin\.zip\Z")
+# Published upstream values: https://gradle.org/release-checksums/ (8.14.6).
+OFFICIAL_GRADLE_URL = "https://services.gradle.org/distributions/gradle-8.14.6-bin.zip"
+OFFICIAL_DIST_SHA256 = "7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24"
+OFFICIAL_WRAPPER_SHA256 = "ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0"
 
 
 def safe_file(root: Path, rel: str, max_bytes: int | None = None) -> bool:
@@ -74,14 +76,12 @@ def audit(root: Path) -> dict[str, object]:
                 else:
                     values[k.strip()] = v.strip().replace("\\:", ":")
             url = values.get("distributionUrl", "")
-            parsed = urlparse(url)
-            url_ok = bool(WRAPPER_URL.fullmatch(url) and parsed.port is None and
-                          parsed.username is None and parsed.password is None)
-            dist_hash_ok = bool(CHECKSUM.fullmatch(values.get("distributionSha256Sum", "")))
+            url_ok = url == OFFICIAL_GRADLE_URL
+            dist_hash_ok = values.get("distributionSha256Sum", "").lower() == OFFICIAL_DIST_SHA256
         except (UnicodeError, OSError, ValueError):
             pass
     results.append(gate("gradle_distribution_pin", has_props and url_ok and dist_hash_ok,
-                        "HTTPS official Gradle binary URL and SHA-256 declaration required; trust not certified"))
+                        "Pinned official Gradle 8.14.6 distribution digest (no downloaded-binary attestation)"))
 
     jar = "android/gradle/wrapper/gradle-wrapper.jar"
     checksum_file = jar + ".sha256"
@@ -91,7 +91,7 @@ def audit(root: Path) -> dict[str, object]:
     if has_jar and has_checksum:
         try:
             declared = (root / checksum_file).read_text(encoding="ascii").strip()
-            if CHECKSUM.fullmatch(declared):
+            if CHECKSUM.fullmatch(declared) and declared.lower() == OFFICIAL_WRAPPER_SHA256:
                 digest = hashlib.sha256()
                 with (root / jar).open("rb") as handle:
                     for chunk in iter(lambda: handle.read(65536), b""):
@@ -100,7 +100,7 @@ def audit(root: Path) -> dict[str, object]:
         except (OSError, UnicodeError, ValueError):
             pass
     results.append(gate("wrapper_jar_integrity", jar_ok,
-                        "Local SHA-256 consistency only; binary origin and licensing not independently certified"))
+                        "Official upstream JAR checksum and content digest must match; provenance/license review stays manual"))
     machine_ready = all(x["status"] == "PASS" for x in results)
     return {"schemaVersion": 1, "scope": "public-source-structural-preflight",
             "machinePreflight": "PASS" if machine_ready else "BLOCKED",
