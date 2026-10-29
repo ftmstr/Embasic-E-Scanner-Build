@@ -2,8 +2,11 @@
 
 Status: **CLEAN-ROOM FOUNDATION ONLY / NO-GO RELEASE**. This source was
 authored afresh for the PUBLIC ftmstr/Embasic-E-Scanner-Build repository.
-No PRIVATE Git history, APK, proprietary scan, signing key, dependency
-binary, wrapper JAR, or user-document asset was imported.
+No PRIVATE Git history, APK, proprietary scan, signing key, customer
+asset, or proprietary runtime dependency was imported. The sole imported
+binary is the public upstream Gradle build-tool wrapper with verified SHA,
+source Git blob identity and copied upstream license; see
+`docs/GRADLE-WRAPPER-PROVENANCE-20261029.md`.
 
 ## Current Kotlin build inputs
 
@@ -13,30 +16,35 @@ binary, wrapper JAR, or user-document asset was imported.
   The exact value is in `gradle/wrapper/gradle-wrapper.properties`.
 - Published Gradle 8.14.6 wrapper JAR SHA-256:
   `ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0`.
-  The expected value is recorded but **no wrapper JAR / gradlew script is
-  approved or committed**. A checksum text file alone is NOT binary
-  verification.
+  The exact upstream JAR and unmodified `gradlew` / `gradlew.bat` scripts
+  are committed and verified against the public Gradle 8.14.6 source commit
+  `c27417f274bd1cf2f36e1f93d54e3de840d54e43`. A SHA text file alone
+  would NOT have been enough.
 - `compileSdk=36`, `targetSdk=36`, `minSdk=26` and Java target 17.
 - `:app` has one `Activity` that displays an explicit non-release message.
   There are **no camera, storage or network permissions**.
-- Third-party runtime dependencies for Compose/Material 3, CameraX, OCR,
-  networking, monetization, export, and test frameworks are deliberately
-  **not included** pending full direct/transitive license and maintenance
-  review. This is not an Android scanner and not platform feature parity.
+- Third-party *production runtime* libraries for Compose/Material 3, CameraX,
+  OCR, networking, monetization and export are **not included** pending
+  direct/transitive licensing review. JUnit 4.13.2 (EPL-1.0) and its
+  Hamcrest Core 1.3 (BSD) dependency are **testImplementation only**;
+  CI must prove neither appears in the production runtime graph.
+  This is not a scanner and not platform feature parity.
 
 ## Two distinct CI gates
 
-1. Existing `.github/workflows/android-build.yml` intentionally
-   **BLOCKS** without a reviewed committed wrapper binary/script. It must
-   not execute an unverified or PRIVATE wrapper.
+1. Existing `.github/workflows/android-build.yml` now checks the committed
+   executable `gradlew`, the official JAR SHA-256 and the pinned distribution
+   checksum before executing. It runs `testDebugUnitTest lintDebug assembleDebug`,
+   rejects NO-SOURCE test runs, and audits test-only dependency isolation.
+   GitHub CI run/job/step/log success must be checked separately.
 2. `.github/workflows/android-cleanroom-compile.yml` separately fetches
    Gradle's official 8.14.6 distribution via HTTPS, verifies the ZIP
    against the independently sourced published SHA-256 **before executing
    it**, checks that Android SDK 36 is present without accepting new SDK
    terms, then runs an **unsigned** `:app:assembleDebug :app:lintDebug`.
    Passing this is compile/lint evidence only; it is not evidence of
-   wrapper JAR provenance, instrumented/unit tests, runtime, device smoke,
-   user features, release signing, or licenses.
+   JUnit execution, instrumented tests, runtime, device smoke,
+   user features, release signing, or full licenses.
 
 ## Official sources and unresolved license gates
 
@@ -54,6 +62,6 @@ binary, wrapper JAR, or user-document asset was imported.
   `docs/ANDROID-TOOLCHAIN-LICENSE-RESEARCH-20261029.md`.
 
 The product license, direct and transitive dependencies, Android SDK Terms,
-SBOM, NOTICE, reproducible artifact identity, Android on-device smoke,
+SBOM, complete NOTICE, reproducible artifact identity, Android on-device smoke,
 privacy requirements, signed APK/AAB and rollback remain open **release
 gates**. Never equate a CI job's success with release certification.
