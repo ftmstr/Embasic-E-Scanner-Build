@@ -61,11 +61,12 @@ def resolved_graph(text: str, configuration: str) -> list[tuple[str, str, str]]:
             continue
         if line.startswith("BUILD SUCCESSFUL"):
             break
+        # Reject an unresolved Gradle edge BEFORE parsing a valid-looking
+        # coordinate; otherwise '+--- group:artifact:version FAILED' passes.
+        if re.search(r"\bFAILED\b|Could not resolve", line):
+            raise AuditError("unresolved dependency in " + configuration)
         match = NODE.match(line)
         if match is None:
-            # An unresolved module appears as e.g. 'group:name:version FAILED'.
-            if re.search(r"\bFAILED\b|Could not resolve", line):
-                raise AuditError("unresolved dependency in " + configuration)
             continue
         group, artifact, requested, selected = match.groups()
         version = selected or requested
