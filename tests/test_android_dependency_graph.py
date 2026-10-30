@@ -29,6 +29,19 @@ BUILD SUCCESSFUL in 3s
 """
 
 
+NOTICE = """# Third-party notices — REVIEW INCOMPLETE
+
+NOT a full SBOM.
+
+| Package | Scope | License metadata |
+| --- | --- | --- |
+| \x60pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\x60 | debug runtime | Apache-2.0 (NOT VERIFIED) |
+| \x60pkg:maven/org.jetbrains/annotations@13.0\x60 | debug runtime | Apache-2.0 (NOT VERIFIED) |
+| \x60pkg:maven/junit/junit@4.13.2\x60 | JVM tests ONLY | EPL-1.0 (review OPEN) |
+| \x60pkg:maven/org.hamcrest/hamcrest-core@1.3\x60 | JVM tests ONLY | New BSD (review OPEN) |
+"""
+
+
 class DependencyGraphAuditTests(unittest.TestCase):
     def test_complete_scoped_graph_reports_partial_non_release(self):
         data = mod.audit(RUNTIME, TEST)
@@ -95,10 +108,44 @@ class DependencyGraphAuditTests(unittest.TestCase):
             test = root / "test.txt"
             runtime.write_text(RUNTIME)
             test.write_text(TEST)
-            self.assertEqual(mod.main(["--runtime", str(runtime), "--test", str(test)]), 0)
+            notice = root / "THIRD-PARTY-NOTICES.md"
+            notice.write_text(NOTICE)
+            self.assertEqual(mod.main(["--runtime", str(runtime), "--test", str(test),
+                                       "--notice", str(notice)]), 0)
             runtime.unlink()
             runtime.symlink_to("/etc/hosts")
-            self.assertEqual(mod.main(["--runtime", str(runtime), "--test", str(test)]), 2)
+            self.assertEqual(mod.main(["--runtime", str(runtime), "--test", str(test),
+                                       "--notice", str(notice)]), 2)
+
+    def test_correct_scoped_notice_has_no_license_approval(self):
+        data = mod.audit(RUNTIME, TEST)
+        mod.check_partial_notice(data, NOTICE)
+        self.assertFalse(data["releaseApproved"])
+        self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+
+    def test_missing_runtime_notice_entry_rejected(self):
+        data = mod.audit(RUNTIME, TEST)
+        changed = "\n".join(line for line in NOTICE.splitlines()
+                            if "kotlin-stdlib@2.3.21" not in line)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, changed)
+
+    def test_incorrect_junit_license_notice_rejected(self):
+        data = mod.audit(RUNTIME, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE.replace("EPL-1.0", "MIT"))
+
+    def test_new_unreviewed_runtime_dependency_rejected(self):
+        runtime = RUNTIME.replace("BUILD SUCCESSFUL",
+                                  "+--- vendor:unreviewed:1.0\nBUILD SUCCESSFUL")
+        data = mod.audit(runtime, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE)
+
+    def test_notice_without_partial_disclaimer_rejected(self):
+        data = mod.audit(RUNTIME, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE.replace("NOT a full SBOM", "ALL LICENSES APPROVED"))
 
     def test_no_test_tree_cannot_pass(self):
         with self.assertRaises(mod.AuditError):
