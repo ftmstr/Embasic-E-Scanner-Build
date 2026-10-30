@@ -15,16 +15,16 @@ RUNTIME = """\
 > Task :app:dependencies
 debugRuntimeClasspath - Runtime classpath of debug.
 +--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21
-|    \--- org.jetbrains:annotations:13.0
+|    \\--- org.jetbrains:annotations:13.0
 BUILD SUCCESSFUL in 3s
 """
 TEST = """\
 > Task :app:dependencies
 debugUnitTestRuntimeClasspath - Resolved configuration for debug unit test.
 +--- junit:junit:4.13.2
-|    \--- org.hamcrest:hamcrest-core:1.3
+|    \\--- org.hamcrest:hamcrest-core:1.3
 +--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21
-|    \--- org.jetbrains:annotations:13.0
+|    \\--- org.jetbrains:annotations:13.0
 BUILD SUCCESSFUL in 3s
 """
 
@@ -64,6 +64,11 @@ class DependencyGraphAuditTests(unittest.TestCase):
     def test_unresolved_module_fails(self):
         with self.assertRaises(mod.AuditError):
             mod.audit(RUNTIME.replace("BUILD SUCCESSFUL", "+--- example:module:1.2 FAILED\nBUILD SUCCESSFUL"), TEST)
+
+    def test_gradle_could_not_resolve_edge_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace(
+                "BUILD SUCCESSFUL", "Could not resolve artifact\\nBUILD SUCCESSFUL"), TEST)
 
     def test_missing_configuration_fails(self):
         with self.assertRaises(mod.AuditError):
