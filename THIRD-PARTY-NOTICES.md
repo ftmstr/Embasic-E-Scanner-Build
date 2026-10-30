@@ -1,6 +1,6 @@
 # Third-party notices — REVIEW INCOMPLETE
 
-This file records **known PUBLIC-sourced build-tool components only**. It is
+This file records **known PUBLIC-sourced build tools and two resolved Android Gradle configurations only**. It is
 NOT a complete runtime dependency inventory, license audit, product-source
 license, SBOM, release approval, or a substitute for reviewing transitive
 dependencies. Distribution and signing remain **NO-GO** until all gates pass.
@@ -47,6 +47,38 @@ copied.
 - Actual resolved dependency graph, runtime exclusion and byte-level
   inventory must be verified from GitHub Actions before any distribution.
   Test success by itself does not close the product license gate.
+
+## Android resolved debug runtime and JVM test-only modules (30 October 2026)
+
+The following exact Maven package coordinates were observed in PUBLIC Android
+Gradle dependency reports at commit
+\`1c3a71de0e78f2aedbb598701a079a27fe8c8b00\`, GitHub Actions run
+\`41056487701\`, job \`124065200691\` (14 synthetic graph-audit tests PASS,
+6 Android JUnit tests PASS). This is **NOT a full SBOM**, and Maven POM
+license metadata is not proof of artifact bytes, legal clearance or product
+release. Gradle plugins/build tooling, Android SDK and release variants are
+outside this scoped inventory.
+
+| Exact resolved Maven purl | Scope | Supplier POM license metadata |
+| --- | --- | --- |
+| \`pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
+| \`pkg:maven/org.jetbrains/annotations@13.0\` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
+| \`pkg:maven/junit/junit@4.13.2\` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
+| \`pkg:maven/org.hamcrest/hamcrest-core@1.3\` | JVM local tests ONLY; absent from Android debug runtime | New BSD (test-only boundary, redistribution review OPEN) |
+
+Publisher metadata (not independently verified byte-for-byte license texts):
+- https://central.sonatype.com/artifact/org.jetbrains.kotlin/kotlin-stdlib/2.3.21
+- https://central.sonatype.com/artifact/org.jetbrains/annotations/13.0
+- https://central.sonatype.com/artifact/junit/junit/4.13.2
+- https://central.sonatype.com/artifact/org.hamcrest/hamcrest-core/1.3
+
+**Boundary:** The two Kotlin/JetBrains dependencies must undergo real
+APK/AAB package inspection, notice/license retention and any transitive
+artifact review. JUnit/Hamcrest are test-only and must remain excluded from
+APK runtime graphs; their appearance here is NOT an EPL runtime waiver.
+Every new resolved runtime/test Maven component requires a source-backed
+NOTICE entry before the graph audit can pass. Even if all listed entries
+exist, full product license/SBOM release closure stays **NOT VERIFIED**.
 
 ## Still missing
 
