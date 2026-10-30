@@ -88,6 +88,7 @@ jobs:
           python3 scripts/audit_android_dependency_graph.py \
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
             --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --notice THIRD-PARTY-NOTICES.md \
             --output "${RUNNER_TEMP}/android-dependency-partial-inventory.json"
           python3 - <<'PY'
           import json
@@ -98,8 +99,10 @@ jobs:
           assert result["graphAudit"] == "PASS"
           assert result["inventoryCompleteness"] == "PARTIAL"
           assert result["licenseClosure"] == "NOT_VERIFIED"
+          assert result["noticeScopeCheck"] == "PASS"
+          assert result["noticeCompleteness"] == "PARTIAL"
           assert result["releaseApproved"] is False
-          print("PASS: resolved module inventory (app runtime and JVM tests), scope PARTIAL")
+          print("PASS: resolved app/test module inventory and partial NOTICE consistency")
           print("COUNTS:", result["componentCounts"])
           print("BLOCKED: full Gradle plugin/build-tool graph, licenses and final SBOM")
           PY
