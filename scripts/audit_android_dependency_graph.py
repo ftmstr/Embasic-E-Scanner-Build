@@ -126,14 +126,54 @@ def audit(runtime_text: str, test_text: str) -> dict:
     }
 
 
+# Only metadata labels; these strings are not proof of license grants.
+NOTICE_LABELS = {
+    "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21": "Apache-2.0",
+    "pkg:maven/org.jetbrains/annotations@13.0": "Apache-2.0",
+    "pkg:maven/junit/junit@4.13.2": "EPL-1.0",
+    "pkg:maven/org.hamcrest/hamcrest-core@1.3": "New BSD",
+}
+
+
+def check_partial_notice(inventory: dict, notice: str) -> None:
+    """Check each resolved coordinate has exactly one correctly labelled row.
+
+    This is a *partial consistency check*, not a full license review or SBOM.
+    Unknown future dependencies must fail until explicitly reviewed/recorded.
+    """
+    if "REVIEW INCOMPLETE" not in notice or "NOT a full SBOM" not in notice:
+        raise AuditError("NOTICE must explicitly state its incomplete scope")
+    purls = {item["purl"] for item in
+             inventory["runtimeComponents"] + inventory["testComponents"]}
+    for purl in sorted(purls):
+        rows = [line for line in notice.splitlines()
+                if line.startswith("|") and f"\x60{purl}\x60" in line]
+        if len(rows) != 1:
+            raise AuditError("missing or duplicate resolved Maven NOTICE row")
+        expected = NOTICE_LABELS.get(purl)
+        if expected is None or expected not in rows[0]:
+            raise AuditError("unreviewed Maven module or mismatched license label")
+        if "NOT VERIFIED" not in rows[0] and "review OPEN" not in rows[0]:
+            raise AuditError("NOTICE row makes unreviewed distribution claim")
+        if purl in (
+            "pkg:maven/junit/junit@4.13.2",
+            "pkg:maven/org.hamcrest/hamcrest-core@1.3",
+        ) and "tests ONLY" not in rows[0]:
+            raise AuditError("test-only module lacks runtime exclusion notice")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--test", type=Path, required=True)
+    parser.add_argument("--notice", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     try:
         result = audit(read_report(args.runtime), read_report(args.test))
+        check_partial_notice(result, read_report(args.notice))
+        result["noticeScopeCheck"] = "PASS"
+        result["noticeCompleteness"] = "PARTIAL"
     except AuditError as exc:
         print("BLOCKED: dependency graph audit: " + str(exc), file=sys.stderr)
         return 2
