@@ -52,8 +52,8 @@ copied.
 
 The following exact Maven package coordinates were observed in PUBLIC Android
 Gradle dependency reports at commit
-\`1c3a71de0e78f2aedbb598701a079a27fe8c8b00\`, GitHub Actions run
-\`41056487701\`, job \`124065200691\` (14 synthetic graph-audit tests PASS,
+`1c3a71de0e78f2aedbb598701a079a27fe8c8b00`, GitHub Actions run
+`41056487701`, job `124065200691` (14 synthetic graph-audit tests PASS,
 6 Android JUnit tests PASS). This is **NOT a full SBOM**, and Maven POM
 license metadata is not proof of artifact bytes, legal clearance or product
 release. Gradle plugins/build tooling, Android SDK and release variants are
@@ -61,10 +61,10 @@ outside this scoped inventory.
 
 | Exact resolved Maven purl | Scope | Supplier POM license metadata |
 | --- | --- | --- |
-| \`pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
-| \`pkg:maven/org.jetbrains/annotations@13.0\` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
-| \`pkg:maven/junit/junit@4.13.2\` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
-| \`pkg:maven/org.hamcrest/hamcrest-core@1.3\` | JVM local tests ONLY; absent from Android debug runtime | New BSD (test-only boundary, redistribution review OPEN) |
+| `pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
+| `pkg:maven/org.jetbrains/annotations@13.0` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
+| `pkg:maven/junit/junit@4.13.2` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
+| `pkg:maven/org.hamcrest/hamcrest-core@1.3` | JVM local tests ONLY; absent from Android debug runtime | New BSD (test-only boundary, redistribution review OPEN) |
 
 Publisher metadata (not independently verified byte-for-byte license texts):
 - https://central.sonatype.com/artifact/org.jetbrains.kotlin/kotlin-stdlib/2.3.21
