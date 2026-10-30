@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -79,4 +79,27 @@ jobs:
               raise SystemExit("BLOCKED: EPL JUnit or BSD Hamcrest leaked into production runtime")
           print("PASS: 2 reviewed test-only modules isolated from debugRuntimeClasspath")
           print("NOT VERIFIED: full transitive license inventory, binary provenance, release SBOM")
+          PY
+      - name: Audit resolved app and test configurations (partial inventory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_android_dependency_graph.py' -v
+          python3 scripts/audit_android_dependency_graph.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/android-dependency-partial-inventory.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "android-dependency-partial-inventory.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["graphAudit"] == "PASS"
+          assert result["inventoryCompleteness"] == "PARTIAL"
+          assert result["licenseClosure"] == "NOT_VERIFIED"
+          assert result["releaseApproved"] is False
+          print("PASS: resolved module inventory (app runtime and JVM tests), scope PARTIAL")
+          print("COUNTS:", result["componentCounts"])
+          print("BLOCKED: full Gradle plugin/build-tool graph, licenses and final SBOM")
           PY
