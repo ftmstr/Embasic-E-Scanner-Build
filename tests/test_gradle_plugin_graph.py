@@ -47,6 +47,23 @@ class PluginGraphTests(unittest.TestCase):
         with self.assertRaises(mod.AuditError):
             mod.audit(FIXTURE.replace("org.example:indirect:1.0 -> 2.0", "org.example:indirect:1.0 FAILED").encode())
 
+    def test_strict_constraint_selected_version_is_resolved(self):
+        actual = FIXTURE.replace(
+            "org.example:indirect:1.0 -> 2.0",
+            "org.example:indirect:{strictly 2.0.21} -> 2.0.21 (c)")
+        result = mod.audit(actual.encode())
+        self.assertIn(
+            "pkg:maven/org.example/indirect@2.0.21",
+            [x["purl"] for x in result["root"]]
+        )
+
+    def test_unresolved_strict_constraint_is_blocked(self):
+        actual = FIXTURE.replace(
+            "org.example:indirect:1.0 -> 2.0",
+            "org.example:indirect:{strictly 2.0.21}")
+        with self.assertRaises(mod.AuditError):
+            mod.audit(actual.encode())
+
     def test_invalid_selected_version_blocks(self):
         with self.assertRaises(mod.AuditError):
             mod.audit(FIXTURE.replace("indirect:1.0 -> 2.0", "indirect:1.0 -> 2.+").encode())
