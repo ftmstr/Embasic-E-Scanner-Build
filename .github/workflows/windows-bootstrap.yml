@@ -1,9 +1,9 @@
 name: Windows bootstrap
 on:
   push:
-    paths: ['windows/**', '.github/workflows/windows-bootstrap.yml']
+    paths: ['windows/**', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
   pull_request:
-    paths: ['windows/**', '.github/workflows/windows-bootstrap.yml']
+    paths: ['windows/**', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
 permissions:
   contents: read
 jobs:
@@ -19,3 +19,19 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet build windows/Embasic.EScanner.Bootstrap/Embasic.EScanner.Bootstrap.csproj -c Release
       - run: dotnet run --project windows/Embasic.EScanner.Bootstrap/Embasic.EScanner.Bootstrap.csproj -c Release --no-build
+      - name: Build contract and synthetic PDF self-test
+        run: dotnet build windows/Embasic.EScanner.SelfTest/Embasic.EScanner.SelfTest.csproj -c Release
+      - name: Verify contract and synthetic PDF fixture
+        run: dotnet run --project windows/Embasic.EScanner.SelfTest/Embasic.EScanner.SelfTest.csproj -c Release --no-build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Audit restored Windows .NET10 foundation dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s tests -p test_dotnet_foundation.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/audit_dotnet_foundation.py --windows-root windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: Windows App SDK/WinUI3, SDK reference packs, signing and full SBOM'

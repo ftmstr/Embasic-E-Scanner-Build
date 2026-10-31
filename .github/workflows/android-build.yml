@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -21,13 +23,143 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f android/gradle/wrapper/gradle-wrapper.jar ]]; then
-            echo 'BLOCKED: Android wrapper provenance not approved; no downloaded or private wrapper binary is trusted.'
-            exit 1
-          fi
+          test -x android/gradlew || { echo '::error::Android gradlew missing or not executable'; exit 2; }
+          cd android
+          test -f gradle/wrapper/gradle-wrapper.jar || { echo '::error::Missing reviewed wrapper JAR'; exit 2; }
+          grep -Fx 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.6-bin.zip' gradle/wrapper/gradle-wrapper.properties
+          grep -Fx 'distributionSha256Sum=7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24' gradle/wrapper/gradle-wrapper.properties
+          grep -Fx 'ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0' gradle/wrapper/gradle-wrapper.jar.sha256
+          sha256sum --check <<'SHA256'
+          ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0  gradle/wrapper/gradle-wrapper.jar
+          SHA256
       - name: Android unit tests and lint (after source audit)
         shell: bash
         run: |
           set -euo pipefail
           cd android
           ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+      - name: Require executed JUnit test cases (not NO-SOURCE)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          xmls = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          if not xmls:
+              raise SystemExit("BLOCKED: JUnit XML absent; task may have been NO-SOURCE")
+          tests = failures = errors = skipped = 0
+          for xml in xmls:
+              root = ET.parse(xml).getroot()
+              tests += int(root.get("tests", "0"))
+              failures += int(root.get("failures", "0"))
+              errors += int(root.get("errors", "0"))
+              skipped += int(root.get("skipped", "0"))
+          print(f"JUnit cases={tests}, failures={failures}, errors={errors}, skipped={skipped}")
+          if tests == 0 or failures or errors or skipped:
+              raise SystemExit("BLOCKED: JUnit not fully executed or not passing")
+          PY
+      - name: Inspect JVM test-only licensing boundary (not an SBOM)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew --no-daemon :app:dependencies --configuration debugRuntimeClasspath > "${RUNNER_TEMP}/android-debug-runtime-deps.txt"
+          ./gradlew --no-daemon :app:dependencies --configuration debugUnitTestRuntimeClasspath > "${RUNNER_TEMP}/android-jvm-test-deps.txt"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          folder = Path(os.environ["RUNNER_TEMP"])
+          release = (folder / "android-debug-runtime-deps.txt").read_text()
+          testing = (folder / "android-jvm-test-deps.txt").read_text()
+          require_test = ("junit:junit:4.13.2", "org.hamcrest:hamcrest-core:1.3")
+          if not all(value in testing for value in require_test):
+              raise SystemExit("BLOCKED: reviewed JUnit/Hamcrest test graph changed")
+          if any(value in release for value in require_test):
+              raise SystemExit("BLOCKED: EPL JUnit or BSD Hamcrest leaked into production runtime")
+          print("PASS: 2 reviewed test-only modules isolated from debugRuntimeClasspath")
+          print("NOT VERIFIED: full transitive license inventory, binary provenance, release SBOM")
+          PY
+      - name: Collect resolved Gradle plugin buildEnvironment evidence (not SBOM)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew --no-daemon buildEnvironment :app:buildEnvironment > "${RUNNER_TEMP}/gradle-build-environment.txt"
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import re
+          path = Path(os.environ["RUNNER_TEMP"]) / "gradle-build-environment.txt"
+          raw = path.read_bytes()
+          print("PLUGIN_GRAPH_CAPTURE_BYTES:", len(raw))
+          print("PLUGIN_GRAPH_CAPTURE_SHA256:", hashlib.sha256(raw).hexdigest())
+          lines = raw.decode("utf-8", errors="replace").splitlines()
+          for line in lines:
+              if (line.startswith("> Task ") or line.startswith("classpath -")
+                      or line.startswith("BUILD SUCCESSFUL") or "No dependencies" in line):
+                  print("PLUGIN_GRAPH_STRUCTURE:", line[:200])
+          coords = sorted(set(re.findall(
+              r"[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[0-9][A-Za-z0-9_.-]*", "\n".join(lines))))
+          print("PLUGIN_GRAPH_COORDINATE_CANDIDATES:", len(coords))
+          for coordinate in coords[:12]:
+              print("PLUGIN_GRAPH_SAMPLE:", coordinate)
+          print("NOT VERIFIED: plugin/build tool full transitive licensing or SBOM")
+          PY
+      - name: Audit pinned root and app Gradle plugin buildEnvironment graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle_plugin_graph.py' -v
+          python3 scripts/audit_gradle_plugin_graph.py \
+            --input "${RUNNER_TEMP}/gradle-build-environment.txt" \
+            --output "${RUNNER_TEMP}/gradle-plugin-partial-inventory.json"
+          echo '::notice::Plugin graph coordinates recorded; binary license and complete SBOM NOT VERIFIED'
+      - name: Audit resolved app and test configurations (partial inventory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_android_dependency_graph.py' -v
+          python3 scripts/audit_android_dependency_graph.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --notice THIRD-PARTY-NOTICES.md \
+            --output "${RUNNER_TEMP}/android-dependency-partial-inventory.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "android-dependency-partial-inventory.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["graphAudit"] == "PASS"
+          assert result["inventoryCompleteness"] == "PARTIAL"
+          assert result["licenseClosure"] == "NOT_VERIFIED"
+          assert result["noticeScopeCheck"] == "PASS"
+          assert result["noticeCompleteness"] == "PARTIAL"
+          assert result["releaseApproved"] is False
+          print("PASS: resolved app/test module inventory and partial NOTICE consistency")
+          print("COUNTS:", result["componentCounts"])
+          print("BLOCKED: full Gradle plugin/build-tool graph, licenses and final SBOM")
+          PY
+      - name: Hash actual Gradle cached JARs from scoped resolved graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_android_cached_artifacts.py' -v
+          python3 scripts/audit_android_cached_artifacts.py \
+            --inventory "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/android-resolved-jar-hashes.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "android-resolved-jar-hashes.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["sourceVerification"] == "LOCAL_SHA256_ONLY"
+          assert result["transitiveLicenseClosure"] == "NOT_VERIFIED"
+          assert result["releaseApproved"] is False
+          print("HASHED_CACHED_MAVEN_ARTIFACTS:", result["artifactCount"])
+          print("NOT VERIFIED: remote Maven publication, binary provenance, package license rights or release")
+          PY
