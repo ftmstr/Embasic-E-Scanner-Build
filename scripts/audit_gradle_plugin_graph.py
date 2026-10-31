@@ -63,7 +63,7 @@ def audit(raw: bytes) -> dict:
         group, name, requested, selected = edge.groups()
         version = selected or requested
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", version):
-            raise AuditError("unbounded or malformed selected plugin version")
+            raise AuditError("unbounded/malformed selected plugin version: " + repr(version) + " on " + repr(line[:180]))
         key = (group, name)
         previous = scopes[active].get(key)
         if previous is not None and previous != version:
