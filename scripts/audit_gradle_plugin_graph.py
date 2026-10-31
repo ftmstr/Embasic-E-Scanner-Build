@@ -16,7 +16,7 @@ import sys
 MAX_BYTES = 3_000_000
 EDGE = re.compile(
     r"^[ |]*[+\\]---\s+([A-Za-z0-9_.-]+):([A-Za-z0-9_.-]+):"
-    r"([^\s()]+)(?:\s+->\s+([^\s()]+))?"
+    r"(\{[^}]+\}|[^\s()]+)(?:\s+->\s+([^\s()]+))?"
 )
 EXPECTED_PLUGINS = {
     ("com.android.tools.build", "gradle"): "8.13.2",
