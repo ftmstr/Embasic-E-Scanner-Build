@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -132,4 +132,25 @@ jobs:
           print("PASS: resolved app/test module inventory and partial NOTICE consistency")
           print("COUNTS:", result["componentCounts"])
           print("BLOCKED: full Gradle plugin/build-tool graph, licenses and final SBOM")
+          PY
+      - name: Hash actual Gradle cached JARs from scoped resolved graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_android_cached_artifacts.py' -v
+          python3 scripts/audit_android_cached_artifacts.py \
+            --inventory "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/android-resolved-jar-hashes.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "android-resolved-jar-hashes.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["sourceVerification"] == "LOCAL_SHA256_ONLY"
+          assert result["transitiveLicenseClosure"] == "NOT_VERIFIED"
+          assert result["releaseApproved"] is False
+          print("HASHED_CACHED_MAVEN_ARTIFACTS:", result["artifactCount"])
+          print("NOT VERIFIED: remote Maven publication, binary provenance, package license rights or release")
           PY
