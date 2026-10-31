@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -107,6 +107,15 @@ jobs:
               print("PLUGIN_GRAPH_SAMPLE:", coordinate)
           print("NOT VERIFIED: plugin/build tool full transitive licensing or SBOM")
           PY
+      - name: Audit pinned root and app Gradle plugin buildEnvironment graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle_plugin_graph.py' -v
+          python3 scripts/audit_gradle_plugin_graph.py \
+            --input "${RUNNER_TEMP}/gradle-build-environment.txt" \
+            --output "${RUNNER_TEMP}/gradle-plugin-partial-inventory.json"
+          echo '::notice::Plugin graph coordinates recorded; binary license and complete SBOM NOT VERIFIED'
       - name: Audit resolved app and test configurations (partial inventory)
         shell: bash
         run: |
