@@ -80,6 +80,33 @@ jobs:
           print("PASS: 2 reviewed test-only modules isolated from debugRuntimeClasspath")
           print("NOT VERIFIED: full transitive license inventory, binary provenance, release SBOM")
           PY
+      - name: Collect resolved Gradle plugin buildEnvironment evidence (not SBOM)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew --no-daemon buildEnvironment :app:buildEnvironment > "${RUNNER_TEMP}/gradle-build-environment.txt"
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import re
+          path = Path(os.environ["RUNNER_TEMP"]) / "gradle-build-environment.txt"
+          raw = path.read_bytes()
+          print("PLUGIN_GRAPH_CAPTURE_BYTES:", len(raw))
+          print("PLUGIN_GRAPH_CAPTURE_SHA256:", hashlib.sha256(raw).hexdigest())
+          lines = raw.decode("utf-8", errors="replace").splitlines()
+          for line in lines:
+              if (line.startswith("> Task ") or line.startswith("classpath -")
+                      or line.startswith("BUILD SUCCESSFUL") or "No dependencies" in line):
+                  print("PLUGIN_GRAPH_STRUCTURE:", line[:200])
+          coords = sorted(set(re.findall(
+              r"[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[0-9][A-Za-z0-9_.-]*", "\n".join(lines))))
+          print("PLUGIN_GRAPH_COORDINATE_CANDIDATES:", len(coords))
+          for coordinate in coords[:12]:
+              print("PLUGIN_GRAPH_SAMPLE:", coordinate)
+          print("NOT VERIFIED: plugin/build tool full transitive licensing or SBOM")
+          PY
       - name: Audit resolved app and test configurations (partial inventory)
         shell: bash
         run: |
