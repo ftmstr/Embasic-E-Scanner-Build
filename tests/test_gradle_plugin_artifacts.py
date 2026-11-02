@@ -153,6 +153,50 @@ class PluginArtifactEvidenceTests(unittest.TestCase):
             kotlin = next(x for x in result["modules"] if x["purl"] == KOTLIN)
             self.assertEqual(kotlin["cacheStatus"], "NO_LOCAL_EVIDENCE")
 
+    def test_correct_partial_notice_counter_is_accepted(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, _, _ = synthetic(Path(directory))
+            result = mod.audit(load(inp), cache)
+            notice = ("# Partial NOTICE: NOT a complete SBOM\n"
+                      "UNVERIFIED_SUPPLIER_POM; releaseApproved=false\n"
+                      "- pluginModules: 2\n"
+                      "- pluginLicenseNameMetadata: 1\n"
+                      "- pluginMissingLicenseMetadata: 1\n"
+                      "- pluginCachedFileHashes: 2\n")
+            mod.check_partial_notice(result, notice)
+
+    def test_stale_license_count_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, _, _ = synthetic(Path(directory))
+            result = mod.audit(load(inp), cache)
+            notice = ("NOT a complete SBOM; UNVERIFIED_SUPPLIER_POM; releaseApproved=false\n"
+                      "- pluginModules: 2\n"
+                      "- pluginLicenseNameMetadata: 2\n"
+                      "- pluginMissingLicenseMetadata: 0\n"
+                      "- pluginCachedFileHashes: 2\n")
+            with self.assertRaises(mod.AuditError):
+                mod.check_partial_notice(result, notice)
+
+    def test_duplicate_plugin_hash_counter_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, _, _ = synthetic(Path(directory))
+            result = mod.audit(load(inp), cache)
+            notice = ("NOT a complete SBOM; UNVERIFIED_SUPPLIER_POM; releaseApproved=false\n"
+                      "- pluginModules: 2\n"
+                      "- pluginLicenseNameMetadata: 1\n"
+                      "- pluginMissingLicenseMetadata: 1\n"
+                      "- pluginCachedFileHashes: 2\n"
+                      "- pluginCachedFileHashes: 2\n")
+            with self.assertRaises(mod.AuditError):
+                mod.check_partial_notice(result, notice)
+
+    def test_misleading_complete_notice_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, _, _ = synthetic(Path(directory))
+            result = mod.audit(load(inp), cache)
+            with self.assertRaises(mod.AuditError):
+                mod.check_partial_notice(result, "ALL LICENSES APPROVED\n")
+
     def test_oversized_metadata_is_not_accepted(self):
         self.assertEqual(mod._licenses(b"x" * (mod.MAX_METADATA + 1))[0]["name"],
                          "UNREADABLE_OVERSIZE_POM")
