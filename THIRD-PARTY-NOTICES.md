@@ -80,6 +80,41 @@ Every new resolved runtime/test Maven component requires a source-backed
 NOTICE entry before the graph audit can pass. Even if all listed entries
 exist, full product license/SBOM release closure stays **NOT VERIFIED**.
 
+## Gradle build-tool root plugin transitive inventory — 2 November 2026
+
+**NOT a complete SBOM. Review is incomplete.** These are local CI
+build-tool cache observations, NOT the E-Scanner app release dependency
+graph or a product-license approval. No downstream APK/AAB contains
+these entire compiler/build-time dependencies merely because they appear
+in the root Gradle plugin classpath.
+
+The publicly linked Android buildEnvironment audit and local-cache verifier
+recorded the following exact snapshot, with hashed binary/metadata evidence
+retained as a GitHub Actions artifact:
+
+- pluginModules: 147
+- pluginLicenseNameMetadata: 105
+- pluginMissingLicenseMetadata: 42
+- pluginCachedFileHashes: 292
+
+All 147 selected Maven modules had at least one local cached file hashed;
+292 cached files were SHA-256 fingerprinted. Supplier POM license-name
+metadata was available for only 105 modules. The other 42 modules have
+no extracted POM license name; they MUST NOT be marked approved.
+Even the 105 source labels are **UNVERIFIED_SUPPLIER_POM**, not legal or
+binary-provenance approval. `originVerified=false`,
+`sbomComplete=false`, `releaseApproved=false`.
+
+Evidence: PUBLIC GitHub Actions run 41383659693, job 125079669267,
+artifact `android-foundation-dependency-evidence` (14-day retention).
+https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/41383659693
+
+**Unresolved release gates:** actual Maven repository provenance/signatures,
+binary publisher authenticity, transitive legal rights, license text retention,
+all per-module notices, complete SPDX/CycloneDX/SBOM, Windows App SDK and
+signed distributables. This section is a CI-scoped **PARTIAL** inventory,
+not a complete third-party notices release obligation inventory.
+
 ## Still missing
 
 The PUBLIC repository's owner-approved **product LICENSE**, complete Android
