@@ -124,6 +124,7 @@ jobs:
           python3 scripts/audit_gradle_plugin_artifacts.py \
             --graph "${RUNNER_TEMP}/gradle-plugin-partial-inventory.json" \
             --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --notice THIRD-PARTY-NOTICES.md \
             --output "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json"
           python3 - <<'PY'
           import json
@@ -134,6 +135,7 @@ jobs:
           counts = data["counts"]
           assert counts["modules"] == counts["withLocalBytes"] + counts["withoutLocalBytes"]
           assert data["status"] == "PASS_WITH_GAPS"
+          assert data["partialNoticeCheck"] == "PASS"
           assert data["releaseApproved"] is False and data["sbomComplete"] is False
           assert data["licenseApproval"] == "NOT_VERIFIED" and data["originVerified"] is False
           print("PLUGIN_CACHE_HASHED:", counts["hashedFiles"])
