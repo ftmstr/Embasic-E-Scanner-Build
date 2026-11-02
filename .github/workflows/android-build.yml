@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -116,6 +116,31 @@ jobs:
             --input "${RUNNER_TEMP}/gradle-build-environment.txt" \
             --output "${RUNNER_TEMP}/gradle-plugin-partial-inventory.json"
           echo '::notice::Plugin graph coordinates recorded; binary license and complete SBOM NOT VERIFIED'
+      - name: Audit scoped Gradle plugin local artifact bytes and POM claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle_plugin_artifacts.py' -v
+          python3 scripts/audit_gradle_plugin_artifacts.py \
+            --graph "${RUNNER_TEMP}/gradle-plugin-partial-inventory.json" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-plugin-artifact-evidence.json"
+          data = json.loads(p.read_text(encoding="utf-8"))
+          counts = data["counts"]
+          assert counts["modules"] == counts["withLocalBytes"] + counts["withoutLocalBytes"]
+          assert data["status"] == "PASS_WITH_GAPS"
+          assert data["releaseApproved"] is False and data["sbomComplete"] is False
+          assert data["licenseApproval"] == "NOT_VERIFIED" and data["originVerified"] is False
+          print("PLUGIN_CACHE_HASHED:", counts["hashedFiles"])
+          print("PLUGIN_CACHE_UNVERIFIED_MODULES:", counts["withoutLocalBytes"])
+          print("PLUGIN_POM_LICENSING_METADATA_ROWS:", counts["pomWithLicenseNames"])
+          print("NOT VERIFIED: publication origin, complete transitive notices and signing")
+          PY
       - name: Audit resolved app and test configurations (partial inventory)
         shell: bash
         run: |
@@ -163,3 +188,14 @@ jobs:
           print("HASHED_CACHED_MAVEN_ARTIFACTS:", result["artifactCount"])
           print("NOT VERIFIED: remote Maven publication, binary provenance, package license rights or release")
           PY
+      - name: Retain scoped dependency evidence (NOT a verified SBOM)
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-foundation-dependency-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/gradle-plugin-partial-inventory.json
+            ${{ runner.temp }}/gradle-plugin-artifact-evidence.json
+            ${{ runner.temp }}/android-dependency-partial-inventory.json
+            ${{ runner.temp }}/android-resolved-jar-hashes.json
