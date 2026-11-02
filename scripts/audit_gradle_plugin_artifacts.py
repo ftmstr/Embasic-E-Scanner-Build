@@ -188,16 +188,39 @@ def audit(graph: dict, cache: Path) -> dict:
     }
 
 
+def check_partial_notice(result: dict, notice: str) -> None:
+    """Fail closed on stale/relabelled snapshot numbers, never approve licenses."""
+    if ("NOT a complete SBOM" not in notice
+            or "UNVERIFIED_SUPPLIER_POM" not in notice
+            or "releaseApproved=false" not in notice):
+        raise AuditError("missing partial NOTICE no-release boundary")
+    counts = result["counts"]
+    expected = {
+        "pluginModules": counts["modules"],
+        "pluginLicenseNameMetadata": counts["pomWithLicenseNames"],
+        "pluginMissingLicenseMetadata":
+            counts["modules"] - counts["pomWithLicenseNames"],
+        "pluginCachedFileHashes": counts["hashedFiles"],
+    }
+    for name, count in expected.items():
+        marker = f"- {name}: {count}"
+        if notice.splitlines().count(marker) != 1:
+            raise AuditError("stale or duplicate partial plugin NOTICE counter: " + name)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--graph", type=Path, required=True)
     p.add_argument("--cache", type=Path, required=True)
+    p.add_argument("--notice", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args(argv)
     try:
         raw = _file_bytes(args.graph, MAX_INPUT)
         graph = json.loads(raw)
         result = audit(graph, args.cache)
+        check_partial_notice(result, _file_bytes(args.notice, MAX_INPUT).decode("utf-8"))
+        result["partialNoticeCheck"] = "PASS"
         args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n",
                                encoding="utf-8")
     except (AuditError, OSError, UnicodeError, ValueError, TypeError) as exc:
