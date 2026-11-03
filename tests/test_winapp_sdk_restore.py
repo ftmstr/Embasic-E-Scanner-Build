@@ -43,7 +43,9 @@ class WinAppSDKRestoreAuditTests(unittest.TestCase):
             self.assertEqual(result["counts"]["supplierLicenseDeclarations"], 1)
             self.assertFalse(result["releaseApproved"])
             self.assertFalse(result["nativeWinuiVerified"])
-            self.assertEqual(result["components"][0]["supplierLicense"]["evidence"],
+            winapp = next(x for x in result["components"] if
+                          x["purl"] == "pkg:nuget/microsoft.windowsappsdk@2.6.4")
+            self.assertEqual(winapp["supplierLicense"]["evidence"],
                              "UNVERIFIED_NUGET_NUSPEC")
 
     def test_wrong_windows_app_sdk_version_fails(self):
