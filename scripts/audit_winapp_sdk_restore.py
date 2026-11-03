@@ -102,9 +102,13 @@ def audit(raw: bytes, packages_root: Path) -> dict:
         if sha512:
             try:
                 # NuGet project.assets.json uses 'sha512-<base64>' package digests.
-                if not isinstance(sha512, str) or not sha512.startswith("sha512-"):
-                    raise ValueError("missing sha512 metadata prefix")
-                if len(base64.b64decode(sha512[7:], validate=True)) != 64:
+                if not isinstance(sha512, str):
+                    raise ValueError("non-string digest metadata")
+                # Real NuGet project.assets.json uses either raw 88-char
+                # base64 or an integrity-style 'sha512-' prefix. Both must
+                # decode to precisely 64 bytes; neither is a publisher proof.
+                value = sha512[7:] if sha512.startswith("sha512-") else sha512
+                if len(base64.b64decode(value, validate=True)) != 64:
                     raise ValueError("wrong digest length")
             except (ValueError, base64.binascii.Error) as exc:
                 observed_prefix = ("sha512-" if isinstance(sha512, str)
