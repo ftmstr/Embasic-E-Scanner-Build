@@ -71,6 +71,15 @@ class WinAppSDKRestoreAuditTests(unittest.TestCase):
             with self.assertRaises(mod.AuditError):
                 mod.audit(json.dumps(assets).encode(), cache)
 
+    def test_actual_nuget_raw_base64_digest_is_accepted(self):
+        with TemporaryDirectory() as directory:
+            assets, cache = setup(Path(directory))
+            raw_digest = base64.b64encode(b"y" * 64).decode()
+            assets["libraries"]["Microsoft.Web.WebView2/1.0.3719.77"]["sha512"] = raw_digest
+            result = mod.audit(json.dumps(assets).encode(), cache)
+            self.assertEqual(result["counts"]["sha512Present"], 2)
+            self.assertFalse(result["publisherVerified"])
+
     def test_bogus_sha512_metadata_rejected(self):
         with TemporaryDirectory() as directory:
             assets, cache = setup(Path(directory))
