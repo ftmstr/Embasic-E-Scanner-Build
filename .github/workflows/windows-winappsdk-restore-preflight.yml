@@ -1,0 +1,71 @@
+name: Windows App SDK 2.6.4 isolated NuGet restore (NOT a product build)
+'on':
+  push:
+    paths:
+      - '.github/workflows/windows-winappsdk-restore-preflight.yml'
+      - 'scripts/audit_winapp_sdk_restore.py'
+      - 'tests/test_winapp_sdk_restore.py'
+  pull_request:
+    paths:
+      - '.github/workflows/windows-winappsdk-restore-preflight.yml'
+      - 'scripts/audit_winapp_sdk_restore.py'
+      - 'tests/test_winapp_sdk_restore.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-restore:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run closed-world NuGet restore security regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s tests -p test_winapp_sdk_restore.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Restore WinAppSDK only in disposable .NET10 Windows probe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $probe = Join-Path $env:RUNNER_TEMP 'embasic-windowsapp-sdk-isolated-probe'
+          $packages = Join-Path $probe 'packages'
+          New-Item -ItemType Directory -Force -Path $probe | Out-Null
+          @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup><TargetFramework>net10.0-windows10.0.26100.0</TargetFramework></PropertyGroup>
+            <ItemGroup><PackageReference Include="Microsoft.WindowsAppSDK" Version="[2.6.4]" /></ItemGroup>
+          </Project>
+          '@ | Set-Content -Path (Join-Path $probe 'Probe.csproj') -Encoding utf8
+          @'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+          </configuration>
+          '@ | Set-Content -Path (Join-Path $probe 'NuGet.Config') -Encoding utf8
+          Write-Output 'Disposable Windows-specific TFM, exact WindowsAppSDK 2.6.4 NuGet pin; product code untouched'
+          dotnet restore (Join-Path $probe 'Probe.csproj') --configfile (Join-Path $probe 'NuGet.Config') --packages $packages --disable-parallel --force --verbosity minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $evidence = Join-Path $env:RUNNER_TEMP 'windowsapp-sdk-restore-evidence.json'
+          python scripts/audit_winapp_sdk_restore.py --assets (Join-Path $probe 'obj/project.assets.json') --packages $packages --output $evidence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: runtime execution, WinUI XAML build, package publisher signature, license closure or product release'
+      - name: Retain isolated NuGet restore evidence (NOT SBOM)
+        uses: actions/upload-artifact@v4
+        with:
+          name: winappsdk-2.6.4-isolated-nuget-evidence
+          retention-days: 14
+          if-no-files-found: error
+          path: ${{ runner.temp }}/windowsapp-sdk-restore-evidence.json
