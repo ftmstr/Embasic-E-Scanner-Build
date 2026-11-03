@@ -141,6 +141,16 @@ jobs:
           print("PLUGIN_CACHE_HASHED:", counts["hashedFiles"])
           print("PLUGIN_CACHE_UNVERIFIED_MODULES:", counts["withoutLocalBytes"])
           print("PLUGIN_POM_LICENSING_METADATA_ROWS:", counts["pomWithLicenseNames"])
+          gaps = data["missingDirectLicenseEvidence"]
+          assert len(gaps) == counts["modules"] - counts["pomWithLicenseNames"]
+          assert data["parentLicenseInheritanceVerified"] is False
+          print("POM_GAP_REASON_COUNTS:", {k: counts[k] for k in
+                ("pomNotCached", "pomWithoutDirectLicenseName", "unreadablePom",
+                 "pomHasUnresolvedParent")})
+          for gap in gaps:
+              print("POM_LICENSE_GAP:", gap["purl"], gap["reason"],
+                    "PARENT_UNVERIFIED:", ",".join(gap["unresolvedPomParents"]))
+          print("NOT VERIFIED: POM parent inheritance, publisher identity, legal rights, SBOM")
           print("NOT VERIFIED: publication origin, complete transitive notices and signing")
           PY
       - name: Audit resolved app and test configurations (partial inventory)
