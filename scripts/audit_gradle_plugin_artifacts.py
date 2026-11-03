@@ -61,6 +61,24 @@ def _licenses(raw: bytes) -> list[dict]:
     return sorted(names, key=lambda x: (x["name"], x["url"]))
 
 
+def _pom_parent(raw: bytes) -> str | None:
+    """Unverified, explicitly unresolved POM parent reference; no license inheritance."""
+    if len(raw) > MAX_METADATA:
+        return None
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return None
+    parent = root.find("{*}parent")
+    if parent is None:
+        return None
+    coordinates = [(parent.findtext("{*}" + tag) or "").strip()
+                   for tag in ("groupId", "artifactId", "version")]
+    if all(coordinates) and all(_safe_segment(value) for value in coordinates):
+        return ":".join(coordinates)[:512]
+    return None
+
+
 def audit(graph: dict, cache: Path) -> dict:
     if (graph.get("status") != "PASS"
             or graph.get("inventoryCompleteness") != "PARTIAL"
@@ -92,6 +110,8 @@ def audit(graph: dict, cache: Path) -> dict:
             record = modules.setdefault(purl, {
                 "purl": purl, "scopes": [], "cachedFiles": [],
                 "pomDeclaredLicenses": [], "cacheStatus": "NOT_CHECKED",
+                "pomFilesSeen": 0, "unresolvedPomParents": [],
+                "licenseMetadataState": "NOT_CHECKED",
             })
             if scope in record["scopes"]:
                 raise AuditError("duplicate selected Maven purl in one scope")
@@ -105,7 +125,9 @@ def audit(graph: dict, cache: Path) -> dict:
 
     totals = {"modules": len(modules), "withLocalBytes": 0,
               "withoutLocalBytes": 0, "hashedFiles": 0,
-              "unreadablePom": 0, "pomWithLicenseNames": 0}
+              "unreadablePom": 0, "pomWithLicenseNames": 0,
+              "pomWithoutDirectLicenseName": 0, "pomNotCached": 0,
+              "pomHasUnresolvedParent": 0}
     for purl, record in sorted(modules.items()):
         group, name, version = PURL.fullmatch(purl).groups()
         base = cache / group / name / version
@@ -113,6 +135,8 @@ def audit(graph: dict, cache: Path) -> dict:
             raise AuditError("symlinked selected module cache directory")
         if not base.is_dir():
             record["cacheStatus"] = "NO_LOCAL_EVIDENCE"
+            record["licenseMetadataState"] = "POM_NOT_CACHED"
+            totals["pomNotCached"] += 1
             totals["withoutLocalBytes"] += 1
             continue
         hashes = sorted(base.iterdir())
@@ -121,6 +145,8 @@ def audit(graph: dict, cache: Path) -> dict:
         found: list[dict] = []
         license_set: set[tuple[str, str]] = set()
         unreadable = False
+        pom_files = 0
+        parents: set[str] = set()
         for sub in hashes:
             if sub.is_symlink():
                 raise AuditError("symlinked Gradle cache digest")
@@ -148,7 +174,12 @@ def audit(graph: dict, cache: Path) -> dict:
                               "sha256": digest.hexdigest(),
                               "sourceVerification": "LOCAL_BYTES_ONLY"})
                 if file.suffix.lower() == ".pom":
-                    for lic in _licenses(_file_bytes(file, MAX_FILE)):
+                    pom_files += 1
+                    content = _file_bytes(file, MAX_FILE)
+                    parent = _pom_parent(content)
+                    if parent:
+                        parents.add(parent)
+                    for lic in _licenses(content):
                         if lic["name"].startswith("UNREADABLE_"):
                             unreadable = True
                         else:
@@ -166,8 +197,21 @@ def audit(graph: dict, cache: Path) -> dict:
                 record["cacheStatus"] = "NO_LOCAL_EVIDENCE"
             totals["withoutLocalBytes"] += 1
         totals["hashedFiles"] += len(found)
+        record["pomFilesSeen"] = pom_files
+        record["unresolvedPomParents"] = sorted(parents)
         if license_set:
+            record["licenseMetadataState"] = "DIRECT_POM_LICENSE_NAME"
             totals["pomWithLicenseNames"] += 1
+        elif unreadable:
+            record["licenseMetadataState"] = "UNREADABLE_POM"
+        elif pom_files:
+            record["licenseMetadataState"] = "POM_WITHOUT_DIRECT_LICENSE_NAME"
+            totals["pomWithoutDirectLicenseName"] += 1
+        else:
+            record["licenseMetadataState"] = "POM_NOT_CACHED"
+            totals["pomNotCached"] += 1
+        if parents:
+            totals["pomHasUnresolvedParent"] += 1
         if unreadable:
             totals["unreadablePom"] += 1
 
@@ -179,6 +223,13 @@ def audit(graph: dict, cache: Path) -> dict:
         "status": "PASS_WITH_GAPS",
         "modules": [modules[k] for k in sorted(modules)],
         "counts": totals,
+        "missingDirectLicenseEvidence": [
+            {"purl": record["purl"], "reason": record["licenseMetadataState"],
+             "unresolvedPomParents": record["unresolvedPomParents"]}
+            for record in (modules[key] for key in sorted(modules))
+            if not record["pomDeclaredLicenses"]
+        ],
+        "parentLicenseInheritanceVerified": False,
         "originVerified": False,
         "licenseApproval": "NOT_VERIFIED",
         "inventoryCompleteness": "PARTIAL",
@@ -195,6 +246,12 @@ def check_partial_notice(result: dict, notice: str) -> None:
             or "releaseApproved=false" not in notice):
         raise AuditError("missing partial NOTICE no-release boundary")
     counts = result["counts"]
+    if len(result["missingDirectLicenseEvidence"]) != (
+            counts["modules"] - counts["pomWithLicenseNames"]):
+        raise AuditError("POM-license gap list disagrees with resolved graph")
+    if (counts["pomWithoutDirectLicenseName"] + counts["pomNotCached"]
+            + counts["unreadablePom"] != len(result["missingDirectLicenseEvidence"])):
+        raise AuditError("POM-license gap reason totals are inconsistent")
     expected = {
         "pluginModules": counts["modules"],
         "pluginLicenseNameMetadata": counts["pomWithLicenseNames"],
@@ -229,6 +286,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     print(json.dumps({
         "status": result["status"], "counts": result["counts"],
+        "missingDirectLicenseEvidence": result["missingDirectLicenseEvidence"],
+        "parentLicenseInheritanceVerified": False,
         "originVerified": False, "licenseApproval": "NOT_VERIFIED",
         "sbomComplete": False, "releaseApproved": False,
     }, sort_keys=True))
