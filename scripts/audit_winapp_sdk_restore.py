@@ -98,8 +98,11 @@ def audit(raw: bytes, packages_root: Path) -> dict:
         sha512 = data.get("sha512")
         if sha512:
             try:
-                if len(base64.b64decode(sha512, validate=True)) != 64:
-                    raise ValueError("wrong length")
+                # NuGet project.assets.json uses 'sha512-<base64>' package digests.
+                if not isinstance(sha512, str) or not sha512.startswith("sha512-"):
+                    raise ValueError("missing sha512 metadata prefix")
+                if len(base64.b64decode(sha512[7:], validate=True)) != 64:
+                    raise ValueError("wrong digest length")
             except (ValueError, base64.binascii.Error) as exc:
                 raise AuditError("invalid NuGet package SHA512 metadata") from exc
             counts["sha512Present"] += 1
