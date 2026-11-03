@@ -77,6 +77,9 @@ def audit(raw: bytes, packages_root: Path) -> dict:
             "localNuspecSha256": None, "supplierLicense": "NOT_VERIFIED",
             "nugetSha512Metadata": data.get("sha512") or "NOT_VERIFIED",
         }
+        # Broken symlinks return False for exists(); reject before that check.
+        if path.is_symlink():
+            raise AuditError("symlinked NuGet package metadata")
         if path.exists():
             content = _read(path)
             record["localNuspecSha256"] = hashlib.sha256(content).hexdigest()
