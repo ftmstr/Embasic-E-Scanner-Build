@@ -197,6 +197,55 @@ class PluginArtifactEvidenceTests(unittest.TestCase):
             with self.assertRaises(mod.AuditError):
                 mod.check_partial_notice(result, "ALL LICENSES APPROVED\n")
 
+    def test_pom_missing_is_not_mislabeled_as_no_license_rights(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            pom.unlink()
+            result = mod.audit(load(inp), cache)
+            agp = next(x for x in result["modules"] if x["purl"] == AGP)
+            self.assertEqual(agp["licenseMetadataState"], "POM_NOT_CACHED")
+            self.assertEqual(agp["pomFilesSeen"], 0)
+            self.assertEqual(result["counts"]["pomNotCached"], 2)
+            self.assertFalse(result["parentLicenseInheritanceVerified"])
+
+    def test_pom_without_direct_license_retains_unverified_parent(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            pom.write_text('<project xmlns="http://maven.apache.org/POM/4.0.0">'
+                           '<parent><groupId>org.example</groupId>'
+                           '<artifactId>parent</artifactId>'
+                           '<version>1.0</version></parent></project>')
+            result = mod.audit(load(inp), cache)
+            agp = next(x for x in result["modules"] if x["purl"] == AGP)
+            self.assertEqual(agp["licenseMetadataState"], "POM_WITHOUT_DIRECT_LICENSE_NAME")
+            self.assertEqual(agp["unresolvedPomParents"], ["org.example:parent:1.0"])
+            self.assertEqual(result["counts"]["pomHasUnresolvedParent"], 1)
+            self.assertEqual(result["counts"]["pomWithoutDirectLicenseName"], 1)
+            self.assertEqual(agp["pomDeclaredLicenses"], [])
+
+    def test_invalid_cached_pom_has_separate_unreadable_status(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            pom.write_text("<project><unclosed>")
+            result = mod.audit(load(inp), cache)
+            agp = next(x for x in result["modules"] if x["purl"] == AGP)
+            self.assertEqual(agp["licenseMetadataState"], "UNREADABLE_POM")
+            self.assertEqual(result["counts"]["unreadablePom"], 1)
+            self.assertEqual(len(result["missingDirectLicenseEvidence"]), 2)
+
+    def test_partial_notice_rejects_tampered_license_reason_totals(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            result = mod.audit(load(inp), cache)
+            notice = ("NOT a complete SBOM; UNVERIFIED_SUPPLIER_POM; releaseApproved=false\\n"
+                      "- pluginModules: 2\\n"
+                      "- pluginLicenseNameMetadata: 1\\n"
+                      "- pluginMissingLicenseMetadata: 1\\n"
+                      "- pluginCachedFileHashes: 2\\n")
+            result["counts"]["pomNotCached"] = 4
+            with self.assertRaises(mod.AuditError):
+                mod.check_partial_notice(result, notice)
+
     def test_oversized_metadata_is_not_accepted(self):
         self.assertEqual(mod._licenses(b"x" * (mod.MAX_METADATA + 1))[0]["name"],
                          "UNREADABLE_OVERSIZE_POM")
