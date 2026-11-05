@@ -79,6 +79,73 @@ def _pom_parent(raw: bytes) -> str | None:
     return None
 
 
+def _parent_chain(first: str, cache: Path) -> list[dict]:
+    """Bounded cached POM ancestry hints, NOT inherited license approval.
+
+    Do not contact a repository, synthesize parent licenses, or mark supplier
+    metadata as verified. Absent parent POM files remain explicit gaps.
+    """
+    trail: list[dict] = []
+    seen: set[str] = set()
+    current: str | None = first
+    for _ in range(5):
+        if not current:
+            return trail
+        if current in seen:
+            raise AuditError("cyclic parent POM chain")
+        seen.add(current)
+        fields = current.split(":")
+        if len(fields) != 3 or any(not _safe_segment(x) for x in fields):
+            raise AuditError("unsafe parent POM coordinate")
+        group, artifact, version = fields
+        folder = cache / group / artifact / version
+        record = {"coordinate": current, "status": "PARENT_POM_NOT_CACHED",
+                  "sha256": None, "unverifiedLicenseNames": [],
+                  "licenseApproved": False}
+        if folder.is_symlink():
+            raise AuditError("symlinked parent POM directory")
+        if not folder.is_dir():
+            trail.append(record)
+            return trail
+        # Parent POMs are metadata only; no implicit dependency or license
+        # injection into selected Gradle buildEnvironment graph.
+        found = []
+        children = list(folder.iterdir())
+        if len(children) > MAX_COUNT:
+            raise AuditError("unbounded parent cache")
+        for entry in children:
+            if entry.is_symlink():
+                raise AuditError("symlinked parent POM cache entry")
+            if entry.is_dir() and CACHE_DIGEST.fullmatch(entry.name):
+                file = entry / (artifact + "-" + version + ".pom")
+                if file.is_symlink():
+                    raise AuditError("symlinked parent POM")
+                if file.is_file():
+                    found.append(file)
+        if len(found) > 1:
+            raise AuditError("ambiguous parent POM cache bytes")
+        if not found:
+            trail.append(record)
+            return trail
+        raw = _file_bytes(found[0], MAX_METADATA)
+        record["sha256"] = hashlib.sha256(raw).hexdigest()
+        lic = _licenses(raw)
+        record["unverifiedLicenseNames"] = sorted(
+            {x["name"] for x in lic if not x["name"].startswith("UNREADABLE_")})
+        record["status"] = ("PARENT_POM_METADATA_ONLY" if
+                            not any(x["name"].startswith("UNREADABLE_") for x in lic)
+                            else "UNREADABLE_PARENT_POM")
+        trail.append(record)
+        if record["status"] == "UNREADABLE_PARENT_POM":
+            return trail
+        current = _pom_parent(raw)
+    if current:
+        trail.append({"coordinate": current, "status": "DEPTH_LIMIT_NOT_VERIFIED",
+                      "sha256": None, "unverifiedLicenseNames": [],
+                      "licenseApproved": False})
+    return trail
+
+
 def audit(graph: dict, cache: Path) -> dict:
     if (graph.get("status") != "PASS"
             or graph.get("inventoryCompleteness") != "PARTIAL"
@@ -214,6 +281,10 @@ def audit(graph: dict, cache: Path) -> dict:
             totals["pomHasUnresolvedParent"] += 1
         if unreadable:
             totals["unreadablePom"] += 1
+        record["parentPomEvidence"] = (
+            [_parent_chain(parent, cache) for parent in sorted(parents)]
+            if not license_set else []
+        )
 
     if totals["withLocalBytes"] == 0 or totals["hashedFiles"] == 0:
         raise AuditError("no selected plugin artifact bytes were verified")
