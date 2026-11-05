@@ -71,6 +71,8 @@ def audit(raw: bytes, packages_root: Path) -> dict:
             raise AuditError("symlinked NuGet cache package")
         path = folder / (name + ".nuspec")
         record = {
+            "licenseMetadataStatus": "NUSPEC_NOT_CACHED",
+            "supplierLicenseUrl": "NOT_VERIFIED",
             "purl": f"pkg:nuget/{name}@{version}",
             "scope": "temporary-WinUI3-restore-only",
             "publisherVerified": False, "licenseApproved": False,
@@ -87,15 +89,21 @@ def audit(raw: bytes, packages_root: Path) -> dict:
             try:
                 xml = ET.fromstring(content)
                 lic = xml.find(".//{*}metadata/{*}license")
+                legacy = xml.find(".//{*}metadata/{*}licenseUrl")
+                record["licenseMetadataStatus"] = "NO_DIRECT_NUSPEC_LICENSE"
+                if legacy is not None and legacy.text and legacy.text.strip():
+                    record["supplierLicenseUrl"] = legacy.text.strip()[:512]
                 if lic is not None and lic.text and lic.text.strip():
                     record["supplierLicense"] = {
                         "kind": lic.attrib.get("type", "unspecified")[:64],
                         "value": lic.text.strip()[:256],
                         "evidence": "UNVERIFIED_NUGET_NUSPEC",
                     }
+                    record["licenseMetadataStatus"] = "DIRECT_NUSPEC_LICENSE_UNVERIFIED"
                     counts["supplierLicenseDeclarations"] += 1
             except ET.ParseError:
                 record["supplierLicense"] = "UNREADABLE_NUSPEC"
+                record["licenseMetadataStatus"] = "UNREADABLE_NUSPEC"
         else:
             counts["nuspecMissing"] += 1
         sha512 = data.get("sha512")
@@ -125,7 +133,14 @@ def audit(raw: bytes, packages_root: Path) -> dict:
         "scope": "disposable Windows SDK 2.6.4 NuGet restore, not E-Scanner runtime",
         "assetsSha256": hashlib.sha256(raw).hexdigest(),
         "targetFrameworks": frameworks, "counts": counts,
-        "components": records, "publisherVerified": False,
+        "components": records,
+        "missingDirectLicenseEvidence": [
+            {"purl": rec["purl"], "reason": rec["licenseMetadataStatus"],
+             "supplierLicenseUrl": rec["supplierLicenseUrl"]}
+            for rec in records
+            if rec["licenseMetadataStatus"] != "DIRECT_NUSPEC_LICENSE_UNVERIFIED"
+        ],
+        "publisherVerified": False,
         "signedPackageVerified": False, "nativeWinuiVerified": False,
         "licenseClosure": "NOT_VERIFIED", "releaseApproved": False,
     }
@@ -146,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
     print(json.dumps({"status": report["status"], "counts": report["counts"],
+                      "missingDirectLicenseEvidence": report["missingDirectLicenseEvidence"],
                       "nativeWinuiVerified": False, "releaseApproved": False},
                      sort_keys=True))
     return 0
