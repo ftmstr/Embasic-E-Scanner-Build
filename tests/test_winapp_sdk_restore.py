@@ -48,6 +48,39 @@ class WinAppSDKRestoreAuditTests(unittest.TestCase):
             self.assertEqual(winapp["supplierLicense"]["evidence"],
                              "UNVERIFIED_NUGET_NUSPEC")
 
+    def test_unverified_missing_nuspec_license_reports_exact_purl(self):
+        with TemporaryDirectory() as directory:
+            assets, cache = setup(Path(directory))
+            result = mod.audit(json.dumps(assets).encode(), cache)
+            self.assertEqual(result["missingDirectLicenseEvidence"], [
+                {"purl": "pkg:nuget/microsoft.web.webview2@1.0.3719.77",
+                 "reason": "NUSPEC_NOT_CACHED",
+                 "supplierLicenseUrl": "NOT_VERIFIED"}])
+            self.assertFalse(result["licenseApproved"] if "licenseApproved" in result else result["releaseApproved"])
+
+    def test_nuspec_without_license_retains_unverified_legacy_url(self):
+        with TemporaryDirectory() as directory:
+            assets, cache = setup(Path(directory))
+            file = cache / "microsoft.windowsappsdk" / "2.6.4" / "microsoft.windowsappsdk.nuspec"
+            file.write_text("<package><metadata><licenseUrl>https://example.org/license"
+                            "</licenseUrl></metadata></package>")
+            result = mod.audit(json.dumps(assets).encode(), cache)
+            gap = next(x for x in result["missingDirectLicenseEvidence"]
+                       if x["purl"] == "pkg:nuget/microsoft.windowsappsdk@2.6.4")
+            self.assertEqual(gap["reason"], "NO_DIRECT_NUSPEC_LICENSE")
+            self.assertEqual(gap["supplierLicenseUrl"], "https://example.org/license")
+            self.assertEqual(result["licenseClosure"], "NOT_VERIFIED")
+
+    def test_malformed_nuspec_remains_unverified(self):
+        with TemporaryDirectory() as directory:
+            assets, cache = setup(Path(directory))
+            file = cache / "microsoft.windowsappsdk" / "2.6.4" / "microsoft.windowsappsdk.nuspec"
+            file.write_text("<package><metadata><license>")
+            result = mod.audit(json.dumps(assets).encode(), cache)
+            gap = next(x for x in result["missingDirectLicenseEvidence"]
+                       if x["purl"] == "pkg:nuget/microsoft.windowsappsdk@2.6.4")
+            self.assertEqual(gap["reason"], "UNREADABLE_NUSPEC")
+
     def test_wrong_windows_app_sdk_version_fails(self):
         with TemporaryDirectory() as directory:
             assets, cache = setup(Path(directory))
