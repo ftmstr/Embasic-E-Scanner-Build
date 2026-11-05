@@ -246,6 +246,66 @@ class PluginArtifactEvidenceTests(unittest.TestCase):
             with self.assertRaises(mod.AuditError):
                 mod.check_partial_notice(result, notice)
 
+    def test_parent_pom_cache_license_is_only_unverified_hint(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            pom.write_text('<project><parent><groupId>org.example</groupId>'
+                           '<artifactId>root-parent</artifactId><version>1.0</version>'
+                           '</parent></project>')
+            parentdir = cache / "org.example" / "root-parent" / "1.0" / ("a" * 40)
+            parentdir.mkdir(parents=True)
+            original = b'<project><licenses><license><name>Apache-2.0</name>' + (
+                b'</license></licenses></project>')
+            (parentdir / "root-parent-1.0.pom").write_bytes(original)
+            result = mod.audit(load(inp), cache)
+            agp = next(x for x in result["modules"] if x["purl"] == AGP)
+            chain = agp["parentPomEvidence"][0]
+            self.assertEqual(len(chain), 1)
+            self.assertEqual(chain[0]["status"], "PARENT_POM_METADATA_ONLY")
+            self.assertEqual(chain[0]["unverifiedLicenseNames"], ["Apache-2.0"])
+            self.assertEqual(chain[0]["sha256"], hashlib.sha256(original).hexdigest())
+            self.assertEqual(agp["pomDeclaredLicenses"], [])
+            self.assertFalse(result["parentLicenseInheritanceVerified"])
+
+    def test_parent_cache_absence_keeps_open_gap(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            pom.write_text('<project><parent><groupId>org.example</groupId>'
+                           '<artifactId>missing</artifactId><version>1.0</version>'
+                           '</parent></project>')
+            result = mod.audit(load(inp), cache)
+            agp = next(x for x in result["modules"] if x["purl"] == AGP)
+            self.assertEqual(agp["parentPomEvidence"][0][0]["status"],
+                             "PARENT_POM_NOT_CACHED")
+            self.assertEqual(result["counts"]["pomWithLicenseNames"], 0)
+
+    def test_parent_pom_symlink_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            pom.write_text('<project><parent><groupId>org.example</groupId>'
+                           '<artifactId>evil</artifactId><version>1.0</version>'
+                           '</parent></project>')
+            dirpath = cache / "org.example" / "evil"
+            dirpath.mkdir(parents=True)
+            (dirpath / "1.0").symlink_to("/etc")
+            with self.assertRaises(mod.AuditError):
+                mod.audit(load(inp), cache)
+
+    def test_parent_cycle_is_rejected_without_license_inheritance(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            pom.write_text('<project><parent><groupId>org.example</groupId>'
+                           '<artifactId>parent</artifactId><version>1.0</version>'
+                           '</parent></project>')
+            dirpath = cache / "org.example" / "parent" / "1.0" / ("b" * 40)
+            dirpath.mkdir(parents=True)
+            (dirpath / "parent-1.0.pom").write_text(
+                '<project><parent><groupId>org.example</groupId>'
+                '<artifactId>parent</artifactId><version>1.0</version>'
+                '</parent></project>')
+            with self.assertRaises(mod.AuditError):
+                mod.audit(load(inp), cache)
+
     def test_oversized_metadata_is_not_accepted(self):
         self.assertEqual(mod._licenses(b"x" * (mod.MAX_METADATA + 1))[0]["name"],
                          "UNREADABLE_OVERSIZE_POM")
