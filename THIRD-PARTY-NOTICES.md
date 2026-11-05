@@ -115,6 +115,36 @@ all per-module notices, complete SPDX/CycloneDX/SBOM, Windows App SDK and
 signed distributables. This section is a CI-scoped **PARTIAL** inventory,
 not a complete third-party notices release obligation inventory.
 
+## Windows App SDK temporary restore license metadata gap — 6 November 2026
+
+This is a **disposable build-tool compatibility probe**, not a Windows
+E-Scanner application dependency or an approved release notice entry.
+
+PUBLIC Windows App SDK 2.6.4 isolated NuGet restore runner evidence:
+https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/42111909888
+
+- 16 selected NuGet packages (temporary `net10.0-windows` restore only).
+- 16 cached `.nuspec` files and 16 NuGet SHA-512 *metadata* values.
+- 15 packages with a direct supplier `<license>` declaration.
+- 1 package with **no direct** `<license>` element:
+  `pkg:nuget/microsoft.windows.sdk.buildtools@10.0.26100.4654`.
+- That package's supplier metadata contains legacy
+  `licenseUrl=https://aka.ms/WinSDKLicenseURL`; the linked Windows
+  SDK terms must be reviewed in full for build, embedding and distribution.
+  A URL is NOT a licence grant or an evaluated redistributable policy.
+- Source listing: https://www.nuget.org/packages/Microsoft.Windows.SDK.BuildTools/10.0.26100.4654
+
+All selected NuGet `project.assets.json` SHA-512 values and local nuspec
+SHA-256 values are **partial metadata/hash evidence only**. No independently
+verified publisher signature, complete transitive license inventory,
+binary-level attestation, native WinUI XAML build or device smoke is
+established. **License closure, product inclusion and release remain NO-GO.**
+
+Gradle parent POM references (where present) are also research-only metadata:
+do NOT copy/infer/grant a child's license from a parent POM without reviewing
+the exact legal and binary distribution boundaries. Parent evidence hashes
+are local cache SHA-256, not upstream publisher provenance.
+
 ## Still missing
 
 The PUBLIC repository's owner-approved **product LICENSE**, complete Android
