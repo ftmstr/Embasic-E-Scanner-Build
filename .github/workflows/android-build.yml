@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -165,6 +165,34 @@ jobs:
           print("NOT VERIFIED: POM parent inheritance, publisher identity, legal rights, SBOM")
           print("NOT VERIFIED: publication origin, complete transitive notices and signing")
           PY
+      - name: Research exact missing child and parent POM metadata from official Maven HTTPS
+        shell: bash
+        continue-on-error: false
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_missing_maven_pom_sources.py' -v
+          python3 scripts/audit_missing_maven_pom_sources.py \
+            --plugin-report "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --output "${RUNNER_TEMP}/gradle-missing-pom-source-research.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-missing-pom-source-research.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["status"] == "PARTIAL_EVIDENCE_ONLY"
+          assert result["releaseApproved"] is False
+          assert result["originVerified"] is False
+          assert result["artifactBinaryVerified"] is False
+          assert result["parentLicenseInheritanceVerified"] is False
+          assert result["licenseClosure"] == "NOT_VERIFIED"
+          assert result["originalDirectLicenseGaps"] == 42
+          assert result["targets"] <= 32
+          print("POM_SOURCE_RESEARCH_TARGETS:", result["targets"])
+          print("POM_SOURCE_RESEARCH_RETRIEVED:", result["remotePomMetadataRetrieved"])
+          print("POM_SOURCE_RESEARCH_UNAVAILABLE:", result["stillUnretrieved"])
+          print("NOT VERIFIED: source POM metadata is not artifact signature or license clearance")
+          PY
       - name: Audit resolved app and test configurations (partial inventory)
         shell: bash
         run: |
@@ -221,5 +249,6 @@ jobs:
           path: |
             ${{ runner.temp }}/gradle-plugin-partial-inventory.json
             ${{ runner.temp }}/gradle-plugin-artifact-evidence.json
+            ${{ runner.temp }}/gradle-missing-pom-source-research.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
             ${{ runner.temp }}/android-resolved-jar-hashes.json
