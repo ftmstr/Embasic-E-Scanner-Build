@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -193,6 +193,35 @@ jobs:
                     record["remoteSha256"] or "NO_REMOTE_HASH", record["repositoryUrl"])
           print("NOT VERIFIED: 147-module publisher provenance and entire plugin license inventory")
           PY
+      - name: Probe four bounded selected Gradle build-tool transitive JARs against Maven Central
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle_central_binary_batch.py' -v
+          python3 scripts/audit_gradle_central_binary_batch.py \
+            --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --output "${RUNNER_TEMP}/gradle-central-buildtool-jar-byte-evidence.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-central-buildtool-jar-byte-evidence.json"
+          x = json.loads(p.read_text(encoding="utf-8"))
+          assert x["selectedArtifactCount"] == 4
+          assert x["sourceByteMatches"] + x["notSourceVerified"] == 4
+          assert x["status"] in ("SOURCE_BYTE_PARITY_PASS", "PARTIAL_EVIDENCE_ONLY")
+          assert x["publisherSignatureVerified"] is False
+          assert x["originAttributionVerified"] is False
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["noticeClosure"] == "NOT_VERIFIED"
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("GRADLE_CENTRAL_JARS_MATCHED:", x["sourceByteMatches"])
+          print("GRADLE_CENTRAL_JARS_NOT_VERIFIED:", x["notSourceVerified"])
+          for item in x["records"]:
+              print("GRADLE_CENTRAL_BYTE:", item["purl"], item["status"],
+                    item["officialSha256"] or "NO_REMOTE_HASH", item["officialSourceUrl"])
+          print("NOT VERIFIED: full 147 modules, publisher signatures, licensing or SBOM")
+          PY
       - name: Research exact missing child and parent POM metadata from official Maven HTTPS
         shell: bash
         continue-on-error: false
@@ -303,6 +332,7 @@ jobs:
             ${{ runner.temp }}/gradle-plugin-partial-inventory.json
             ${{ runner.temp }}/gradle-plugin-artifact-evidence.json
             ${{ runner.temp }}/android-pinned-plugin-jar-byte-parity.json
+            ${{ runner.temp }}/gradle-central-buildtool-jar-byte-evidence.json
             ${{ runner.temp }}/gradle-missing-pom-source-research.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
             ${{ runner.temp }}/android-resolved-jar-hashes.json
