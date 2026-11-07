@@ -57,6 +57,71 @@ class PinnedGradlePluginTests(unittest.TestCase):
         with self.assertRaisesRegex(mod.AuditError, "BYTE_MISMATCH"):
             mod.audit(fixture(), fetcher=lambda url: b"mismatched binary")
 
+    def test_real_gradle813_variant_cache_bytes_enable_second_match(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            filename = "kotlin-gradle-plugin-2.3.21-gradle813.jar"
+            jar = root / "org.jetbrains.kotlin" / "kotlin-gradle-plugin" / "2.3.21" / ("a" * 40) / filename
+            jar.parent.mkdir(parents=True)
+            jar.write_bytes(BINARY)
+            report = fixture()
+            report["modules"][1]["cachedFiles"] = []
+            result = mod.audit(report, fetcher=lambda url: BINARY, cache=root)
+            self.assertEqual(result["status"], "SOURCE_BYTE_PARITY_PASS")
+            self.assertEqual(result["sourceByteMatches"], 2)
+            kotlin = result["records"][1]
+            self.assertTrue(kotlin["repositoryUrl"].endswith(filename))
+            self.assertEqual(kotlin["localEvidenceType"],
+                             "CLASSIFIED_VARIANT_BYTES_FROM_GRADLE_CACHE")
+            self.assertEqual(kotlin["remoteSha256"], hashlib.sha256(BINARY).hexdigest())
+            self.assertFalse(result["publisherSignatureVerified"])
+
+    def test_gradle813_classifier_mismatch_fails_closed(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            jar = root / "org.jetbrains.kotlin" / "kotlin-gradle-plugin" / "2.3.21" / ("b" * 40) / "kotlin-gradle-plugin-2.3.21-gradle813.jar"
+            jar.parent.mkdir(parents=True)
+            jar.write_bytes(b"cached bytes differ")
+            data = fixture()
+            data["modules"][1]["cachedFiles"] = []
+            with self.assertRaisesRegex(mod.AuditError, "BYTE_MISMATCH"):
+                mod.audit(data, fetcher=lambda url: BINARY, cache=root)
+
+    def test_nonmatching_gradle_variant_is_not_silent_approval(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            jar = root / "org.jetbrains.kotlin" / "kotlin-gradle-plugin" / "2.3.21" / ("c" * 40) / "kotlin-gradle-plugin-2.3.21-gradle88.jar"
+            jar.parent.mkdir(parents=True)
+            jar.write_bytes(BINARY)
+            data = fixture()
+            data["modules"][1]["cachedFiles"] = []
+            result = mod.audit(data, fetcher=lambda url: BINARY, cache=root)
+            self.assertEqual(result["sourceByteMatches"], 1)
+            self.assertEqual(result["records"][1]["status"], "LOCAL_JAR_NOT_PRESENT")
+
+    def test_symlinked_kotlin_variant_cache_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            jar = root / "org.jetbrains.kotlin" / "kotlin-gradle-plugin" / "2.3.21" / ("d" * 40) / "kotlin-gradle-plugin-2.3.21-gradle813.jar"
+            jar.parent.mkdir(parents=True)
+            jar.symlink_to("/etc/hosts")
+            data = fixture()
+            data["modules"][1]["cachedFiles"] = []
+            with self.assertRaisesRegex(mod.AuditError, "symlink"):
+                mod.audit(data, fetcher=lambda url: BINARY, cache=root)
+
+    def test_ambiguous_kotlin_variant_cache_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for letter in ("e", "f"):
+                jar = root / "org.jetbrains.kotlin" / "kotlin-gradle-plugin" / "2.3.21" / (letter * 40) / "kotlin-gradle-plugin-2.3.21-gradle813.jar"
+                jar.parent.mkdir(parents=True)
+                jar.write_bytes(BINARY)
+            data = fixture()
+            data["modules"][1]["cachedFiles"] = []
+            with self.assertRaisesRegex(mod.AuditError, "ambiguous"):
+                mod.audit(data, fetcher=lambda url: BINARY, cache=root)
+
     def test_missing_upstream_binary_is_explicit_gap(self):
         result = mod.audit(fixture(), fetcher=lambda url: None)
         self.assertEqual(result["status"], "PARTIAL_EVIDENCE_ONLY")
