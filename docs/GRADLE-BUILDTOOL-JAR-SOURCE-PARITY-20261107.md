@@ -1,84 +1,82 @@
-# PUBLIC Gradle build-tool JAR source-byte parity — 7 November 2026
+# PUBLIC Gradle source-byte parity — 7 November 2026, corrected follow-up
 
-**Scope: four intentionally allowlisted Maven Central build-tool transitives.
-Not an Android/Windows scanner release and NOT a complete 147-module SBOM.**
+**Scope: four NEW Maven Central build-tool JARs with missing direct child POM license names.
+Not an Android/Windows scanner release, publisher attestation or a complete 147-module SBOM.**
 
-## Why this exists
+## Correction and source-of-truth
 
-The PUBLIC root Gradle `buildEnvironment` selected 147 Maven modules
-(previous partial inventory: 292 cached artifact SHA-256 hashes).
-The previous focused CI verified the actual AGP 8.13.2 and Kotlin Gradle
-Plugin 2.3.21 (`gradle813`) binary bytes against Google Maven/Maven Central,
-and separately four Android runtime/test JARs. It did not establish a general
-source parity check for the other Gradle build-time modules.
+The initial batch at `5c751005c7b84500d65c673a83c0b076727cf330`
+unintentionally duplicated four JARs already verified in a preceding tour:
+Guava, Protobuf Java, Commons IO, and SLF4J API. Those checks remained valid
+but provided **zero new module coverage**. The mistake was detected and
+corrected on the same PUBLIC fix branch, without changing main or PR #1.
 
-This turn adds `scripts/audit_gradle_central_binary_batch.py`, 15 offline
-adversarial regression tests, and Android CI source-byte evidence. The
-source selection is exactly four named Maven modules; there is **no network
-fetch for arbitrary dependency metadata URLs**, no redirect and no auto-fallback
-to unknown repository hosts/classifiers.
+The corrected batch targets four **different** resolved modules whose local
+child POM has no direct license name. No parent POM is treated as a license grant.
 
-## Real PUBLIC CI evidence
+- Fix commit `5fd685e80ff45e36094687824f990498e6e92d40`: four distinct PURL allowlist entries and direct-license-gap identity check.
+- Test commit `51799eb4c95051373aabb5ade80f03ff4bcada88`: two additional regression cases (total 17) prevent future duplicate sampling and unexpected licensing-status escalation.
+- CI commit `309fb328cc7439e4c549fa5ed65effab6c6f91c7`: exact selected PURLs and missing direct-license metadata enforced as in-CI assertions.
 
-- Tested commit: `5c751005c7b84500d65c673a83c0b076727cf330`.
-- Android Kotlin Foundation:
-  https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/42360634578
-  (job `128368080483`).
-- Step: `Probe four bounded selected Gradle build-tool transitive JARs against Maven Central`:
-  **completed/success**, 15/15 synthetic security regressions, four
-  upstream JAR byte/size matches, `notSourceVerified=0`.
-- Evidence artifact: `android-foundation-dependency-evidence`,
-  ID `13569665747`, GitHub retention **14 days**;
-  `gradle-central-buildtool-jar-byte-evidence.json` is included.
+## Real corrected PUBLIC CI
 
-| Selected Maven artifact (build-tool scope) | Local/official SHA-256 identical |
+- Run https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/42365165688
+- Job `128381581463`, **completed/success**.
+- `17/17` synthetic security tests PASS; Android JUnit `6/6`, failures/errors/skips 0.
+- Selected four new cached JAR SHA256 + byte sizes matched official Maven Central HTTPS bytes exactly: `4/4` PASS, `notSourceVerified=0`.
+- Evidence JSON `gradle-central-buildtool-jar-byte-evidence.json` in CI artifact
+  `android-foundation-dependency-evidence` ID `13570864748`
+  (14-day retention; ZIP 31,513 bytes).
+
+| Selected Maven artifact / distinct module | Official/local SHA-256 |
 |---|---|
-| `com.google.guava:guava:33.3.1-jre` | `4bf0e2c5af8e4525c96e8fde17a4f7307f97f8478f11c4c8e35a0e3298ae4e90` |
-| `com.google.protobuf:protobuf-java:3.25.5` | `8540247fad9e06baefa8fb45eb313802d019f485f14300e0f9d6b556ed88e753` |
-| `commons-io:commons-io:2.16.1` | `f41f7baacd716896447ace9758621f62c1c6b0a91d89acee488da26fc477c84f` |
-| `org.slf4j:slf4j-api:1.7.30` | `cdba07964d1bb40a0761485c6b1e8c2f8fd9eb1d19c53928ac0d7f9510105c57` |
+| `com.google.guava:failureaccess:1.0.2` | `8a8f81cf9b359e3f6dfa691a1e776985c061ef2f223c9b2c80753e1b458e8064` |
+| `com.google.protobuf:protobuf-java-util:3.25.5` | `dacc58b2c3d2fa8d4bddc1acb881e78d6cf7c137dd78bc1d67f6aca732436a8d` |
+| `com.google.jimfs:jimfs:1.1` | `c4828e28d7c0a930af9387510b3bada7daa5c04d7c25a75c7b8b081f1c257ddd` |
+| `com.google.auto.value:auto-value-annotations:1.6.2` | `b48b04ddba40e8ac33bf036f06fc43995fc5084bd94bdaace807ce27d3bea3fb` |
 
-All four sources use
-`https://repo.maven.apache.org/maven2/<group path>/<artifact>/<version>/<artifact>-<version>.jar`,
-with explicit coordinates above. Their canonical coordinates and raw source
-URLs also appear in the independent job log.
+All official-source URLs use the static allowlisted
+`https://repo.maven.apache.org/maven2/<group path>/<artifact>/<version>/<artifact>-<version>.jar`.
+Exact URL, PURL, SHA-256 and SOURCE_BYTES_MATCH_LOCAL status are in the CI log.
 
-**Interpretation:** bytes retrieved over HTTPS from the allowed Maven
-Central endpoint matched the actual local Gradle cached bytes in this CI run.
-No detached signature or publisher identity was authenticated.
-`publisherSignatureVerified=false`, `originAttributionVerified=false`,
-`licenseClosure=NOT_VERIFIED`, `noticeClosure=NOT_VERIFIED`,
-`sbomComplete=false`, `releaseApproved=false`.
+## Classifier/origin/license boundary
 
-## Remaining release blockers
+The tool accepts only exact non-classifier JAR filenames and coordinate
+patterns in the reviewed allowlist. Other cached classifier variants remain
+`unreviewedJarVariants` and do NOT obtain a fabricated source SHA match.
+Mismatching official bytes raise an AuditError (fail closed); missing local
+JARs, 404s and transport errors remain explicit gaps. There is no network
+fallback to untrusted hosts or redirect following.
 
-- The 147 root plugin modules are NOT all independently byte verified.
-  Specifically, this turn verifies four additional ordinary JARs; the
-  previous two pinned plugin JARs and four Android runtime/test JARs belong
-  to separate, narrowly defined evidence scopes.
-- Direct cached POM license-name metadata remains 105 of 147. The other
-  42 are still 12 POM-not-cached and 30 without direct license names.
-  Source POMs and parent references are **unreviewed supplier claims**,
-  not transitive legal approval. Some parent metadata uses dual/copyleft
-  license labels requiring separate legal-boundary assessment.
-- No independently verified publisher signature, complete SPDX/CycloneDX
-  SBOM, linked/embedded release payload inventory, THIRD-PARTY LICENSES
-  or approved product root LICENSE.
-- Windows App SDK 2.6.4 is only in a disposable .NET 10 Windows restore
-  probe. `Microsoft.Windows.SDK.BuildTools@10.0.26100.4654` has a
-  legacy supplier `licenseUrl`, not evaluated redistribution rights.
-- Android native camera/OCR/PDF, Windows native WinUI 3 scanner,
-  QR/HTTPS/WSS secure transfer, cross-device fixture parity and signed
-  package smoke remain **NOT VERIFIED**.
+Corrected data is **remote byte parity, not signed publisher provenance**:
+`publisherSignatureVerified=false`,
+`originAttributionVerified=false`, `licenseClosure=NOT_VERIFIED`,
+`noticeClosure=NOT_VERIFIED`, `sbomComplete=false`,
+`releaseApproved=false`.
 
-**PUBLIC PR #1 remains OPEN/DRAFT/BLOCKED FOR MERGE. No PRIVATE imports,
-main merges or force pushes were used.**
+This turn increases disjoint sampled Gradle build-tool JAR modules from six
+(previous 2 pinned AGP/KGP and 4 Maven Central transitive modules) to
+**10 distinct sampled modules** out of 147 selected modules. It is NOT a
+complete binary provenance measure for all 147, and is separate from four
+Android debug runtime/JUnit-test JARs verified earlier. Some selected modules
+have no standard JAR; do not infer completeness from 10/147.
 
-## Next bounded engineering task
+POM direct license names remain 105 of 147, with **42 direct metadata gaps**
+(12 POM not cached, 30 no direct license names). The four newly checked modules
+belong to the no-direct-name group. Source POMs, parent POM names, and their
+metadata are unapproved claims pending applicable third-party licenses/terms
+and transitive obligations. Other open gates: publisher signature, full
+NOTICE/LICENSES/SPDX/CycloneDX SBOM, rights-holder-approved PUBLIC product
+root LICENSE, Windows SDK BuildTools redistributables and actual linked
+Android/Windows runtime composition.
 
-Expand official-source byte equality to another small source-allowlisted
-slice of resolved Gradle build-time modules, including explicit classifier
-inventory and provenance gap reasons. Preserve exact dependency scope,
-negative security tests and release NO-GO guardrails. Independently review
-applicable license texts and actual shipped runtime artifacts before any
-commercial release decision.
+Windows App SDK 2.6.4 is still only a disposable .NET 10 Windows NuGet restore
+probe (16 packages; 15 with direct supplier license metadata). The package
+`Microsoft.Windows.SDK.BuildTools@10.0.26100.4654` lacks a direct nuspec
+license element, citing `https://aka.ms/WinSDKLicenseURL`. No legal closure
+or redistributed Windows executable/app asset has been verified.
+
+**PR #1 remains OPEN/DRAFT/BLOCKED FOR MERGE. PRIVATE untouched; PUBLIC main
+unmodified. Android CameraX, Windows WinUI3, QR/TLS, local OCR/searchable PDF,
+staged atomic export, shared golden fixtures and signed package acceptance
+remain NOT VERIFIED. RELEASE NO-GO.**
