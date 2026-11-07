@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -240,6 +240,31 @@ jobs:
           print("HASHED_CACHED_MAVEN_ARTIFACTS:", result["artifactCount"])
           print("NOT VERIFIED: remote Maven publication, binary provenance, package license rights or release")
           PY
+      - name: Verify four Android runtime/test Maven JARs against official HTTPS source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_maven_release_jar_bytes.py' -v
+          python3 scripts/audit_maven_release_jar_bytes.py \
+            --inventory "${RUNNER_TEMP}/android-resolved-jar-hashes.json" \
+            --output "${RUNNER_TEMP}/android-official-jar-byte-parity.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                               "android-official-jar-byte-parity.json").read_text())
+          assert report["status"] == "SOURCE_BYTE_PARITY_PASS"
+          assert report["sourceByteMatches"] == 4
+          assert report["unverifiedSources"] == 0
+          assert report["originAttributionVerified"] is False
+          assert report["publisherSignatureVerified"] is False
+          assert report["licenseClosure"] == "NOT_VERIFIED"
+          assert report["releaseApproved"] is False
+          for x in report["artifacts"]:
+              print("MAVEN_OFFICIAL_BYTES_MATCH:", x["purl"], x["sourceSha256"], x["sourceUrl"])
+          print("NOT VERIFIED: upstream publisher signatures, legal license closure, SBOM or APK")
+          PY
       - name: Retain scoped dependency evidence (NOT a verified SBOM)
         uses: actions/upload-artifact@v4
         with:
@@ -252,3 +277,4 @@ jobs:
             ${{ runner.temp }}/gradle-missing-pom-source-research.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
             ${{ runner.temp }}/android-resolved-jar-hashes.json
+            ${{ runner.temp }}/android-official-jar-byte-parity.json
