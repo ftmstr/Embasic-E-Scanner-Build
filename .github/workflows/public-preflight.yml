@@ -1,0 +1,55 @@
+name: PUBLIC source preflight (NOT a release approval)
+'on':
+  push:
+    paths:
+      - 'scripts/public_preflight.py'
+      - 'tests/test_public_preflight.py'
+      - '.github/workflows/public-preflight.yml'
+      - 'android/**'
+      - 'LICENSE*'
+      - 'NOTICE*'
+      - 'THIRD-PARTY-NOTICES.md'
+  pull_request:
+    paths:
+      - 'scripts/public_preflight.py'
+      - 'tests/test_public_preflight.py'
+      - '.github/workflows/public-preflight.yml'
+      - 'android/**'
+      - 'LICENSE*'
+      - 'NOTICE*'
+      - 'THIRD-PARTY-NOTICES.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run offline synthetic-only audit regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_public_preflight.py' -v
+      - name: Report public-source blockers (not release approval)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/public_preflight.py --root . > public-preflight.json
+          python3 - <<'PY'
+          import json
+          with open("public-preflight.json", encoding="utf-8") as stream:
+              state = json.load(stream)
+          assert state["releaseApproved"] is False
+          assert state["releaseStatus"] == "NOT_VERIFIED"
+          print("STRUCTURAL PREFLIGHT:", state["machinePreflight"])
+          for gate in state["gates"]:
+              print(gate["name"] + ": " + gate["status"])
+          if state["machinePreflight"] == "BLOCKED":
+              print("::warning::PUBLIC foundation remains BLOCKED; CI audit passing is NOT a release approval")
+          PY
