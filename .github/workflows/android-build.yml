@@ -172,6 +172,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_pinned_gradle_plugin_jars.py' -v
           python3 scripts/audit_pinned_gradle_plugin_jars.py \
             --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
             --output "${RUNNER_TEMP}/android-pinned-plugin-jar-byte-parity.json"
           python3 - <<'PY'
           import json, os
