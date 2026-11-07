@@ -53,6 +53,26 @@ class GradleCentralBinaryBatchTests(unittest.TestCase):
         self.assertEqual(len(seen), 4)
         self.assertTrue(all(u.startswith(audit.ORIGIN + "/") for u in seen))
 
+    def test_distinct_no_direct_pom_license_gap_coordinates_are_pinned(self):
+        self.assertEqual(set(audit.TARGETS), {
+            "pkg:maven/com.google.guava/failureaccess@1.0.2",
+            "pkg:maven/com.google.protobuf/protobuf-java-util@3.25.5",
+            "pkg:maven/com.google.jimfs/jimfs@1.1",
+            "pkg:maven/com.google.auto.value/auto-value-annotations@1.6.2",
+        })
+        self.assertEqual(len(set(audit.TARGETS)), 4)
+        result = audit.audit(sample(), fetcher=lambda _: BYTES)
+        self.assertTrue(all(
+            item["directPomLicenseMetadata"] == "POM_WITHOUT_DIRECT_LICENSE_NAME"
+            and item["licenseApproved"] is False
+            for item in result["records"]))
+
+    def test_switch_to_direct_license_metadata_must_reassess_selection(self):
+        changed = sample()
+        changed["modules"][0]["licenseMetadataState"] = "DIRECT_POM_LICENSE_NAME"
+        with self.assertRaisesRegex(audit.AuditError, "expected child-POM"):
+            audit.audit(changed, fetcher=lambda _: BYTES)
+
     def test_mismatch_is_a_fail_closed_exception(self):
         with self.assertRaisesRegex(audit.AuditError, "OFFICIAL_BINARY_MISMATCH"):
             audit.audit(sample(), fetcher=lambda _: b"tampered JAR")
