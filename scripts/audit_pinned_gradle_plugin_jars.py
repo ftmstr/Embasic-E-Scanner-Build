@@ -91,6 +91,52 @@ def _selection(report: dict) -> list[dict]:
     return selected
 
 
+def _kotlin_gradle813_cache_variant(cache: Path | None) -> dict | None:
+    """Inspect actual Gradle 8.13-8.14 Kotlin plugin variant, no classifiers guessed.
+
+    Gradle 8.14.6 selects 'gradle813' according to JetBrains' supported
+    plugin variants documentation. A POM-only cache entry is NOT binary proof.
+    """
+    if cache is None:
+        return None
+    if cache.is_symlink() or not cache.is_dir():
+        raise AuditError("unsafe Gradle cache root for variant")
+    base = cache / "org.jetbrains.kotlin" / "kotlin-gradle-plugin" / "2.3.21"
+    if base.is_symlink():
+        raise AuditError("symlinked Kotlin plugin cache")
+    if not base.is_dir():
+        return None
+    filename = "kotlin-gradle-plugin-2.3.21-gradle813.jar"
+    candidates = []
+    dirs = list(base.iterdir())
+    if len(dirs) > 200:
+        raise AuditError("unbounded Kotlin plugin cache digest directories")
+    for directory in dirs:
+        if directory.is_symlink():
+            raise AuditError("symlinked Kotlin plugin digest")
+        if not directory.is_dir() or not re.fullmatch(r"[0-9a-f]{40}", directory.name):
+            continue
+        jar = directory / filename
+        if jar.is_symlink():
+            raise AuditError("symlinked Kotlin Gradle variant JAR")
+        if jar.is_file():
+            if jar.stat().st_size <= 0 or jar.stat().st_size > MAX_JAR:
+                raise AuditError("empty/oversized Kotlin Gradle variant JAR")
+            candidates.append(jar)
+    if len(candidates) > 1:
+        raise AuditError("ambiguous Kotlin Gradle variant JAR cache bytes")
+    if not candidates:
+        return None
+    jar = candidates[0]
+    sha = hashlib.sha256()
+    with jar.open("rb") as fp:
+        for chunk in iter(lambda: fp.read(1024 * 1024), b""):
+            sha.update(chunk)
+    return {"filename": filename, "sha256": sha.hexdigest(),
+            "byteSize": jar.stat().st_size, "status": "PENDING_REMOTE",
+            "localEvidenceType": "CLASSIFIED_VARIANT_BYTES_FROM_GRADLE_CACHE"}
+
+
 def fetch(url: str) -> bytes | None:
     if not any(url.startswith(origin + "/") for origin in EXPECTED.values()):
         raise AuditError("unapproved plugin repository host")
@@ -114,10 +160,15 @@ def fetch(url: str) -> bytes | None:
         raise AuditError("upstream network unavailable") from exc
 
 
-def audit(report: dict, fetcher=fetch) -> dict:
+def audit(report: dict, fetcher=fetch, cache: Path | None = None) -> dict:
     selected = _selection(report)
     results = []
     for item in selected:
+        if (item["purl"] == "pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin@2.3.21"
+                and item["status"] == "LOCAL_JAR_NOT_PRESENT"):
+            variant = _kotlin_gradle813_cache_variant(cache)
+            if variant is not None:
+                item.update(variant)
         group, artifact, version = PURL.fullmatch(item["purl"]).groups()
         path = ("/".join(group.split(".")) + f"/{artifact}/{version}/" +
                 item["filename"])
@@ -126,6 +177,7 @@ def audit(report: dict, fetcher=fetch) -> dict:
             "purl": item["purl"], "status": item["status"],
             "repositoryUrl": url, "localSha256": item["sha256"],
             "localByteSize": item["byteSize"], "remoteSha256": None,
+            "localEvidenceType": item.get("localEvidenceType", "SCOPED_PLUGIN_GRAPH_BYTES"),
             "publisherSignatureVerified": False, "licenseApproved": False,
         }
         if item["status"] == "PENDING_REMOTE":
@@ -166,13 +218,14 @@ def audit(report: dict, fetcher=fetch) -> dict:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--plugin-inventory", type=Path, required=True)
+    p.add_argument("--cache", type=Path)
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args(argv)
     try:
         inp = args.plugin_inventory
         if inp.is_symlink() or not inp.is_file() or inp.stat().st_size > MAX_REPORT:
             raise AuditError("missing/oversized plugin inventory")
-        report = audit(json.loads(inp.read_text(encoding="utf-8")))
+        report = audit(json.loads(inp.read_text(encoding="utf-8")), cache=args.cache)
         args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
                                encoding="utf-8")
     except (AuditError, OSError, ValueError, UnicodeError, TypeError) as exc:
