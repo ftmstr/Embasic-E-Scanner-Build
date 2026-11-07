@@ -193,7 +193,7 @@ jobs:
                     record["remoteSha256"] or "NO_REMOTE_HASH", record["repositoryUrl"])
           print("NOT VERIFIED: 147-module publisher provenance and entire plugin license inventory")
           PY
-      - name: Probe four bounded selected Gradle build-tool transitive JARs against Maven Central
+      - name: Probe four distinct POM-license-gap Gradle JARs against Maven Central
         shell: bash
         run: |
           set -euo pipefail
@@ -209,6 +209,14 @@ jobs:
           x = json.loads(p.read_text(encoding="utf-8"))
           assert x["selectedArtifactCount"] == 4
           assert x["sourceByteMatches"] + x["notSourceVerified"] == 4
+          assert {r["purl"] for r in x["records"]} == {
+              "pkg:maven/com.google.guava/failureaccess@1.0.2",
+              "pkg:maven/com.google.protobuf/protobuf-java-util@3.25.5",
+              "pkg:maven/com.google.jimfs/jimfs@1.1",
+              "pkg:maven/com.google.auto.value/auto-value-annotations@1.6.2",
+          }
+          assert all(r["directPomLicenseMetadata"] == "POM_WITHOUT_DIRECT_LICENSE_NAME"
+                     and r["licenseApproved"] is False for r in x["records"])
           assert x["status"] in ("SOURCE_BYTE_PARITY_PASS", "PARTIAL_EVIDENCE_ONLY")
           assert x["publisherSignatureVerified"] is False
           assert x["originAttributionVerified"] is False
