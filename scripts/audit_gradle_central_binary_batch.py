@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Four further fixed Gradle root build-tool JARs vs official Maven Central bytes.
+"""Four NEW direct-license-gap Gradle build-tool JARs vs official Maven bytes.
 
 Strict build-only scope. Inputs are resolved PUBLIC CI Gradle module inventory
 with SHA256 of *local* artifact bytes. Only the four reviewed Maven coordinates
@@ -18,10 +18,10 @@ import sys
 from urllib import error, request
 
 TARGETS = (
-    "pkg:maven/com.google.guava/guava@33.3.1-jre",
-    "pkg:maven/com.google.protobuf/protobuf-java@3.25.5",
-    "pkg:maven/commons-io/commons-io@2.16.1",
-    "pkg:maven/org.slf4j/slf4j-api@1.7.30",
+    "pkg:maven/com.google.guava/failureaccess@1.0.2",
+    "pkg:maven/com.google.protobuf/protobuf-java-util@3.25.5",
+    "pkg:maven/com.google.jimfs/jimfs@1.1",
+    "pkg:maven/com.google.auto.value/auto-value-annotations@1.6.2",
 )
 ORIGIN = "https://repo.maven.apache.org/maven2"
 PURL = re.compile(r"pkg:maven/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)@([A-Za-z0-9_.-]+)\Z")
@@ -68,6 +68,11 @@ def choose(report: dict) -> list[dict]:
         group, artifact, version = PURL.fullmatch(purl).groups()
         expected = artifact + "-" + version + ".jar"
         module = lookup[purl]
+        # All four have genuinely missing direct child POM license names in
+        # the pre-change PUBLIC Gradle graph. This is not a license grant,
+        # even if an unverified parent later supplies a license label.
+        if module.get("licenseMetadataState") != "POM_WITHOUT_DIRECT_LICENSE_NAME":
+            raise AuditError("missing expected child-POM license metadata gap: " + purl)
         files = module.get("cachedFiles")
         if not isinstance(files, list) or len(files) > 32:
             raise AuditError("missing/oversized cached-file evidence")
@@ -155,7 +160,7 @@ def audit(report: dict, fetcher=retrieve) -> dict:
     matched = sum(x["status"] == "SOURCE_BYTES_MATCH_LOCAL" for x in results)
     return {
         "schemaVersion": 1,
-        "scope": "FOUR fixed Maven Central build-tool transitives; not all 147",
+        "scope": "FOUR distinct no-direct-license Gradle build-tool JARs; not all 147",
         "selectedArtifactCount": len(TARGETS), "sourceByteMatches": matched,
         "notSourceVerified": len(TARGETS) - matched,
         "status": "SOURCE_BYTE_PARITY_PASS" if matched == len(TARGETS)
