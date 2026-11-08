@@ -139,6 +139,22 @@ jobs:
           assert data["releaseApproved"] is False and data["sbomComplete"] is False
           assert data["licenseApproval"] == "NOT_VERIFIED" and data["originVerified"] is False
           print("PLUGIN_CACHE_HASHED:", counts["hashedFiles"])
+          classifier_rows = [
+              (module["purl"], entry) for module in data["modules"]
+              for entry in module.get("cachedFiles", [])
+              if entry.get("classifier") is not None
+          ]
+          assert counts["classifierJarFiles"] == len(classifier_rows)
+          assert counts["classifierJarModules"] == len({p for p, _ in classifier_rows})
+          assert counts["classifierJarFiles"] >= 1
+          assert all(entry["binaryOrigin"] == "NOT_VERIFIED"
+                     and entry["sourceVerification"] == "LOCAL_BYTES_ONLY"
+                     for _, entry in classifier_rows)
+          print("CLASSIFIER_JAR_FILES_LOCAL_SHA:", len(classifier_rows))
+          print("CLASSIFIER_JAR_MODULES:", counts["classifierJarModules"])
+          for purl, entry in classifier_rows:
+              print("CLASSIFIER_UNVERIFIED_LOCAL_SHA:", purl,
+                    entry["filename"], entry["sha256"], entry["classifier"])
           print("PLUGIN_CACHE_UNVERIFIED_MODULES:", counts["withoutLocalBytes"])
           print("PLUGIN_POM_LICENSING_METADATA_ROWS:", counts["pomWithLicenseNames"])
           gaps = data["missingDirectLicenseEvidence"]
@@ -186,6 +202,24 @@ jobs:
           assert x["originAttributionVerified"] is False
           assert x["licenseClosure"] == "NOT_VERIFIED"
           assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          inventory = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                                  "gradle-plugin-artifact-evidence.json").read_text())
+          kotlin = next(m for m in inventory["modules"] if
+                        m["purl"] == "pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin@2.3.21")
+          classified = [entry for entry in kotlin.get("cachedFiles", [])
+                        if entry["filename"] == "kotlin-gradle-plugin-2.3.21-gradle813.jar"]
+          assert len(classified) == 1
+          candidate = classified[0]
+          assert candidate["classifier"] == "gradle813"
+          assert candidate["binaryOrigin"] == "NOT_VERIFIED"
+          pinned = next(r for r in x["records"] if
+                        r["purl"] == kotlin["purl"])
+          assert candidate["sha256"] == pinned["localSha256"]
+          assert candidate["byteSize"] == pinned["localByteSize"]
+          if pinned["status"] == "SOURCE_BYTES_MATCH_LOCAL":
+              assert candidate["sha256"] == pinned["remoteSha256"]
+          print("KOTLIN_CLASSIFIER_INVENTORY_CROSSCHECK:", candidate["sha256"],
+                pinned["status"])
           print("PINNED_PLUGIN_JARS_MATCHED:", x["sourceByteMatches"])
           print("PINNED_PLUGIN_JARS_NOT_VERIFIED:", x["unverifiedPinnedPluginJars"])
           for record in x["records"]:
