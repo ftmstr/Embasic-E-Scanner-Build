@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -227,6 +227,54 @@ jobs:
                     record["remoteSha256"] or "NO_REMOTE_HASH", record["repositoryUrl"])
           print("NOT VERIFIED: 147-module publisher provenance and entire plugin license inventory")
           PY
+      - name: Verify two additional Kotlin gradle813 classifier JARs against exact official Maven Central bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle813_classifier_jars.py' -v
+          python3 scripts/audit_gradle813_classifier_jars.py \
+            --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --output "${RUNNER_TEMP}/gradle813-other-two-classifier-byte-evidence.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          directory = Path(os.environ["RUNNER_TEMP"])
+          evidence = json.loads((directory / "gradle813-other-two-classifier-byte-evidence.json").read_text())
+          inventory = json.loads((directory / "gradle-plugin-artifact-evidence.json").read_text())
+          expected = {
+              "pkg:maven/org.jetbrains.kotlin/fus-statistics-gradle-plugin@2.3.21":
+                  "73379b384d9da66419b5f4d5c83de1a99dd7f195662bc45c39443859e63e18b2",
+              "pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin-api@2.3.21":
+                  "ad58d2638ee041f6ce4e73e9782ebf528e18cf9003b1099aa7045ec958e3c195",
+          }
+          assert evidence["selectedClassifierCount"] == 2
+          assert evidence["sourceByteMatches"] == 2 and evidence["notSourceVerified"] == 0
+          assert evidence["status"] == "SOURCE_BYTE_PARITY_PASS"
+          assert {row["purl"] for row in evidence["records"]} == set(expected)
+          assert inventory["counts"]["classifierJarFiles"] == 3
+          assert inventory["counts"]["hashedFiles"] == 295
+          for row in evidence["records"]:
+              assert row["status"] == "SOURCE_BYTES_MATCH_LOCAL"
+              assert row["officialSha256"] == row["localSha256"] == expected[row["purl"]]
+              assert row["officialByteSize"] == row["localByteSize"]
+              module = next(m for m in inventory["modules"] if m["purl"] == row["purl"])
+              cached = [f for f in module["cachedFiles"] if f["filename"] == row["filename"]]
+              assert len(cached) == 1
+              assert cached[0]["sha256"] == row["localSha256"]
+              assert cached[0]["byteSize"] == row["localByteSize"]
+              assert cached[0]["classifier"] == "gradle813"
+              assert cached[0]["binaryOrigin"] == "NOT_VERIFIED"
+              print("GRADLE813_OFFICIAL_BYTE_MATCH:", row["purl"], row["officialSha256"],
+                    row["officialByteSize"], row["officialUrl"])
+          assert evidence["publisherSignatureVerified"] is False
+          assert evidence["originAttributionVerified"] is False
+          assert evidence["parentLicenseInheritanceVerified"] is False
+          assert evidence["licenseClosure"] == "NOT_VERIFIED"
+          assert evidence["noticeClosure"] == "NOT_VERIFIED"
+          assert evidence["sbomComplete"] is False and evidence["releaseApproved"] is False
+          print("NOT VERIFIED: signed publisher provenance, license rights, NOTICE, SBOM or release")
+          PY
       - name: Probe four distinct POM-license-gap Gradle JARs against Maven Central
         shell: bash
         run: |
@@ -374,6 +422,7 @@ jobs:
             ${{ runner.temp }}/gradle-plugin-partial-inventory.json
             ${{ runner.temp }}/gradle-plugin-artifact-evidence.json
             ${{ runner.temp }}/android-pinned-plugin-jar-byte-parity.json
+            ${{ runner.temp }}/gradle813-other-two-classifier-byte-evidence.json
             ${{ runner.temp }}/gradle-central-buildtool-jar-byte-evidence.json
             ${{ runner.temp }}/gradle-missing-pom-source-research.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
