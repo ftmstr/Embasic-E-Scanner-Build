@@ -306,6 +306,74 @@ class PluginArtifactEvidenceTests(unittest.TestCase):
             with self.assertRaises(mod.AuditError):
                 mod.audit(load(inp), cache)
 
+    def test_classifier_jar_sha_is_recorded_without_origin_approval(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            folder = cache / "org.jetbrains.kotlin" / "kotlin-gradle-plugin" / "2.3.21" / ("b" * 40)
+            folder.mkdir(parents=True)
+            variant = folder / "kotlin-gradle-plugin-2.3.21-gradle813.jar"
+            payload = b"synthetic Gradle813 variant, no publisher signature"
+            variant.write_bytes(payload)
+            result = mod.audit(load(inp), cache)
+            item = next(row for row in result["modules"] if row["purl"] == KOTLIN)
+            self.assertEqual(item["classifierJarCount"], 1)
+            self.assertEqual(result["counts"]["classifierJarFiles"], 1)
+            self.assertEqual(result["counts"]["classifierJarModules"], 1)
+            self.assertEqual(result["counts"]["hashedFiles"], 3)
+            self.assertEqual(item["licenseMetadataState"], "POM_NOT_CACHED")
+            entry = next(row for row in item["cachedFiles"] if row["filename"] == variant.name)
+            self.assertEqual(entry["sha256"], hashlib.sha256(payload).hexdigest())
+            self.assertEqual(entry["byteSize"], len(payload))
+            self.assertEqual(entry["classifier"], "gradle813")
+            self.assertEqual(entry["binaryOrigin"], "NOT_VERIFIED")
+            self.assertEqual(entry["sourceVerification"], "LOCAL_BYTES_ONLY")
+            self.assertFalse(result["originVerified"])
+            self.assertFalse(result["releaseApproved"])
+
+    def test_classifier_does_not_count_as_a_direct_pom_license(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            folder = cache / "com.android.tools.build" / "gradle" / "8.13.2" / ("a" * 40)
+            (folder / "gradle-8.13.2-sources.jar").write_bytes(b"synthetic source jar")
+            result = mod.audit(load(inp), cache)
+            self.assertEqual(result["counts"]["classifierJarFiles"], 1)
+            self.assertEqual(result["counts"]["pomWithLicenseNames"], 1)
+            self.assertEqual(result["counts"]["pomNotCached"], 1)
+            self.assertFalse(result["parentLicenseInheritanceVerified"])
+
+    def test_classifier_name_must_use_exact_coordinate_prefix_and_jar_extension(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            folder = cache / "com.android.tools.build" / "gradle" / "8.13.2" / ("a" * 40)
+            (folder / "gradle-8.13.2other.jar").write_bytes(b"fake")
+            (folder / "gradle-8.13.2-custom.pom").write_bytes(b"fake")
+            (folder / "gradle-8.13.2-!bad.jar").write_bytes(b"fake")
+            result = mod.audit(load(inp), cache)
+            self.assertEqual(result["counts"]["classifierJarFiles"], 0)
+            self.assertEqual(result["counts"]["hashedFiles"], 2)
+
+    def test_symlinked_classifier_jar_is_rejected_fail_closed(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            folder = cache / "com.android.tools.build" / "gradle" / "8.13.2" / ("a" * 40)
+            (folder / "gradle-8.13.2-gradle813.jar").symlink_to("/etc/hosts")
+            with self.assertRaises(mod.AuditError):
+                mod.audit(load(inp), cache)
+
+    def test_stale_notice_counter_rejects_new_classifier_hash_evidence(self):
+        with TemporaryDirectory() as directory:
+            inp, cache, jar, pom = synthetic(Path(directory))
+            folder = cache / "com.android.tools.build" / "gradle" / "8.13.2" / ("a" * 40)
+            (folder / "gradle-8.13.2-gradle813.jar").write_bytes(b"classified")
+            result = mod.audit(load(inp), cache)
+            stale = ("NOT a complete SBOM; UNVERIFIED_SUPPLIER_POM; releaseApproved=false\n"
+                     "- pluginModules: 2\n"
+                     "- pluginLicenseNameMetadata: 1\n"
+                     "- pluginMissingLicenseMetadata: 1\n"
+                     "- pluginCachedFileHashes: 2\n")
+            with self.assertRaisesRegex(mod.AuditError, "stale or duplicate"):
+                mod.check_partial_notice(result, stale)
+
     def test_oversized_metadata_is_not_accepted(self):
         self.assertEqual(mod._licenses(b"x" * (mod.MAX_METADATA + 1))[0]["name"],
                          "UNREADABLE_OVERSIZE_POM")
