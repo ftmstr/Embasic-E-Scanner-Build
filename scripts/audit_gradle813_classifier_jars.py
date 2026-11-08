@@ -182,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
         inp = args.plugin_inventory
         if inp.is_symlink() or not inp.is_file() or not 0 < inp.stat().st_size <= MAX_REPORT:
             raise AuditError("invalid or oversized local Gradle inventory")
-        result = audit(json.loads(inp.read_text(encoding="utf-8")))
+        result = audit(json.loads(inp.read_text(encoding="utf-8")), fetcher=retrieve)
         args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n",
                                encoding="utf-8")
     except (AuditError, UnicodeError, ValueError, TypeError, OSError) as exc:
