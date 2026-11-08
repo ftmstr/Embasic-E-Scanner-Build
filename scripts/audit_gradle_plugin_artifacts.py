@@ -22,6 +22,7 @@ import xml.etree.ElementTree as ET
 PURL = re.compile(r"pkg:maven/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)@([A-Za-z0-9_.-]+)\Z")
 CACHE_DIGEST = re.compile(r"[0-9a-f]{40}\Z")
 ALLOWED_EXT = frozenset({".jar", ".pom", ".module", ".aar"})
+CLASSIFIER_JAR_SUFFIX = re.compile(r"-([A-Za-z0-9][A-Za-z0-9._-]{0,79})\.jar\Z")
 MAX_INPUT = 3_000_000
 MAX_METADATA = 1_000_000
 MAX_FILE = 128 * 1024 * 1024
@@ -194,7 +195,8 @@ def audit(graph: dict, cache: Path) -> dict:
               "withoutLocalBytes": 0, "hashedFiles": 0,
               "unreadablePom": 0, "pomWithLicenseNames": 0,
               "pomWithoutDirectLicenseName": 0, "pomNotCached": 0,
-              "pomHasUnresolvedParent": 0}
+              "pomHasUnresolvedParent": 0,
+              "classifierJarFiles": 0, "classifierJarModules": 0}
     for purl, record in sorted(modules.items()):
         group, name, version = PURL.fullmatch(purl).groups()
         base = cache / group / name / version
@@ -210,6 +212,7 @@ def audit(graph: dict, cache: Path) -> dict:
         if len(hashes) > MAX_COUNT:
             raise AuditError("excessive cache digest directories")
         found: list[dict] = []
+        module_classifier_jars = 0
         license_set: set[tuple[str, str]] = set()
         unreadable = False
         pom_files = 0
@@ -227,7 +230,16 @@ def audit(graph: dict, cache: Path) -> dict:
                     continue
                 if file.is_symlink() or not file.is_file():
                     raise AuditError("symlinked or unsafe cached Maven artifact")
-                if not file.name.startswith(name + "-" + version + "."):
+                prefix = name + "-" + version
+                rest = file.name[len(prefix):] if file.name.startswith(prefix) else ""
+                if rest in (".jar", ".pom", ".module", ".aar"):
+                    classifier = None
+                elif file.suffix.lower() == ".jar":
+                    matched = CLASSIFIER_JAR_SUFFIX.fullmatch(rest)
+                    if not matched:
+                        continue
+                    classifier = matched.group(1)
+                else:
                     continue
                 size = file.stat().st_size
                 if size <= 0 or size > MAX_FILE:
@@ -239,7 +251,11 @@ def audit(graph: dict, cache: Path) -> dict:
                         digest.update(chunk)
                 found.append({"filename": file.name, "byteSize": size,
                               "sha256": digest.hexdigest(),
+                              "classifier": classifier,
+                              "binaryOrigin": "NOT_VERIFIED",
                               "sourceVerification": "LOCAL_BYTES_ONLY"})
+                if classifier is not None:
+                    module_classifier_jars += 1
                 if file.suffix.lower() == ".pom":
                     pom_files += 1
                     content = _file_bytes(file, MAX_FILE)
@@ -264,6 +280,10 @@ def audit(graph: dict, cache: Path) -> dict:
                 record["cacheStatus"] = "NO_LOCAL_EVIDENCE"
             totals["withoutLocalBytes"] += 1
         totals["hashedFiles"] += len(found)
+        totals["classifierJarFiles"] += module_classifier_jars
+        if module_classifier_jars:
+            totals["classifierJarModules"] += 1
+        record["classifierJarCount"] = module_classifier_jars
         record["pomFilesSeen"] = pom_files
         record["unresolvedPomParents"] = sorted(parents)
         if license_set:
