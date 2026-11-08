@@ -130,8 +130,9 @@ updated to 295 **only because of that independently observed CI result**.
 The classified files are not approved as signed publisher-origin artifacts,
 and source/testing classifiers must not be treated as linked product runtime.
 
-The four directly missing child POM license names and all other unresolved
-licenses remain independent of these byte hash counts. Do not infer legal
+All 42 unresolved direct child POM license metadata gaps (12 POMs not
+cached, 30 POMs without direct license names) remain independent of these
+byte hash counts. Do not infer legal
 license permissions or a complete build-tool/software bill of materials from
 a larger number of locally fingerprinted cache files.
 
