@@ -95,7 +95,7 @@ retained as a GitHub Actions artifact:
 - pluginModules: 147
 - pluginLicenseNameMetadata: 105
 - pluginMissingLicenseMetadata: 42
-- pluginCachedFileHashes: 292
+- pluginCachedFileHashes: 295
 
 All 147 selected Maven modules had at least one local cached file hashed;
 292 cached files were SHA-256 fingerprinted. Supplier POM license-name
@@ -114,6 +114,26 @@ binary publisher authenticity, transitive legal rights, license text retention,
 all per-module notices, complete SPDX/CycloneDX/SBOM, Windows App SDK and
 signed distributables. This section is a CI-scoped **PARTIAL** inventory,
 not a complete third-party notices release obligation inventory.
+
+## Classified Gradle JAR local SHA evidence — 8 November 2026
+
+The PUBLIC Gradle build-tool cache inventory previously omitted selected
+`artifact-version-classifier.jar` byte files, including Kotlin's reviewed
+`gradle813` classifier. The new, bounded filename parser records classified
+JAR byte sizes and local SHA-256 evidence under `sourceVerification =
+LOCAL_BYTES_ONLY`, `binaryOrigin = NOT_VERIFIED`.
+
+The actual Android CI on 8 November 2026 rejected the old snapshot
+`pluginCachedFileHashes: 292` with explicit expected marker
+`pluginCachedFileHashes: 295`. This partial NOTICE counter has been
+updated to 295 **only because of that independently observed CI result**.
+The classified files are not approved as signed publisher-origin artifacts,
+and source/testing classifiers must not be treated as linked product runtime.
+
+The four directly missing child POM license names and all other unresolved
+licenses remain independent of these byte hash counts. Do not infer legal
+license permissions or a complete build-tool/software bill of materials from
+a larger number of locally fingerprinted cache files.
 
 ## Windows App SDK temporary restore license metadata gap — 6 November 2026
 
