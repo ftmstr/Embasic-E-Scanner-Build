@@ -353,7 +353,9 @@ def check_partial_notice(result: dict, notice: str) -> None:
     for name, count in expected.items():
         marker = f"- {name}: {count}"
         if notice.splitlines().count(marker) != 1:
-            raise AuditError("stale or duplicate partial plugin NOTICE counter: " + name)
+            raise AuditError(
+                "stale or duplicate partial plugin NOTICE counter: " + name
+                + "; expected marker " + repr(marker))
 
 
 def main(argv: list[str] | None = None) -> int:
