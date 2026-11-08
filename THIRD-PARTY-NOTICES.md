@@ -97,8 +97,10 @@ retained as a GitHub Actions artifact:
 - pluginMissingLicenseMetadata: 42
 - pluginCachedFileHashes: 295
 
-All 147 selected Maven modules had at least one local cached file hashed;
-292 cached files were SHA-256 fingerprinted. Supplier POM license-name
+In the 2 November historical snapshot, all 147 selected Maven modules had
+at least one local cached file hashed and 292 cached files were fingerprinted.
+The later 8 November classifier-aware CI snapshot hashes 295 cached files
+for those 147 modules; see the separate dated section below. Supplier POM license-name
 metadata was available for only 105 modules. The other 42 modules have
 no extracted POM license name; they MUST NOT be marked approved.
 Even the 105 source labels are **UNVERIFIED_SUPPLIER_POM**, not legal or
@@ -135,6 +137,39 @@ cached, 30 POMs without direct license names) remain independent of these
 byte hash counts. Do not infer legal
 license permissions or a complete build-tool/software bill of materials from
 a larger number of locally fingerprinted cache files.
+
+## Exact Maven Central Kotlin classifier source-byte comparison — 9 November 2026
+
+The PUBLIC source integrity gate in scripts/audit_gradle813_classifier_jars.py
+and its offline negative tests covers **only two build-tool classifier JARs**
+not independently compared in the 8 November report. Fixed PURL/filename/SHA:
+
+- pkg:maven/org.jetbrains.kotlin/fus-statistics-gradle-plugin@2.3.21,
+  fus-statistics-gradle-plugin-2.3.21-gradle813.jar,
+  73379b384d9da66419b5f4d5c83de1a99dd7f195662bc45c39443859e63e18b2
+- pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin-api@2.3.21,
+  kotlin-gradle-plugin-api-2.3.21-gradle813.jar,
+  ad58d2638ee041f6ce4e73e9782ebf528e18cf9003b1099aa7045ec958e3c195
+
+Only exact static Maven Central HTTPS paths for the above coordinates are
+requested, with no redirects. Selected Gradle cached JAR size/SHA,
+the historical local SHA pin and downloaded repository bytes must all agree.
+Byte mismatches block. Network/404/missing cache means NOT VERIFIED; an
+offline synthetic test alone cannot establish an upstream source-byte PASS.
+The CI evidence filename is gradle813-other-two-classifier-byte-evidence.json
+when its actual Android workflow job executes successfully.
+
+**IMPORTANT:** Even if exact official endpoint byte parity is verified,
+publisherSignatureVerified, originAttributionVerified, licenseClosure,
+noticeClosure and sbomComplete remain negative. There is no claim of
+licensable binary rights, signed provenance or a complete product BOM.
+Parent-POM names are untrusted metadata, not inherited license grants.
+The **42 direct child POM gaps remain unresolved**.
+
+Full legal action matrix and authoritative-document limitations:
+docs/GRADLE813-TWO-CLASSIFIER-SOURCE-PARITY-20261109.md.
+The Microsoft.Windows.SDK.BuildTools 10.0.26100.4654 use versus
+redistribution/REDIST.TXT question is a separate blocking review.
 
 ## Windows App SDK temporary restore license metadata gap — 6 November 2026
 
