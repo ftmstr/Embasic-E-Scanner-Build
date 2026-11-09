@@ -171,6 +171,30 @@ docs/GRADLE813-TWO-CLASSIFIER-SOURCE-PARITY-20261109.md.
 The Microsoft.Windows.SDK.BuildTools 10.0.26100.4654 use versus
 redistribution/REDIST.TXT question is a separate blocking review.
 
+## Windows SDK BuildTools exact NuGet archive hash vs REDIST rights — 9 November 2026
+
+This independent PUBLIC-only build-tool evidence audit DOES NOT clear
+Microsoft.Windows.SDK.BuildTools 10.0.26100.4654 for commercial
+redistribution. The disposable restore-selected package has a supplier
+legacy licenseUrl but NO direct nuspec licence declaration.
+
+A bounded cache audit verifies two **different** NuGet SHA-512 domains:
+raw .nupkg byte SHA-512 against its cache .nupkg.sha512; and
+signature-neutral .nupkg.metadata/contentHash against project.assets.json
+restore metadata. Their difference for signed nupkg is expected by NuGet's
+package hash design (https://github.com/NuGet/Home/wiki/Nupkg-Metadata-File).
+The exact embedded .nuspec SHA-256 is compared with the restore-extracted
+.nuspec SHA-256. Archive filename evidence can identify REDIST/LICENSE
+candidates, but neither their presence nor absence proves distribution
+rights. The audit does not validate publisher signing identity.
+
+Code: scripts/audit_windows_sdk_buildtools_nupkg.py;
+legal boundary: docs/WINDOWS-BUILDTOOLS-EXACT-NUPKG-REDIST-REVIEW-20261109.md.
+The source code, actual REDIST.TXT and applicable package-version licence
+and release-payload composition still require independent review.
+NOTICE/LICENSES, complete SBOM and product source LICENSE are UNVERIFIED.
+No Windows installer or product runtime inclusion has been approved.
+
 ## Windows App SDK temporary restore license metadata gap — 6 November 2026
 
 This is a **disposable build-tool compatibility probe**, not a Windows
