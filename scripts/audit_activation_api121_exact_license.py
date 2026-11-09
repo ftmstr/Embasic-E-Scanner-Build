@@ -9,14 +9,18 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from io import BytesIO
 import json
+import stat
+import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import re
 import sys
 from urllib import request, error
 
 from audit_jaf120_exact_license import (
-    AuditError, NoRedirect, _embedded_license, _git_blob_sha1, _pom,
+    AuditError, NoRedirect, _git_blob_sha1, _pom,
     _read, _sha,
 )
 
@@ -46,6 +50,72 @@ LIMITS = {
 }
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
+
+
+ARCHIVE_LICENSE = "META-INF/LICENSE.md"
+ARCHIVE_NOTICE = "META-INF/NOTICE.md"
+
+
+def _child_pom(raw: bytes) -> tuple[str, list[dict]]:
+    """Exact Jakarta child inherits version from a *different* group parent."""
+    if (not 0 < len(raw) <= 65536 or b"<!DOCTYPE" in raw.upper()
+            or b"<!ENTITY" in raw.upper()):
+        raise AuditError("unsafe Jakarta API POM bytes")
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        raise AuditError("malformed Jakarta API Maven POM") from exc
+    def elem(path: str) -> str:
+        return (root.findtext(path) or "").strip()
+    parent = root.find("./{*}parent")
+    if parent is None:
+        raise AuditError("missing exact Jakarta API parent")
+    parent_coord = ":".join((parent.findtext("./{*}" + k) or "").strip()
+                             for k in ("groupId", "artifactId", "version"))
+    if (elem("./{*}groupId") != "jakarta.activation"
+            or elem("./{*}artifactId") != "jakarta.activation-api"
+            or elem("./{*}version") not in ("", "1.2.1")
+            or parent_coord != PARENT_COORD):
+        raise AuditError("Maven child group/artifact/inherited-version/parent mismatch")
+    licenses = root.findall("./{*}licenses/{*}license")
+    return parent_coord, [
+        {"name": (p.findtext("./{*}name") or "").strip()} for p in licenses
+    ]
+
+
+def _archive_legal_texts(raw: bytes) -> dict[str, bytes]:
+    if not 0 < len(raw) <= LIMITS[CHILD_JAR]:
+        raise AuditError("JAR exceeds allowed binary size")
+    texts: dict[str, bytes] = {}
+    try:
+        with zipfile.ZipFile(BytesIO(raw)) as z:
+            info = z.infolist()
+            if not 0 < len(info) <= 2048:
+                raise AuditError("unbounded JAR member count")
+            seen: set[str] = set()
+            unpacked = 0
+            for member in info:
+                name = member.filename
+                parts = name.rstrip("/").split("/")
+                if (not name or name.startswith(("/", "\\"))
+                        or "\\" in name or ":" in name or "//" in name
+                        or any(p in ("", ".", "..") for p in parts)
+                        or name.casefold() in seen
+                        or stat.S_IFMT(member.external_attr >> 16) == stat.S_IFLNK):
+                    raise AuditError("unsafe JAR path, symlink or duplicate")
+                seen.add(name.casefold())
+                unpacked += member.file_size
+                if unpacked > 20_000_000:
+                    raise AuditError("decompression bomb in JAR metadata")
+                if name in (ARCHIVE_LICENSE, ARCHIVE_NOTICE):
+                    if member.file_size > 16384 or name in texts:
+                        raise AuditError("duplicate or oversized JAR legal text")
+                    texts[name] = z.read(member)
+    except (zipfile.BadZipFile, RuntimeError, EOFError, OSError) as exc:
+        raise AuditError("malformed Maven JAR archive") from exc
+    if set(texts) != {ARCHIVE_LICENSE, ARCHIVE_NOTICE} or any(not x for x in texts.values()):
+        raise AuditError("missing exact JAR-embedded LICENSE.md/NOTICE.md")
+    return texts
 
 def retrieve(url: str) -> bytes:
     limit = LIMITS.get(url)
@@ -185,8 +255,7 @@ def audit(inventory: dict, queue: dict, runtime: dict, fetch=retrieve,
         raise AuditError("exact published Maven API JAR differs from cache")
     if _sha(blobs[PARENT_POM]) != parents[0]["localPOMSha256"]:
         raise AuditError("exact Maven parent POM differs from cache SHA")
-    parent, child_lic = _pom(blobs[CHILD_POM],
-                             "jakarta.activation", "jakarta.activation-api", "1.2.1")
+    parent, child_lic = _child_pom(blobs[CHILD_POM])
     if parent != PARENT_COORD or child_lic:
         raise AuditError("published child POM direct licence state or parent changed")
     _, parent_lic = _pom(blobs[PARENT_POM],
@@ -207,16 +276,17 @@ def audit(inventory: dict, queue: dict, runtime: dict, fetch=retrieve,
             or b"SPDX-License-Identifier: BSD-3-Clause" not in tag_pom
             or b"only intended to be used" not in tag_pom):
         raise AuditError("exact tagged EDL / BSD three-clause supplier material changed")
-    tag_parent, tag_lic = _pom(tag_pom,
-                               "jakarta.activation", "jakarta.activation-api", "1.2.1")
+    tag_parent, tag_lic = _child_pom(tag_pom)
     if tag_parent != PARENT_COORD or tag_lic:
         raise AuditError("exact source tag API POM parent/direct licence mismatch")
     if tag_pom != blobs[CHILD_POM]:
         raise AuditError("published child POM diverged from exact source release tag POM")
 
-    jar_lic = _embedded_license(blobs[CHILD_JAR])
-    if jar_lic != upstream_tag_lic:
-        raise AuditError("API JAR embedded licence differs from exact release tag")
+    jar_legal = _archive_legal_texts(blobs[CHILD_JAR])
+    jar_lic = jar_legal[ARCHIVE_LICENSE]
+    jar_notice = jar_legal[ARCHIVE_NOTICE]
+    if jar_lic != upstream_tag_lic or jar_notice != tag_notice:
+        raise AuditError("API JAR-embedded LICENSE/NOTICE differs from immutable source tag")
     return {
         "schemaVersion": 1,
         "status": "EXACT_ACTIVATION_API121_SOURCE_BYTES_MATCH_LEGAL_REVIEW_OPEN",
@@ -228,7 +298,9 @@ def audit(inventory: dict, queue: dict, runtime: dict, fetch=retrieve,
         "mavenJar": {"url": CHILD_JAR, "sha256": _sha(blobs[CHILD_JAR]),
                      "byteSize": len(blobs[CHILD_JAR]),
                      "embeddedLicenseSha256": _sha(jar_lic),
-                     "matchesLocalGradleBytes": True, "embeddedTextTagByteParity": True},
+                     "embeddedNoticeSha256": _sha(jar_notice),
+                     "matchesLocalGradleBytes": True, "embeddedTextTagByteParity": True,
+                     "embeddedNoticeTagByteParity": True},
         "upstreamTag": {"name": "1.2.1", "tagObject": ANNOTATED_TAG_SHA,
                          "commit": VERSION_COMMIT, "tagCryptographicallySigned": TAG_SIGNED,
                          "licenseGitBlobSha1": _git_blob_sha1(upstream_tag_lic),
