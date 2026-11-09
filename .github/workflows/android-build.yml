@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -508,6 +508,56 @@ jobs:
                 e["all42DirectPOMMetadataGapsOpen"])
           print("NOT VERIFIED: unsigned tag publisher signature, exact legal choice, runtime packaging and release rights")
           PY
+      - name: Verify iStack Commons 3.0.8 exact unsigned tagged EDL LICENSE/NOTICE Maven JAR (NOT legal clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_istack308_exact_license.py' -v
+          python3 scripts/audit_istack308_exact_license.py \
+            --inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/istack308-exact-source-legal-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "istack308-exact-source-legal-evidence.json").read_text(encoding="utf-8"))
+          assert e["schemaVersion"] == 1
+          assert e["status"] == "EXACT_ISTACK308_MAVEN_TAG_LICENSE_NOTICE_PARITY_LEGAL_REVIEW_OPEN"
+          assert e["purl"] == "pkg:maven/com.sun.istack/istack-commons-runtime@3.0.8"
+          assert e["tag"]["name"] == "3.0.8"
+          assert e["tag"]["commit"] == "5384038f6a62c7e4ed32b609fa15c796732dd3c5"
+          assert e["tag"]["tagObject"] == "f7e3de724c9c87fe7bdb59acc4b2588508907e22"
+          assert e["tag"]["tagCryptographicallySigned"] is False
+          assert e["tag"]["licenseBlobSha1"] == "c739f78bc05856bfbfe35a5b76f2d4e6242cea66"
+          assert e["tag"]["noticeBlobSha1"] == "85121e7dd8aac65432eec604c6fe12cce454e79c"
+          assert e["tag"]["runtimePomBlobSha1"] == "3900bb38f6cea873fcfca9cb85ea867fd4d9193a"
+          assert e["tag"]["parentPomBlobSha1"] == "1bf55a0f4655d0dd63187f1b905e48764c623c59"
+          assert e["mavenChildPOM"]["tagSourceByteParity"] is True
+          assert e["mavenParentPOM"]["tagSourceByteParity"] is True
+          assert e["mavenJar"]["matchesSelectedLocalGradleCache"] is True
+          assert e["mavenJar"]["embeddedLicenseNoticeTagByteParity"] is True
+          assert e["mavenJar"]["embeddedLicenseSha256"] == e["tag"]["licenseSha256"]
+          assert e["mavenJar"]["embeddedNoticeSha256"] == e["tag"]["noticeSha256"]
+          assert e["mavenParentPOM"]["licenseName"] == "Eclipse Distribution License - v 1.0"
+          assert e["organizationalAncestor"]["effectiveChildLicenseNotInferred"] is True
+          assert e["all42ChildPOMReviewGapsOpen"] is True
+          assert e["licenseOptionSelected"] is False
+          assert e["publisherSignatureVerified"] is False
+          assert e["productRuntimeInclusionVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("ISTACK308_EXACT_JAR_SHA256:", e["mavenJar"]["sha256"])
+          print("ISTACK308_TAG_LICENSE_SHA256:", e["tag"]["licenseSha256"])
+          print("ISTACK308_TAG_NOTICE_SHA256:", e["tag"]["noticeSha256"])
+          print("ISTACK308_TAGGED_LEGAL_BYTES_MATCH:", True)
+          print("ISTACK308_REVIEW_GAPS_OPEN:", e["all42ChildPOMReviewGapsOpen"])
+          print("NOT VERIFIED: effective child/source licenses, publisher signature, release APK/MSIX file scope or commercial rights")
+          PY
       - name: Hash actual Gradle cached JARs from scoped resolved graph
         shell: bash
         run: |
@@ -570,6 +620,7 @@ jobs:
             ${{ runner.temp }}/gradle-pom-legal-review-queue.json
             ${{ runner.temp }}/jaf120-exact-source-license-evidence.json
             ${{ runner.temp }}/activation-api121-exact-source-license-evidence.json
+            ${{ runner.temp }}/istack308-exact-source-legal-evidence.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
             ${{ runner.temp }}/android-resolved-jar-hashes.json
             ${{ runner.temp }}/android-official-jar-byte-parity.json
