@@ -210,6 +210,41 @@ signals are review prompts only; all 42 child licensing gaps, exact legal
 texts, third-party rights and NOTICE/SBOM closure remain NOT VERIFIED.
 No linked or embedded GPL/LGPL/MPL licence claim has been made.
 
+## JAF 1.2.0 exact release-tag and JAR-embedded licence byte crosscheck — 9 Nov 2026
+
+PUBLIC Gradle root/app BUILD-TOOL selected
+pkg:maven/com.sun.activation/javax.activation@1.2.0 is one of the **42**
+unresolved direct child POM licence metadata gaps. Its Maven parent POM
+com.sun.activation:all:1.2.0 lists CDDL/GPLv2+CE. The parent's supplier
+licence link points to mutable GitHub master; this is **not** exact
+version provenance or an approved effective child licence.
+
+An original, immutable release-tag source was found in the archived upstream
+javaee/activation JAF-1_2_0 release, commit
+8f8ec08d736983c839d31a7bd98d29594e508785, LICENSE.txt Git blob
+5ad62c442b336861b5832b7a8197a507b7df61f0. The full CDDL-1.1,
+GPLv2 and Classpath Exception licence text and source-file header exceptions
+require individual human review. Nothing here chooses CDDL or GPL,
+guarantees an exception applies, or clears third-party redistribution.
+
+scripts/audit_jaf120_exact_license.py (synthetic tests at
+tests/test_jaf120_exact_license.py) checks official Maven Central exact
+child/parent POM and JAR bytes against selected LOCAL Gradle cache hashes,
+and compares the JAR-embedded META-INF/LICENSE.txt to exact tagged
+LICENSE.txt bytes. It also checks the partial Android app/test dependency
+graph has not changed to include this build-tool coordinate. A file/byte
+mismatch is BLOCKED, not silently accepted. GitHub CI retains only a
+scoped JSON evidence report, not a ready-to-ship licence bundle.
+
+Official exact-tag reference:
+https://github.com/javaee/activation/releases/tag/JAF-1_2_0
+Versioned scope/readiness decision:
+docs/JAF120-EXACT-TAG-LICENCE-BYTE-REVIEW-20261109.md.
+A matching licence text, POM or JAR hash does **not** prove signed publisher
+identity, actual Android APK inclusion/exclusion, SPDX/CycloneDX closure,
+legal redistribution rights or a completed THIRD-PARTY LICENSES inventory.
+All 42 child review items remain OPEN and product release is NO-GO.
+
 ## Windows SDK BuildTools exact NuGet archive hash vs REDIST rights — 9 November 2026
 
 This independent PUBLIC-only build-tool evidence audit DOES NOT clear
