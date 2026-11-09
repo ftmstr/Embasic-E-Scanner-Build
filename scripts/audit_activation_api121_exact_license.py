@@ -274,7 +274,7 @@ def audit(inventory: dict, queue: dict, runtime: dict, fetch=retrieve,
             or b"SPDX-License-Identifier: BSD-3-Clause" not in tag_notice
             or b"Eclipse Distribution License v. 1.0" not in tag_notice
             or b"SPDX-License-Identifier: BSD-3-Clause" not in tag_pom
-            or b"only intended to be used" not in tag_pom):
+            or b"*only* intended to be used" not in tag_pom):
         raise AuditError("exact tagged EDL / BSD three-clause supplier material changed")
     tag_parent, tag_lic = _child_pom(tag_pom)
     if tag_parent != PARENT_COORD or tag_lic:
