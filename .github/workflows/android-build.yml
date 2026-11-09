@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -340,6 +340,45 @@ jobs:
           print("POM_SOURCE_RESEARCH_UNAVAILABLE:", result["stillUnretrieved"])
           print("NOT VERIFIED: source POM metadata is not artifact signature or license clearance")
           PY
+      - name: Reconcile 42 selected Maven POM license gaps with bounded official-source research (NOT legal approval)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_reconcile_gradle_pom_license_gaps.py' -v
+          python3 scripts/reconcile_gradle_pom_license_gaps.py \
+            --plugin-report "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --pom-research "${RUNNER_TEMP}/gradle-missing-pom-source-research.json" \
+            --output "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-pom-legal-review-queue.json"
+          report = json.loads(p.read_text(encoding="utf-8"))
+          c = report["counts"]
+          assert report["status"] == "REVIEW_QUEUE_ONLY_LEGAL_NO_GO"
+          assert c["selectedModules"] == 147
+          assert c["directPOMLicenseGaps"] == 42
+          assert c["childPOMNotCached"] == 12
+          assert c["childPOMWithoutDirectLicenseName"] == 30
+          assert c["unreadableChildPOM"] == 0
+          assert c["remoteResearchTargets"] <= 32
+          assert len(report["reviewQueue"]) == 42
+          assert all(item["evidenceOnly"] is True
+                     and item["licenseApproved"] is False
+                     and item["redistributionRightsVerified"] is False
+                     for item in report["reviewQueue"])
+          assert report["allChildGapsRemainUnresolved"] is True
+          assert report["parentLicenseInheritanceVerified"] is False
+          assert report["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert report["licenseClosure"] == "NOT_VERIFIED"
+          assert report["noticeClosure"] == "NOT_VERIFIED"
+          assert report["sbomComplete"] is False and report["releaseApproved"] is False
+          print("LEGAL_REVIEW_QUEUE_SELECTED:", c["selectedModules"])
+          print("LEGAL_REVIEW_QUEUE_GAPS:", c["directPOMLicenseGaps"])
+          print("LEGAL_REVIEW_QUEUE_REMOTE_METADATA:", c["remoteMetadataRetrieved"])
+          print("LEGAL_REVIEW_QUEUE_UNRESOLVED:", len(report["reviewQueue"]))
+          print("NOT VERIFIED: 42 child license rights, exact Microsoft REDIST terms and product release")
+          PY
       - name: Audit resolved app and test configurations (partial inventory)
         shell: bash
         run: |
@@ -425,6 +464,7 @@ jobs:
             ${{ runner.temp }}/gradle813-other-two-classifier-byte-evidence.json
             ${{ runner.temp }}/gradle-central-buildtool-jar-byte-evidence.json
             ${{ runner.temp }}/gradle-missing-pom-source-research.json
+            ${{ runner.temp }}/gradle-pom-legal-review-queue.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
             ${{ runner.temp }}/android-resolved-jar-hashes.json
             ${{ runner.temp }}/android-official-jar-byte-parity.json
