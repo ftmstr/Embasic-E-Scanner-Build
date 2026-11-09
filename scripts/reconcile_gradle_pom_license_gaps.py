@@ -26,7 +26,8 @@ GAPS = {"POM_NOT_CACHED": "pomNotCached",
 # Heuristic review attention ONLY; not an SPDX classifier or legal conclusion.
 # Parent POM assertions are untrusted metadata even when a local SHA exists.
 COMPLEX_PARENT_NAMES = re.compile(
-    r"(?:\b(?:a?gpl|lgpl|mpl|cddl|epl|edl)\b"
+    r"(?:\b(?:a?gpl|lgpl)(?:v?[0-9]+(?:\.[0-9]+)?)?\b"
+    r"|\b(?:mpl|cddl|epl|edl)(?:-[0-9]+(?:\.[0-9]+)?)?\b"
     r"|gnu\s+(?:affero\s+|lesser\s+)?general\s+public"
     r"|eclipse\s+(?:public|distribution)\s+licen[cs]e"
     r"|mozilla\s+public\s+licen[cs]e"
