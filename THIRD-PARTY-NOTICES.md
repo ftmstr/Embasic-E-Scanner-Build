@@ -210,6 +210,38 @@ signals are review prompts only; all 42 child licensing gaps, exact legal
 texts, third-party rights and NOTICE/SBOM closure remain NOT VERIFIED.
 No linked or embedded GPL/LGPL/MPL licence claim has been made.
 
+## iStack Commons Runtime 3.0.8 — exact EDL/BSD tag and JAR-embedded legal text review (9 Nov 2026)
+
+The Gradle root/app BUILD-TOOL-only selected Maven module
+pkg:maven/com.sun.istack/istack-commons-runtime@3.0.8 has no direct
+child POM license name. Its parent com.sun.istack:istack-commons:3.0.8
+declares Eclipse Distribution License - v 1.0; organization-wide
+org.eclipse.ee4j:project:1.0.5 includes EPLv2 and GPLv2/Classpath
+Exception names as unverified PARENT metadata. These are NOT an
+automatic effective child licence or confirmed Android APK runtime bytes.
+
+Original supplier tag 3.0.8 (eclipse-ee4j/jaxb-istack-commons) is
+pinned to commit 5384038f6a62c7e4ed32b609fa15c796732dd3c5,
+original LICENSE.md Git blob
+c739f78bc05856bfbfe35a5b76f2d4e6242cea66, NOTICE.md Git blob
+85121e7dd8aac65432eec604c6fe12cce454e79c.
+The original tag is UNSIGNED, so publisher cryptographic provenance
+NOT VERIFIED. The source has EDL v1.0 / SPDX BSD-3-Clause supplier
+metadata and a project-wide third-party NOTICE. The latter is NOT
+the exact downstream runtime transitive dependency inventory.
+
+scripts/audit_istack308_exact_license.py and adversarial synthetic
+tests/test_istack308_exact_license.py require source-tag Git blobs
+and exact Maven Central child/parent POM + JAR bytes against the
+PUBLIC selected Gradle cache hashes; compare JAR
+META-INF/LICENSE.md and META-INF/NOTICE.md bytes with exact tagged
+source; reject spoofed rights or package-graph scope. The scoped
+JSON evidence output is only for review, NOT a full licence/NOTICE
+inventory, signer proof or redistributable product release.
+See docs/ISTACK308-EXACT-TAG-EDL-BSD-LEGAL-REVIEW-20261109.md.
+All 42 direct child licensing review gaps remain OPEN, no release
+package composition or commercial redistribution rights verified.
+
 ## Jakarta Activation API 1.2.1 — exact EDL/BSD tagged source and JAR research (9 Nov 2026)
 
 PUBLIC Gradle root/app **build-tool selected**
