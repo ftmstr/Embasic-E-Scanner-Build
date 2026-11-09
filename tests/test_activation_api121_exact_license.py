@@ -31,7 +31,7 @@ def archive(license_text: bytes, notice_text: bytes, extra=()):
 
 def fixture():
     child = (b'<?xml version="1.0"?><!-- SPDX-License-Identifier: BSD-3-Clause '
-             b'only intended to be used -->'
+             b'*only* intended to be used -->'
              b'<project><parent><groupId>com.sun.activation</groupId>'
              b'<artifactId>all</artifactId><version>1.2.1</version></parent>'
              b'<groupId>jakarta.activation</groupId>'
