@@ -180,7 +180,11 @@ def audit(report: dict, package_root: Path) -> dict:
                                "local cache")
     assets_hash = _sha512_text(row["nugetSha512Metadata"], "project assets")
     if cached_hash != assets_hash:
-        raise AuditError("NUGET_CACHED_SHA512_VS_ASSETS_MISMATCH")
+        # Digest prefixes refer only to the public exact NuGet package; never
+        # print potentially untrusted cache paths, credentials or file bytes.
+        raise AuditError("NUGET_CACHED_SHA512_VS_ASSETS_MISMATCH"
+                         + " cache=" + cached_hash.hex()[:24]
+                         + " assets=" + assets_hash.hex()[:24])
     digest = hashlib.sha512()
     with archive.open("rb") as fh:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
