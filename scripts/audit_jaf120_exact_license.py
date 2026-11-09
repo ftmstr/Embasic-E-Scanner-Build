@@ -171,9 +171,12 @@ def audit(inventory: dict, queue: dict, runtime: dict, fetch=retrieve,
     mod = matches[0]
     if (mod.get("licenseMetadataState") != "POM_WITHOUT_DIRECT_LICENSE_NAME"
             or mod.get("pomDeclaredLicenses") != []
-            or sorted(mod.get("scopes", [])) != ["app", "root"]):
-        # Actual observed scope could be only root/app; verify scope rather
-        # than infer a product runtime from a plugin buildEnvironment graph.
+            or not isinstance(mod.get("scopes"), list)
+            or not 1 <= len(mod["scopes"]) <= 2
+            or len(set(mod["scopes"])) != len(mod["scopes"])
+            or not set(mod["scopes"]).issubset({"root", "app"})):
+        # BuildEnvironment may select this module in either root or app,
+        # and neither graph by itself proves an APK/runtime inclusion.
         raise AuditError("JAF direct POM gap or build-tool scope changed")
     cached = mod.get("cachedFiles")
     if not isinstance(cached, list) or len(cached) > 24:
