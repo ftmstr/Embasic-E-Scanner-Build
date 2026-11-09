@@ -79,7 +79,8 @@ jobs:
           $evidence = Get-Content $out -Raw | ConvertFrom-Json
           if ($evidence.purl -ne 'pkg:nuget/microsoft.windows.sdk.buildtools@10.0.26100.4654' -or
               $evidence.status -ne 'PACKAGE_BYTES_VERIFIED_LICENSE_BLOCKED' -or
-              !$evidence.packageHashMatchesAssetsAndCache -or
+              !$evidence.rawArchiveHashMatchesCache -or
+              !$evidence.restoreContentHashMatchesMetadata -or
               !$evidence.nuspecHashMatchesRestore -or
               $evidence.exactVersionLicenseTermsVerified -ne $false -or
               $evidence.redistributionFileListVerified -ne $false -or
@@ -89,6 +90,8 @@ jobs:
             throw 'BLOCKED: BuildTools exact package evidence or legal NO-GO boundary changed'
           }
           Write-Output "BUILDTOOLS_ARCHIVE_SHA512: $($evidence.nupkgSha512Hex)"
+          Write-Output "BUILDTOOLS_NEUTRAL_CONTENT_SHA512: $($evidence.nugetSignatureNeutralContentHashHex)"
+          Write-Output "BUILDTOOLS_RAW_AND_NEUTRAL_SHA_DIFFER: $($evidence.rawAndSignatureNeutralDigestsDifferent)"
           Write-Output "BUILDTOOLS_ARCHIVE_BYTES: $($evidence.nupkgByteSize)"
           Write-Output "BUILDTOOLS_REDIST_FILENAME_CANDIDATES: $($evidence.redistFilenameCandidates.Count)"
           Write-Output 'NOT VERIFIED: exact SDK license wording, REDIST rights, publisher signature, native WinUI or release'
