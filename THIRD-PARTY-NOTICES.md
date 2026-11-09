@@ -193,6 +193,23 @@ Evidence artifact when actually run by Android CI:
 gradle-pom-legal-review-queue.json. All rows remain rights-NOT_VERIFIED,
 the complete NOTICE/LICENSES/SBOM is missing, and release is NO-GO.
 
+### Parent POM metadata with complex/dual licence declarations — review required
+
+The 42-row source-reconciled queue now retains each cached parent POM
+coordinate, **local-only SHA256** (or missing-state), supplier-declared
+parent licence NAMES and bounded attention signals. The previous verified
+Android CI reported 59 parent evidence rows; some included, for example,
+CDDL/GPLv2+CE, Eclipse Distribution License 1.0, Eclipse Public License
+2.0 and GNU GPLv2 with Classpath Exception supplier-name metadata.
+This is **not** an inherited child licence, a determination of obligations,
+or evidence that the build tools are included in a distributed APK.
+
+Source-specific examples and exact cached POM hashes are described in
+docs/PARENT-POM-LICENCE-METADATA-TRIAGE-20261109.md. The attention
+signals are review prompts only; all 42 child licensing gaps, exact legal
+texts, third-party rights and NOTICE/SBOM closure remain NOT VERIFIED.
+No linked or embedded GPL/LGPL/MPL licence claim has been made.
+
 ## Windows SDK BuildTools exact NuGet archive hash vs REDIST rights — 9 November 2026
 
 This independent PUBLIC-only build-tool evidence audit DOES NOT clear
