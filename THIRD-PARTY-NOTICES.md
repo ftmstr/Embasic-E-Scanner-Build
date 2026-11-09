@@ -210,6 +210,47 @@ signals are review prompts only; all 42 child licensing gaps, exact legal
 texts, third-party rights and NOTICE/SBOM closure remain NOT VERIFIED.
 No linked or embedded GPL/LGPL/MPL licence claim has been made.
 
+## Jakarta Activation API 1.2.1 — exact EDL/BSD tagged source and JAR research (9 Nov 2026)
+
+PUBLIC Gradle root/app **build-tool selected**
+pkg:maven/jakarta.activation/jakarta.activation-api@1.2.1 is
+another one of the 42 unresolved child POM direct licence metadata
+gaps. The immediate parent com.sun.activation:all:1.2.1 names
+EDL 1.0; the distant EE4J organization parent mentions
+EPLv2/GPLv2+Classpath. **Do not inherit** the organization-wide
+licence names as a conclusion about this API JAR.
+
+The original 1.2.1 supplier release tag at jakartaee/jaf-api is
+pinned to commit 41bad0bd6ba821abd8652c80e8e3c50b55851da2,
+annotated tag 74a1e74bf03213a0bb16e8e2392933aa47c233f3.
+GitHub reports this original tag is **unsigned**. Its source
+LICENSE.md has Git blob e0358f972175d83cc567fcd129cc205ea9d40ff0;
+NOTICE.md has Git blob d6492f81ccce4efec1e8d03248ca64d3b26c164f;
+API source POM has Git blob 09697c4589fb48882fb8ad28aaffe5d097054351.
+Supplier notice labels EDL 1.0 and SPDX BSD-3-Clause; the exact
+copyright/non-endorsement text and binary notices still need
+human review. An unsigned Git tag is not a publisher signature.
+
+scripts/audit_activation_api121_exact_license.py with 34 synthetic
+adversarial tests checks bounded official Maven Central child/parent
+POM and JAR bytes against selected LOCAL Gradle cache hashes,
+compares source POM with version-pinned original source, and verifies
+JAR-embedded META-INF/LICENSE.md and META-INF/NOTICE.md against
+the historical upstream tagged bytes. The program fail-closes
+on byte drift or scope change and retains a scoped JSON evidence file;
+no result is a signed-package inventory or legal release permission.
+
+Detailed version-specific review:
+docs/JAKARTA-ACTIVATION-API121-EXACT-EDL-TAG-REVIEW-20261109.md.
+Official historical tag:
+https://github.com/jakartaee/jaf-api/releases/tag/1.2.1
+
+All 42 direct child POM metadata review items, publisher-signature
+verification, actual APK/AAB/MSIX runtime composition, complete
+third-party NOTICE/LICENSES/SBOM, effective licence obligations and
+commercial redistribution rights remain **NOT VERIFIED**.
+This research does not add an E-Scanner product root LICENSE.
+
 ## JAF 1.2.0 exact release-tag and JAR-embedded licence byte crosscheck — 9 Nov 2026
 
 PUBLIC Gradle root/app BUILD-TOOL selected
