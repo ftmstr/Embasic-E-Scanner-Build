@@ -487,6 +487,8 @@ jobs:
           assert e["mavenJar"]["matchesLocalGradleBytes"] is True
           assert e["mavenJar"]["embeddedTextTagByteParity"] is True
           assert e["mavenJar"]["embeddedNoticeTagByteParity"] is True
+          assert e["mavenJar"]["embeddedLicenseSha256"] == e["upstreamTag"]["licenseSha256"]
+          assert e["mavenJar"]["embeddedNoticeSha256"] == e["upstreamTag"]["noticeSha256"]
           assert e["mavenParentPOM"]["supplierDeclaredLicenceName"] == "EDL 1.0"
           assert e["organizationalAncestor"]["effectiveChildLicenseNotInferred"] is True
           assert e["licenseOptionSelected"] is False
@@ -502,6 +504,8 @@ jobs:
           print("ACTIVATION121_TAG_LICENSE_SHA256:", e["upstreamTag"]["licenseSha256"])
           print("ACTIVATION121_TAG_NOTICE_SHA256:", e["upstreamTag"]["noticeSha256"])
           print("ACTIVATION121_EMBEDDED_LICENSE_NOTICE_PARITY:", True)
+          print("ACTIVATION121_ALL42_LEGAL_REVIEW_GAPS_OPEN:",
+                e["all42DirectPOMMetadataGapsOpen"])
           print("NOT VERIFIED: unsigned tag publisher signature, exact legal choice, runtime packaging and release rights")
           PY
       - name: Hash actual Gradle cached JARs from scoped resolved graph
