@@ -98,7 +98,7 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             root = Path(temp) / "packages"
             report, archive, _ = fixture(root)
             archive.write_bytes(archive.read_bytes() + b"tampered")
-            with self.assertRaisesRegex(mod.AuditError, "NUPKG_ARCHIVE_SHA512_MISMATCH"):
+            with self.assertRaisesRegex(mod.AuditError, "NUGET_SHA512_TRIAD_MISMATCH"):
                 mod.audit(report, root)
 
     def test_wrong_project_assets_digest_fails_closed(self):
@@ -106,7 +106,7 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             root = Path(temp) / "packages"
             report, _, _ = fixture(root)
             report["components"][0]["nugetSha512Metadata"] = base64.b64encode(b"x"*64).decode()
-            with self.assertRaisesRegex(mod.AuditError, "ASSETS_MISMATCH"):
+            with self.assertRaisesRegex(mod.AuditError, "NUGET_SHA512_TRIAD_MISMATCH"):
                 mod.audit(report, root)
 
     def test_wrong_cache_sidecar_digest_fails_closed(self):
@@ -114,7 +114,7 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             root = Path(temp) / "packages"
             report, _, sha = fixture(root)
             sha.write_text(base64.b64encode(b"x"*64).decode())
-            with self.assertRaisesRegex(mod.AuditError, "ASSETS_MISMATCH"):
+            with self.assertRaisesRegex(mod.AuditError, "NUGET_SHA512_TRIAD_MISMATCH"):
                 mod.audit(report, root)
 
     def test_malformed_sha512_is_rejected(self):
