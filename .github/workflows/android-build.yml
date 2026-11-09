@@ -538,6 +538,10 @@ jobs:
           assert e["mavenParentPOM"]["tagSourceByteParity"] is True
           assert e["mavenJar"]["matchesSelectedLocalGradleCache"] is True
           assert e["mavenJar"]["embeddedLicenseNoticeTagByteParity"] is True
+          assert e["mavenJar"]["sha256"] == "4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef"
+          assert e["mavenParentPOM"]["sha256"] == "a0f0517e8512f0fbcc7b8295c12f6566a3d0c2d86d655639dc662ef8c0c7ebe5"
+          assert e["tag"]["licenseSha256"] == "525447f3da8d1e96f48760714de8b27fbc5c5452b5283c9d74dfde810d95f30a"
+          assert e["tag"]["noticeSha256"] == "f0d964e3984ac60b0aedefe518860f559f1c4b63b0a0cb010f95834ee2d6dc3b"
           assert e["mavenJar"]["embeddedLicenseSha256"] == e["tag"]["licenseSha256"]
           assert e["mavenJar"]["embeddedNoticeSha256"] == e["tag"]["noticeSha256"]
           assert e["mavenParentPOM"]["licenseName"] == "Eclipse Distribution License - v 1.0"
