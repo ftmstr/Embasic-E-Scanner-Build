@@ -437,7 +437,7 @@ jobs:
           python3 - <<'PY'
           import json, os
           from pathlib import Path
-          p = Path(os.environ["RUNNER_${RUNNER_TEMP}"]) / "jaf120-exact-source-license-evidence.json"
+          p = Path(os.environ["RUNNER_TEMP"]) / "jaf120-exact-source-license-evidence.json"
           evidence = json.loads(p.read_text(encoding="utf-8"))
           assert evidence["status"] == "EXACT_JAF120_SOURCE_BYTES_AND_LICENSE_TEXT_MATCH_REVIEW_OPEN"
           assert evidence["purl"] == "pkg:maven/com.sun.activation/javax.activation@1.2.0"
