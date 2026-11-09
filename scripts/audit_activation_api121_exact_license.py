@@ -194,6 +194,17 @@ def audit(inventory: dict, queue: dict, runtime: dict, fetch=retrieve,
     qrows = queue.get("reviewQueue")
     if not isinstance(qrows, list) or len(qrows) != 42:
         raise AuditError("selected 42-child legal gaps missing")
+    seen_review_purls = set()
+    for record in qrows:
+        if (not isinstance(record, dict)
+                or not isinstance(record.get("purl"), str)
+                or record["purl"] in seen_review_purls
+                or record.get("licenseApproved") is not False
+                or record.get("redistributionRightsVerified") is not False
+                or record.get("parentLicenseInheritanceVerified") is not False
+                or record.get("evidenceOnly") is not True):
+            raise AuditError("42-child legal queue contains duplicate or forged approval")
+        seen_review_purls.add(record["purl"])
     matches = [r for r in qrows if isinstance(r, dict) and r.get("purl") == PURL]
     if len(matches) != 1:
         raise AuditError("missing/duplicated exact Activation121 legal row")
