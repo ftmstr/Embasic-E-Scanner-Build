@@ -42,6 +42,9 @@ def fixture(root: Path, files=None):
     path.write_bytes(raw)
     encoded = base64.b64encode(hashlib.sha512(raw).digest()).decode("ascii")
     sha.write_text(encoded, encoding="ascii")
+    (folder / ".nupkg.metadata").write_text(
+        json.dumps({"version": 2, "contentHash": encoded,
+                    "source": "https://api.nuget.org/v3/index.json"}), encoding="utf-8")
     sdk = {
         "purl": mod.PURL,
         "scope": "temporary-WinUI3-restore-only",
@@ -74,7 +77,8 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             report, _, _ = fixture(root)
             result = mod.audit(report, root)
             self.assertEqual(result["status"], "PACKAGE_BYTES_VERIFIED_LICENSE_BLOCKED")
-            self.assertTrue(result["packageHashMatchesAssetsAndCache"])
+            self.assertTrue(result["rawArchiveHashMatchesCache"])
+            self.assertTrue(result["restoreContentHashMatchesMetadata"])
             self.assertTrue(result["nuspecHashMatchesRestore"])
             self.assertEqual(result["purl"], mod.PURL)
             self.assertEqual(result["redistFilenameCandidates"], [])
@@ -98,7 +102,7 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             root = Path(temp) / "packages"
             report, archive, _ = fixture(root)
             archive.write_bytes(archive.read_bytes() + b"tampered")
-            with self.assertRaisesRegex(mod.AuditError, "NUGET_SHA512_TRIAD_MISMATCH"):
+            with self.assertRaisesRegex(mod.AuditError, "NUPKG_RAW_ARCHIVE_VS_CACHE_SHA512_MISMATCH"):
                 mod.audit(report, root)
 
     def test_wrong_project_assets_digest_fails_closed(self):
@@ -106,7 +110,7 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             root = Path(temp) / "packages"
             report, _, _ = fixture(root)
             report["components"][0]["nugetSha512Metadata"] = base64.b64encode(b"x"*64).decode()
-            with self.assertRaisesRegex(mod.AuditError, "NUGET_SHA512_TRIAD_MISMATCH"):
+            with self.assertRaisesRegex(mod.AuditError, "NUGET_CONTENT_HASH_VS_ASSETS_MISMATCH"):
                 mod.audit(report, root)
 
     def test_wrong_cache_sidecar_digest_fails_closed(self):
@@ -114,7 +118,7 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             root = Path(temp) / "packages"
             report, _, sha = fixture(root)
             sha.write_text(base64.b64encode(b"x"*64).decode())
-            with self.assertRaisesRegex(mod.AuditError, "NUGET_SHA512_TRIAD_MISMATCH"):
+            with self.assertRaisesRegex(mod.AuditError, "NUPKG_RAW_ARCHIVE_VS_CACHE_SHA512_MISMATCH"):
                 mod.audit(report, root)
 
     def test_malformed_sha512_is_rejected(self):
@@ -265,6 +269,64 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             report, archive, _ = fixture(root)
             archive.unlink()
             with self.assertRaises(mod.AuditError):
+                mod.audit(report, root)
+
+    def test_signed_raw_sha_can_differ_from_nuget_content_hash_without_approval(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp) / "packages"
+            report, archive, _ = fixture(root)
+            meta = archive.parent / ".nupkg.metadata"
+            neutral = base64.b64encode(b"n" * 64).decode()
+            data = json.loads(meta.read_text())
+            data["contentHash"] = neutral
+            meta.write_text(json.dumps(data))
+            report["components"][0]["nugetSha512Metadata"] = neutral
+            result = mod.audit(report, root)
+            self.assertTrue(result["rawAndSignatureNeutralDigestsDifferent"])
+            self.assertTrue(result["rawArchiveHashMatchesCache"])
+            self.assertTrue(result["restoreContentHashMatchesMetadata"])
+            self.assertFalse(result["publisherSignatureVerified"])
+            self.assertFalse(result["releaseApproved"])
+
+    def test_cache_content_metadata_is_mandatory(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp) / "packages"
+            report, archive, _ = fixture(root)
+            (archive.parent / ".nupkg.metadata").unlink()
+            with self.assertRaises(mod.AuditError):
+                mod.audit(report, root)
+
+    def test_wrong_signature_neutral_content_hash_rejected(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp) / "packages"
+            report, archive, _ = fixture(root)
+            meta = archive.parent / ".nupkg.metadata"
+            data = json.loads(meta.read_text())
+            data["contentHash"] = base64.b64encode(b"x" * 64).decode()
+            meta.write_text(json.dumps(data))
+            with self.assertRaisesRegex(mod.AuditError, "NUGET_CONTENT_HASH_VS_ASSETS_MISMATCH"):
+                mod.audit(report, root)
+
+    def test_untrusted_nuget_source_hint_rejected(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp) / "packages"
+            report, archive, _ = fixture(root)
+            meta = archive.parent / ".nupkg.metadata"
+            data = json.loads(meta.read_text())
+            data["source"] = "https://evil.example/v3/index.json"
+            meta.write_text(json.dumps(data))
+            with self.assertRaisesRegex(mod.AuditError, "source hint"):
+                mod.audit(report, root)
+
+    def test_future_content_metadata_version_rejected(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp) / "packages"
+            report, archive, _ = fixture(root)
+            meta = archive.parent / ".nupkg.metadata"
+            data = json.loads(meta.read_text())
+            data["version"] = 999
+            meta.write_text(json.dumps(data))
+            with self.assertRaisesRegex(mod.AuditError, "metadata version"):
                 mod.audit(report, root)
 
     def test_cli_missing_evidence_is_blocked(self):
