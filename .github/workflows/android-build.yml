@@ -368,6 +368,25 @@ jobs:
                      and item["redistributionRightsVerified"] is False
                      for item in report["reviewQueue"])
           assert report["allChildGapsRemainUnresolved"] is True
+          assert report["parentMetadataTextTriageNotALicenseConclusion"] is True
+          assert c["parentEvidenceRows"] >= 1
+          assert c["withComplexParentMetadataSignals"] >= 1
+          flagged = [r for r in report["reviewQueue"]
+                     if r["complexParentMetadataReviewRequired"]]
+          assert len(flagged) == c["withComplexParentMetadataSignals"]
+          for item in report["reviewQueue"]:
+              evidence = item["cachedParentPOMReviewEvidence"]
+              assert all(x["supplierMetadataOnly"] is True
+                         and x["effectiveChildLicenseVerified"] is False
+                         and x["licenseApproved"] is False for x in evidence)
+              assert item["licenseApproved"] is False
+              assert item["redistributionRightsVerified"] is False
+          print("PARENT_POM_METADATA_REVIEW_ROWS:", c["parentEvidenceRows"])
+          print("COMPLEX_PARENT_LICENSE_METADATA_REVIEW_ROWS:",
+                c["withComplexParentMetadataSignals"])
+          for row in flagged:
+              print("PARENT_COMPLEX_REVIEW_NOT_APPROVAL:", row["purl"],
+                    "|".join(row["complexParentLicenseMetadataNames"]))
           assert report["parentLicenseInheritanceVerified"] is False
           assert report["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
           assert report["licenseClosure"] == "NOT_VERIFIED"
