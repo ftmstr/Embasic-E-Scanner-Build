@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -460,6 +460,50 @@ jobs:
           print("JAF120_BYTE_EQUALITY:", evidence["embeddedLicense"]["matchesExactTaggedLicenseBytes"])
           print("NOT VERIFIED: exact chosen licence, per-source header exception, signed provenance, APK packaging or legal permission")
           PY
+      - name: Verify Jakarta Activation API 1.2.1 exact unsigned release-tag LICENSE/NOTICE and Maven JAR (NOT rights clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_activation_api121_exact_license.py' -v
+          python3 scripts/audit_activation_api121_exact_license.py \
+            --inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/activation-api121-exact-source-license-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "activation-api121-exact-source-license-evidence.json"
+          e = json.loads(p.read_text(encoding="utf-8"))
+          assert e["status"] == "EXACT_ACTIVATION_API121_SOURCE_BYTES_MATCH_LEGAL_REVIEW_OPEN"
+          assert e["purl"] == "pkg:maven/jakarta.activation/jakarta.activation-api@1.2.1"
+          assert e["upstreamTag"]["name"] == "1.2.1"
+          assert e["upstreamTag"]["commit"] == "41bad0bd6ba821abd8652c80e8e3c50b55851da2"
+          assert e["upstreamTag"]["licenseGitBlobSha1"] == "e0358f972175d83cc567fcd129cc205ea9d40ff0"
+          assert e["upstreamTag"]["noticeGitBlobSha1"] == "d6492f81ccce4efec1e8d03248ca64d3b26c164f"
+          assert e["upstreamTag"]["apiPomGitBlobSha1"] == "09697c4589fb48882fb8ad28aaffe5d097054351"
+          assert e["upstreamTag"]["tagCryptographicallySigned"] is False
+          assert e["mavenChildPOM"]["tagSourceByteParity"] is True
+          assert e["mavenJar"]["matchesLocalGradleBytes"] is True
+          assert e["mavenJar"]["embeddedTextTagByteParity"] is True
+          assert e["mavenJar"]["embeddedNoticeTagByteParity"] is True
+          assert e["mavenParentPOM"]["supplierDeclaredLicenceName"] == "EDL 1.0"
+          assert e["organizationalAncestor"]["effectiveChildLicenseNotInferred"] is True
+          assert e["licenseOptionSelected"] is False
+          assert e["publisherSignatureVerified"] is False
+          assert e["apkPackagingVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["all42DirectPOMMetadataGapsOpen"] is True
+          assert e["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("ACTIVATION121_JAR_SHA256:", e["mavenJar"]["sha256"])
+          print("ACTIVATION121_TAG_LICENSE_SHA256:", e["upstreamTag"]["licenseSha256"])
+          print("ACTIVATION121_TAG_NOTICE_SHA256:", e["upstreamTag"]["noticeSha256"])
+          print("ACTIVATION121_EMBEDDED_LICENSE_NOTICE_PARITY:", True)
+          print("NOT VERIFIED: unsigned tag publisher signature, exact legal choice, runtime packaging and release rights")
+          PY
       - name: Hash actual Gradle cached JARs from scoped resolved graph
         shell: bash
         run: |
@@ -521,6 +565,7 @@ jobs:
             ${{ runner.temp }}/gradle-missing-pom-source-research.json
             ${{ runner.temp }}/gradle-pom-legal-review-queue.json
             ${{ runner.temp }}/jaf120-exact-source-license-evidence.json
+            ${{ runner.temp }}/activation-api121-exact-source-license-evidence.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
             ${{ runner.temp }}/android-resolved-jar-hashes.json
             ${{ runner.temp }}/android-official-jar-byte-parity.json
