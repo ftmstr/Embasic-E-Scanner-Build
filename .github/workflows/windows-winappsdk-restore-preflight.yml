@@ -5,11 +5,15 @@ name: Windows App SDK 2.6.4 isolated NuGet restore (NOT a product build)
       - '.github/workflows/windows-winappsdk-restore-preflight.yml'
       - 'scripts/audit_winapp_sdk_restore.py'
       - 'tests/test_winapp_sdk_restore.py'
+      - 'scripts/audit_windows_sdk_buildtools_nupkg.py'
+      - 'tests/test_windows_sdk_buildtools_nupkg.py'
   pull_request:
     paths:
       - '.github/workflows/windows-winappsdk-restore-preflight.yml'
       - 'scripts/audit_winapp_sdk_restore.py'
       - 'tests/test_winapp_sdk_restore.py'
+      - 'scripts/audit_windows_sdk_buildtools_nupkg.py'
+      - 'tests/test_windows_sdk_buildtools_nupkg.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -62,10 +66,38 @@ jobs:
           python scripts/audit_winapp_sdk_restore.py --assets (Join-Path $probe 'obj/project.assets.json') --packages $packages --output $evidence
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Output 'NOT VERIFIED: runtime execution, WinUI XAML build, package publisher signature, license closure or product release'
+      - name: Crosscheck exact Windows SDK BuildTools NUPKG SHA512 and REDIST file candidates (NOT legal clearance)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s tests -p test_windows_sdk_buildtools_nupkg.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $probe = Join-Path $env:RUNNER_TEMP 'embasic-windowsapp-sdk-isolated-probe'
+          $out = Join-Path $env:RUNNER_TEMP 'windows-sdk-buildtools-26100-4654-archive-evidence.json'
+          python scripts/audit_windows_sdk_buildtools_nupkg.py --restore-report (Join-Path $env:RUNNER_TEMP 'windowsapp-sdk-restore-evidence.json') --packages (Join-Path $probe 'packages') --output $out
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $evidence = Get-Content $out -Raw | ConvertFrom-Json
+          if ($evidence.purl -ne 'pkg:nuget/microsoft.windows.sdk.buildtools@10.0.26100.4654' -or
+              $evidence.status -ne 'PACKAGE_BYTES_VERIFIED_LICENSE_BLOCKED' -or
+              !$evidence.packageHashMatchesAssetsAndCache -or
+              !$evidence.nuspecHashMatchesRestore -or
+              $evidence.exactVersionLicenseTermsVerified -ne $false -or
+              $evidence.redistributionFileListVerified -ne $false -or
+              $evidence.redistributableAssetRightsVerified -ne $false -or
+              $evidence.publisherSignatureVerified -ne $false -or
+              $evidence.releaseApproved -ne $false) {
+            throw 'BLOCKED: BuildTools exact package evidence or legal NO-GO boundary changed'
+          }
+          Write-Output "BUILDTOOLS_ARCHIVE_SHA512: $($evidence.nupkgSha512Hex)"
+          Write-Output "BUILDTOOLS_ARCHIVE_BYTES: $($evidence.nupkgByteSize)"
+          Write-Output "BUILDTOOLS_REDIST_FILENAME_CANDIDATES: $($evidence.redistFilenameCandidates.Count)"
+          Write-Output 'NOT VERIFIED: exact SDK license wording, REDIST rights, publisher signature, native WinUI or release'
       - name: Retain isolated NuGet restore evidence (NOT SBOM)
         uses: actions/upload-artifact@v4
         with:
           name: winappsdk-2.6.4-isolated-nuget-evidence
           retention-days: 14
           if-no-files-found: error
-          path: ${{ runner.temp }}/windowsapp-sdk-restore-evidence.json
+          path: |
+            ${{ runner.temp }}/windowsapp-sdk-restore-evidence.json
+            ${{ runner.temp }}/windows-sdk-buildtools-26100-4654-archive-evidence.json
