@@ -135,7 +135,8 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             report, _, sha = fixture(root)
             report["components"][0]["nugetSha512Metadata"] = "sha512-" + sha.read_text()
             result = mod.audit(report, root)
-            self.assertTrue(result["packageHashMatchesAssetsAndCache"])
+            self.assertTrue(result["rawArchiveHashMatchesCache"])
+            self.assertTrue(result["restoreContentHashMatchesMetadata"])
 
     def test_nuspec_extract_mismatch_fails_closed(self):
         with TemporaryDirectory() as temp:
@@ -185,6 +186,10 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             checksum = base64.b64encode(hashlib.sha512(blob).digest()).decode()
             sidecar.write_text(checksum)
             report["components"][0]["nugetSha512Metadata"] = checksum
+            meta_file = archive.parent / ".nupkg.metadata"
+            data = json.loads(meta_file.read_text())
+            data["contentHash"] = checksum
+            meta_file.write_text(json.dumps(data))
             with self.assertRaisesRegex(mod.AuditError, "symlinked NuGet ZIP"):
                 mod.audit(report, root)
 
