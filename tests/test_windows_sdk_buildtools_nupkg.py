@@ -149,11 +149,13 @@ class BuildToolsNuGetEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(mod.AuditError, "unsafe NuGet ZIP"):
                 mod.audit(report, root)
 
-    def test_zip_directory_odd_separator_rejected(self):
+    def test_zip_entry_with_drive_like_colon_rejected(self):
+        # ZipInfo normalizes backslashes on Windows, so use a stable invalid
+        # archive path that survives serialization on both operating systems.
         with TemporaryDirectory() as temp:
             root = Path(temp) / "packages"
-            report, _, _ = fixture(root, dict(BASE_FILES, **{"tools\\private.txt": b"x"}))
-            with self.assertRaises(mod.AuditError):
+            report, _, _ = fixture(root, dict(BASE_FILES, **{"tools/private:evil.txt": b"x"}))
+            with self.assertRaisesRegex(mod.AuditError, "unsafe NuGet ZIP"):
                 mod.audit(report, root)
 
     def test_duplicate_archive_entry_casefold_rejected(self):
