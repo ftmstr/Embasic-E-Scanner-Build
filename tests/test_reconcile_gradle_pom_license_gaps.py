@@ -261,6 +261,143 @@ class SelectedPomLegalQueueTests(unittest.TestCase):
                                        "--pom-research", str(root/"no.json"),
                                        "--output", str(root/"result.json")]), 2)
 
+    def test_cached_parent_dual_license_metadata_is_attention_not_permission(self):
+        plugin, research = fixture()
+        parent = plugin["modules"][1]["parentPomEvidence"][0][0]
+        parent.update({
+            "status": "PARENT_POM_METADATA_ONLY",
+            "sha256": "a" * 64,
+            "unverifiedLicenseNames": ["CDDL/GPLv2+CE", "Apache License 2.0"],
+        })
+        # Missing parent source target no longer exists; no extra fake row.
+        research["records"] = research["records"][:1]
+        research["targets"] = 1
+        research["remotePomMetadataRetrieved"] = 1
+        research["stillUnretrieved"] = 0
+        result = mod.audit(plugin, research)
+        row = next(x for x in result["reviewQueue"] if x["purl"] == NO_LIC)
+        self.assertEqual(result["counts"]["withComplexParentMetadataSignals"], 1)
+        self.assertEqual(result["counts"]["parentEvidenceRows"], 1)
+        self.assertTrue(row["complexParentMetadataReviewRequired"])
+        self.assertEqual(row["complexParentLicenseMetadataNames"], ["CDDL/GPLv2+CE"])
+        self.assertEqual(row["cachedParentPOMReviewEvidence"][0]["localPOMSha256"],
+                         "a" * 64)
+        self.assertFalse(row["cachedParentPOMReviewEvidence"][0]["licenseApproved"])
+        self.assertFalse(row["parentLicenseInheritanceVerified"])
+        self.assertFalse(result["releaseApproved"])
+
+    def test_supplier_epl_gpl_classpath_metadata_requires_review(self):
+        plugin, research = fixture()
+        parent = plugin["modules"][1]["parentPomEvidence"][0][0]
+        parent.update({
+            "status": "PARENT_POM_METADATA_ONLY",
+            "sha256": "d" * 64,
+            "unverifiedLicenseNames": [
+                "Eclipse Public License v. 2.0",
+                "GNU General Public License, version 2 with the GNU Classpath Exception",
+            ],
+        })
+        research["records"] = research["records"][:1]
+        research["targets"] = 1
+        research["remotePomMetadataRetrieved"] = 1
+        research["stillUnretrieved"] = 0
+        result = mod.audit(plugin, research)
+        row = next(x for x in result["reviewQueue"] if x["purl"] == NO_LIC)
+        self.assertTrue(row["complexParentMetadataReviewRequired"])
+        self.assertEqual(len(row["complexParentLicenseMetadataNames"]), 2)
+        self.assertFalse(row["licenseApproved"])
+
+    def test_permissive_metadata_does_not_infer_approved_rights(self):
+        plugin, research = fixture()
+        parent = plugin["modules"][1]["parentPomEvidence"][0][0]
+        parent.update({"status": "PARENT_POM_METADATA_ONLY",
+                       "sha256": "b" * 64,
+                       "unverifiedLicenseNames": ["Apache License, Version 2.0"]})
+        research["records"] = research["records"][:1]
+        research["targets"] = 1
+        research["remotePomMetadataRetrieved"] = 1
+        research["stillUnretrieved"] = 0
+        result = mod.audit(plugin, research)
+        row = next(x for x in result["reviewQueue"] if x["purl"] == NO_LIC)
+        self.assertFalse(row["complexParentMetadataReviewRequired"])
+        self.assertFalse(row["licenseApproved"])
+        self.assertFalse(result["parentLicenseInheritanceVerified"])
+
+    def test_gplv2_version_name_requires_attention(self):
+        self.assertIsNotNone(mod.COMPLEX_PARENT_NAMES.search("GPLv2+CE"))
+        self.assertIsNotNone(mod.COMPLEX_PARENT_NAMES.search("LGPL-2.1"))
+        self.assertIsNotNone(mod.COMPLEX_PARENT_NAMES.search("AGPLv3"))
+        self.assertIsNone(mod.COMPLEX_PARENT_NAMES.search("Apache License, Version 2.0"))
+
+    def test_cached_parent_claim_without_exact_sha_rejected(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"][0][0].update({
+            "status": "PARENT_POM_METADATA_ONLY",
+            "sha256": None,
+            "unverifiedLicenseNames": ["EPL-2.0"]})
+        with self.assertRaisesRegex(mod.AuditError, "parent cached POM SHA256"):
+            mod.audit(plugin, research)
+
+    def test_missing_parent_cannot_smuggle_supplier_license(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"][0][0][
+            "unverifiedLicenseNames"] = ["EPL-2.0"]
+        with self.assertRaisesRegex(mod.AuditError, "smuggles license"):
+            mod.audit(plugin, research)
+
+    def test_missing_parent_cannot_smuggle_a_hash(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"][0][0]["sha256"] = "b" * 64
+        with self.assertRaisesRegex(mod.AuditError, "smuggles license"):
+            mod.audit(plugin, research)
+
+    def test_parent_untrusted_name_is_bounded(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"][0][0].update({
+            "status": "PARENT_POM_METADATA_ONLY",
+            "sha256": "b" * 64,
+            "unverifiedLicenseNames": ["X" * 257]})
+        with self.assertRaisesRegex(mod.AuditError, "invalid untrusted"):
+            mod.audit(plugin, research)
+
+    def test_cached_parent_invalid_digest_fails_closed(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"][0][0].update({
+            "status": "PARENT_POM_METADATA_ONLY",
+            "sha256": "f" * 63,
+            "unverifiedLicenseNames": ["GPL-2.0"]})
+        with self.assertRaisesRegex(mod.AuditError, "parent cached POM SHA256"):
+            mod.audit(plugin, research)
+
+    def test_cached_parent_parent_identity_traversal_refused(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"][0][0][
+            "coordinate"] = "com.example:..:1.0"
+        with self.assertRaises(mod.AuditError):
+            mod.audit(plugin, research)
+
+    def test_duplicate_cached_parent_evidence_chain_refused(self):
+        plugin, research = fixture()
+        chain = plugin["modules"][1]["parentPomEvidence"][0]
+        chain.append(dict(chain[0]))
+        with self.assertRaisesRegex(mod.AuditError, "duplicate"):
+            mod.audit(plugin, research)
+
+    def test_unreadable_parent_cannot_forge_supplier_license(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"][0][0].update({
+            "status": "UNREADABLE_PARENT_POM",
+            "sha256": "a" * 64,
+            "unverifiedLicenseNames": ["GPL-3.0"]})
+        with self.assertRaisesRegex(mod.AuditError, "unreadable parent"):
+            mod.audit(plugin, research)
+
+    def test_inconsistent_parent_container_shape_rejected(self):
+        plugin, research = fixture()
+        plugin["modules"][1]["parentPomEvidence"] = "not a POM chain"
+        with self.assertRaisesRegex(mod.AuditError, "unsafe parent chain"):
+            mod.audit(plugin, research)
+
     def test_cli_writes_legal_queue_but_not_approval(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
