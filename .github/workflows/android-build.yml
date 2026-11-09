@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -424,6 +424,42 @@ jobs:
           print("COUNTS:", result["componentCounts"])
           print("BLOCKED: full Gradle plugin/build-tool graph, licenses and final SBOM")
           PY
+      - name: Verify JAF 1.2.0 exact release-tag licence and embedded Maven JAR text (NOT rights clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_jaf120_exact_license.py' -v
+          python3 scripts/audit_jaf120_exact_license.py \
+            --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/jaf120-exact-source-license-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_${RUNNER_TEMP}"]) / "jaf120-exact-source-license-evidence.json"
+          evidence = json.loads(p.read_text(encoding="utf-8"))
+          assert evidence["status"] == "EXACT_JAF120_SOURCE_BYTES_AND_LICENSE_TEXT_MATCH_REVIEW_OPEN"
+          assert evidence["purl"] == "pkg:maven/com.sun.activation/javax.activation@1.2.0"
+          assert evidence["tag"]["name"] == "JAF-1_2_0"
+          assert evidence["tag"]["commit"] == "8f8ec08d736983c839d31a7bd98d29594e508785"
+          assert evidence["tag"]["licenseGitBlobSha1"] == "5ad62c442b336861b5832b7a8197a507b7df61f0"
+          assert evidence["embeddedLicense"]["matchesExactTaggedLicenseBytes"] is True
+          assert evidence["mavenJAR"]["matchesLocalGradleCache"] is True
+          assert evidence["mavenParentPOM"]["supplierLicenseName"] == "CDDL/GPLv2+CE"
+          assert evidence["licenseOptionSelected"] is False
+          assert evidence["productRuntimeInclusionVerified"] is False
+          assert evidence["parentLicenseInheritanceVerified"] is False
+          assert evidence["publisherSignatureVerified"] is False
+          assert evidence["all42ChildLicenseReviewGapsOpen"] is True
+          assert evidence["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert evidence["licenseClosure"] == "NOT_VERIFIED"
+          assert evidence["sbomComplete"] is False and evidence["releaseApproved"] is False
+          print("JAF120_MAVEN_JAR_SHA256:", evidence["mavenJAR"]["sha256"])
+          print("JAF120_TAG_LICENSE_SHA256:", evidence["tag"]["licenseSha256"])
+          print("JAF120_BYTE_EQUALITY:", evidence["embeddedLicense"]["matchesExactTaggedLicenseBytes"])
+          print("NOT VERIFIED: exact chosen licence, per-source header exception, signed provenance, APK packaging or legal permission")
+          PY
       - name: Hash actual Gradle cached JARs from scoped resolved graph
         shell: bash
         run: |
@@ -484,6 +520,7 @@ jobs:
             ${{ runner.temp }}/gradle-central-buildtool-jar-byte-evidence.json
             ${{ runner.temp }}/gradle-missing-pom-source-research.json
             ${{ runner.temp }}/gradle-pom-legal-review-queue.json
+            ${{ runner.temp }}/jaf120-exact-source-license-evidence.json
             ${{ runner.temp }}/android-dependency-partial-inventory.json
             ${{ runner.temp }}/android-resolved-jar-hashes.json
             ${{ runner.temp }}/android-official-jar-byte-parity.json
