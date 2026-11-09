@@ -179,18 +179,18 @@ def audit(report: dict, package_root: Path) -> dict:
     cached_hash = _sha512_text(_read(hashfile, 512).decode("ascii").strip(),
                                "local cache")
     assets_hash = _sha512_text(row["nugetSha512Metadata"], "project assets")
-    if cached_hash != assets_hash:
-        # Digest prefixes refer only to the public exact NuGet package; never
-        # print potentially untrusted cache paths, credentials or file bytes.
-        raise AuditError("NUGET_CACHED_SHA512_VS_ASSETS_MISMATCH"
-                         + " cache=" + cached_hash.hex()[:24]
-                         + " assets=" + assets_hash.hex()[:24])
     digest = hashlib.sha512()
     with archive.open("rb") as fh:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             digest.update(chunk)
-    if digest.digest() != assets_hash:
-        raise AuditError("NUPKG_ARCHIVE_SHA512_MISMATCH")
+    if cached_hash != assets_hash or digest.digest() != assets_hash:
+        # Three distinct hashes are public exact-package bytes/metadata only.
+        # Diagnose which source disagrees WITHOUT allowing an unsigned match
+        # or silently discarding the restore's originally selected digest.
+        raise AuditError("NUGET_SHA512_TRIAD_MISMATCH"
+                         + " cache=" + cached_hash.hex()[:24]
+                         + " assets=" + assets_hash.hex()[:24]
+                         + " archive=" + digest.digest().hex()[:24])
     listing = _archive_entries(archive, row["localNuspecSha256"])
     return {
         "schemaVersion": 1,
