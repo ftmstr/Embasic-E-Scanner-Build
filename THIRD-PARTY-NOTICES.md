@@ -171,6 +171,28 @@ docs/GRADLE813-TWO-CLASSIFIER-SOURCE-PARITY-20261109.md.
 The Microsoft.Windows.SDK.BuildTools 10.0.26100.4654 use versus
 redistribution/REDIST.TXT question is a separate blocking review.
 
+## Selected 42 Gradle child POM legal-review queue — 9 November 2026
+
+The partial Android Gradle build-tool evidence contains 147 selected
+root/app modules. In its last confirmed CI, 42 lacked **direct child**
+POM licence names: 12 child POMs not cached, 30 cached child POMs with
+no direct name, 0 unreadable child POMs. This is not a determination that
+the other 105 licences are approved.
+
+The bounded independent source-POM research (selected missing children and
+uncached ancestor POMs only) is reconciled into an evidence-only
+42-component queue by scripts/reconcile_gradle_pom_license_gaps.py.
+Its tests reject missing/duplicate selected modules, stale gap counts,
+unexpected source URLs, mismatched POM identity/hashes, parent-licence
+elevation, and fake approved status. Metadata may help select which exact
+legal text to review next, but it never reduces the 42 legal review gaps
+or inherits licences from parents.
+
+Detailed review: docs/SELECTED-POM-LICENCE-REVIEW-QUEUE-20261109.md.
+Evidence artifact when actually run by Android CI:
+gradle-pom-legal-review-queue.json. All rows remain rights-NOT_VERIFIED,
+the complete NOTICE/LICENSES/SBOM is missing, and release is NO-GO.
+
 ## Windows SDK BuildTools exact NuGet archive hash vs REDIST rights — 9 November 2026
 
 This independent PUBLIC-only build-tool evidence audit DOES NOT clear
