@@ -23,6 +23,18 @@ GAPS = {"POM_NOT_CACHED": "pomNotCached",
         "POM_WITHOUT_DIRECT_LICENSE_NAME": "pomWithoutDirectLicenseName",
         "UNREADABLE_POM": "unreadablePom"}
 
+# Heuristic review attention ONLY; not an SPDX classifier or legal conclusion.
+# Parent POM assertions are untrusted metadata even when a local SHA exists.
+COMPLEX_PARENT_NAMES = re.compile(
+    r"(?:\b(?:a?gpl|lgpl|mpl|cddl|epl|edl)\b"
+    r"|gnu\s+(?:affero\s+|lesser\s+)?general\s+public"
+    r"|eclipse\s+(?:public|distribution)\s+licen[cs]e"
+    r"|mozilla\s+public\s+licen[cs]e"
+    r"|common\s+development\s+and\s+distribution"
+    r"|classpath\s+exception)",
+    re.IGNORECASE,
+)
+
 
 class AuditError(ValueError):
     pass
@@ -228,6 +240,7 @@ def audit(plugin: dict, research: dict) -> dict:
                            else "OBTAIN_EXACT_CHILD_POM_AND_LICENSE_TEXT")
         else:
             next_action = "REVIEW_CHILD_DIRECT_LICENSE_AND_APPLICABLE_PARENT_TERMS"
+        parent_evidence, parent_names_to_review = _parent_review_evidence(mod)
         actions.append({
             "purl": purl,
             "directPomState": expected[purl],
@@ -240,6 +253,12 @@ def audit(plugin: dict, research: dict) -> dict:
                 if own_source else []),
             "retrievedMissingParents": parents_found,
             "missingParentTargets": parents,
+            "cachedParentPOMReviewEvidence": parent_evidence,
+            "complexParentLicenseMetadataNames": parent_names_to_review,
+            "complexParentMetadataReviewRequired": bool(parent_names_to_review),
+            "attentionReason": ("REVIEW_POTENTIALLY_COMPLEX_PARENT_METADATA"
+                                if parent_names_to_review
+                                else "REVIEW_EXACT_CHILD_PARENT_AND_TRANSITIVE_TERMS"),
             "nextAction": next_action,
             "evidenceOnly": True,
             "licenseApproved": False,
@@ -256,8 +275,13 @@ def audit(plugin: dict, research: dict) -> dict:
                    "unreadableChildPOM": derived["unreadablePom"],
                    "remoteResearchTargets": len(rows),
                    "remoteMetadataRetrieved": fetched,
-                   "remoteMetadataUnavailable": len(rows) - fetched},
+                   "remoteMetadataUnavailable": len(rows) - fetched,
+                   "parentEvidenceRows": sum(len(x["cachedParentPOMReviewEvidence"])
+                                             for x in actions),
+                   "withComplexParentMetadataSignals":
+                       sum(x["complexParentMetadataReviewRequired"] for x in actions)},
         "reviewQueue": actions,
+        "parentMetadataTextTriageNotALicenseConclusion": True,
         "sourceResearchNotLicenceGrant": True,
         "allChildGapsRemainUnresolved": True,
         "microsoftSDKBuildToolsExactRedistRights": "NOT_VERIFIED_SEPARATE_GATE",
@@ -270,17 +294,65 @@ def audit(plugin: dict, research: dict) -> dict:
     }
 
 
-def _source_targets_parent_check(mod: dict) -> None:
-    for chain in mod.get("parentPomEvidence", []):
-        if not isinstance(chain, list) or len(chain) > 6:
+def _parent_review_evidence(mod: dict) -> tuple[list[dict], list[str]]:
+    """Tie every untrusted parent hint to its local SHA and explicit state.
+
+    This does not compute Maven effective POMs, inherit licences, or approve
+    linking/redistribution. The risk markers are text-only reviewer prompts.
+    """
+    output = []
+    flagged = set()
+    chains = mod.get("parentPomEvidence", [])
+    if not isinstance(chains, list) or len(chains) > 12:
+        raise AuditError("unsafe parent chain container")
+    for chain in chains:
+        if not isinstance(chain, list) or not 0 < len(chain) <= 6:
             raise AuditError("unsafe parent evidence chain")
+        visited = set()
         for row in chain:
-            if (not isinstance(row, dict) or
-                    row.get("licenseApproved") is not False
-                    or row.get("status") not in (
-                        "PARENT_POM_NOT_CACHED", "PARENT_POM_METADATA_ONLY",
-                        "UNREADABLE_PARENT_POM", "DEPTH_LIMIT_NOT_VERIFIED")):
+            if not isinstance(row, dict) or row.get("licenseApproved") is not False:
                 raise AuditError("parent POM evidence legal scope escalated")
+            status = row.get("status")
+            coordinate = row.get("coordinate")
+            if not isinstance(coordinate, str) or len(coordinate.split(":")) != 3:
+                raise AuditError("invalid parent coordinate")
+            group, artifact, version = coordinate.split(":")
+            _purl(f"pkg:maven/{group}/{artifact}@{version}")
+            if coordinate in visited:
+                raise AuditError("cyclic/duplicate parent evidence chain")
+            visited.add(coordinate)
+            names = row.get("unverifiedLicenseNames")
+            sha = row.get("sha256")
+            if (not isinstance(names, list) or len(names) > 24
+                    or any(not isinstance(n, str) or not n.strip()
+                           or len(n) > 256 for n in names)):
+                raise AuditError("invalid untrusted parent license names")
+            if status in ("PARENT_POM_METADATA_ONLY", "UNREADABLE_PARENT_POM"):
+                if not isinstance(sha, str) or not SHA.fullmatch(sha):
+                    raise AuditError("missing parent cached POM SHA256")
+                if status == "UNREADABLE_PARENT_POM" and names:
+                    raise AuditError("unreadable parent POM smuggles a license name")
+            elif status in ("PARENT_POM_NOT_CACHED", "DEPTH_LIMIT_NOT_VERIFIED"):
+                if sha is not None or names:
+                    raise AuditError("missing parent POM smuggles license evidence")
+            else:
+                raise AuditError("unexpected parent evidence status")
+            if status == "PARENT_POM_METADATA_ONLY":
+                flagged.update(name for name in names if COMPLEX_PARENT_NAMES.search(name))
+            output.append({
+                "coordinate": coordinate,
+                "status": status,
+                "localPOMSha256": sha,
+                "unverifiedSupplierLicenseNames": sorted(set(names)),
+                "supplierMetadataOnly": True,
+                "effectiveChildLicenseVerified": False,
+                "licenseApproved": False,
+            })
+    return output, sorted(flagged)
+
+
+def _source_targets_parent_check(mod: dict) -> None:
+    _parent_review_evidence(mod)
 
 
 def _read(path: Path) -> dict:
@@ -313,6 +385,10 @@ def main(argv: list[str] | None = None) -> int:
     for item in data["reviewQueue"]:
         print("LEGAL_REVIEW_GAP:", item["purl"], item["directPomState"],
               item["remoteChildMetadataStatus"], item["nextAction"])
+        if item["complexParentMetadataReviewRequired"]:
+            print("COMPLEX_PARENT_LICENSE_METADATA_REVIEW:", item["purl"],
+                  "|".join(item["complexParentLicenseMetadataNames"]),
+                  "UNVERIFIED_NOT_CHILD_LICENSE")
     return 0
 
 
