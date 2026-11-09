@@ -40,10 +40,15 @@ scripts/audit_windows_sdk_buildtools_nupkg.py reads the PUBLIC CI-created
 windowsapp-sdk-restore-evidence.json and the disposable restore NuGet cache.
 It refuses any alternate BuildTools version, concealed missing-license gap,
 publisher/legal escalation, untrusted cache root, package path symlink or
-oversized package. For the exact target only, it requires **three-way SHA-512
-equality** between resolved project.assets.json supplier digest, NuGet cache
-.nupkg.sha512 digest and actual locally downloaded .nupkg bytes. It also
-requires ZIP-embedded exact .nuspec SHA-256 to match the extracted
+oversized package. For the exact target, it verifies **two separate
+SHA-512 domains**: the raw signed ZIP bytes must equal the NuGet cache
+.nupkg.sha512, while the restore project.assets.json content SHA-512
+must equal the NuGet .nupkg.metadata contentHash. Signature-neutral contentHash
+MAY differ from the raw ZIP digest; collapsing them produced a genuine CI RED
+in the first audit. NuGet's own package metadata design explains this distinction:
+https://github.com/NuGet/Home/wiki/Nupkg-Metadata-File
+NuGet provenance metadata is NOT a publisher signature attestation.
+The ZIP-embedded exact .nuspec SHA-256 must also match the extracted
 .nuspec whose SHA-256 was measured by the existing restore audit.
 
 ZIP metadata enumeration rejects traversal, absolute/drive-like names,
