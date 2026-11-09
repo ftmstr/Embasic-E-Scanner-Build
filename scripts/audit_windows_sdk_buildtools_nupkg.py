@@ -177,29 +177,49 @@ def audit(report: dict, package_root: Path) -> dict:
             or not 0 < archive.stat().st_size <= MAX_ARCHIVE):
         raise AuditError("missing, symlinked or oversized SDK .nupkg")
     cached_hash = _sha512_text(_read(hashfile, 512).decode("ascii").strip(),
-                               "local cache")
-    assets_hash = _sha512_text(row["nugetSha512Metadata"], "project assets")
+                               "raw archive cache")
+    assets_hash = _sha512_text(row["nugetSha512Metadata"], "restore content hash")
+    # NuGet records TWO different SHA512 domains for signed nupkgs:
+    # .nupkg.sha512 = raw archive, .nupkg.metadata/contentHash = signature-neutral
+    # package CONTENT hash (the value used by project.assets.json).
+    # Never conflate the two: see NuGet/Home Nupkg Metadata File design.
+    meta_path = folder / ".nupkg.metadata"
+    try:
+        meta = json.loads(_read(meta_path, 8192).decode("utf-8"))
+    except (ValueError, UnicodeError) as exc:
+        raise AuditError("invalid NuGet content-hash metadata") from exc
+    if not isinstance(meta, dict) or type(meta.get("version")) is not int or meta["version"] not in (1, 2):
+        raise AuditError("unsupported NuGet content-hash metadata version")
+    source_hint = meta.get("source", "NOT_VERIFIED")
+    if source_hint not in ("NOT_VERIFIED", "https://api.nuget.org/v3/index.json"):
+        raise AuditError("unexpected NuGet cache source hint")
+    content_hash = _sha512_text(meta.get("contentHash"), "NuGet signature-neutral content")
+    if content_hash != assets_hash:
+        raise AuditError("NUGET_CONTENT_HASH_VS_ASSETS_MISMATCH"
+                         + " metadata=" + content_hash.hex()[:24]
+                         + " assets=" + assets_hash.hex()[:24])
     digest = hashlib.sha512()
     with archive.open("rb") as fh:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             digest.update(chunk)
-    if cached_hash != assets_hash or digest.digest() != assets_hash:
-        # Three distinct hashes are public exact-package bytes/metadata only.
-        # Diagnose which source disagrees WITHOUT allowing an unsigned match
-        # or silently discarding the restore's originally selected digest.
-        raise AuditError("NUGET_SHA512_TRIAD_MISMATCH"
+    if cached_hash != digest.digest():
+        raise AuditError("NUPKG_RAW_ARCHIVE_VS_CACHE_SHA512_MISMATCH"
                          + " cache=" + cached_hash.hex()[:24]
-                         + " assets=" + assets_hash.hex()[:24]
                          + " archive=" + digest.digest().hex()[:24])
     listing = _archive_entries(archive, row["localNuspecSha256"])
     return {
         "schemaVersion": 1,
         "status": "PACKAGE_BYTES_VERIFIED_LICENSE_BLOCKED",
-        "scope": "exact local NuGet BuildTools 10.0.26100.4654 ZIP vs restore+cache SHA512 only",
+        "scope": "exact local NuGet BuildTools 10.0.26100.4654 raw ZIP/cache SHA512 and separate signature-neutral restore contentHash",
         "purl": PURL,
         "nupkgSha512Hex": digest.hexdigest(),
         "nupkgByteSize": archive.stat().st_size,
-        "packageHashMatchesAssetsAndCache": True,
+        "rawArchiveHashMatchesCache": True,
+        "restoreContentHashMatchesMetadata": True,
+        "nugetSignatureNeutralContentHashHex": content_hash.hex(),
+        "rawAndSignatureNeutralDigestsDifferent": digest.digest() != content_hash,
+        "cacheSourceHint": source_hint,
+        "cacheSourceHintAuthenticated": False,
         "nuspecHashMatchesRestore": True,
         **listing,
         "directNuspecLicense": "MISSING",
