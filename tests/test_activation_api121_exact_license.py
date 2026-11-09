@@ -83,7 +83,9 @@ def fixture():
         "microsoftSDKBuildToolsExactRedistRights": "NOT_VERIFIED_SEPARATE_GATE",
         "reviewQueue": [
             {"purl": "pkg:maven/example/fixture@"+str(i),
-             "licenseApproved": False} for i in range(41)
+             "licenseApproved": False, "redistributionRightsVerified": False,
+             "parentLicenseInheritanceVerified": False, "evidenceOnly": True}
+            for i in range(41)
         ]+[{
             "purl": auditlib.PURL,
             "directPomState": "POM_WITHOUT_DIRECT_LICENSE_NAME",
@@ -93,6 +95,7 @@ def fixture():
                 "GNU General Public License, version 2 with the GNU Classpath Exception",
             ],
             "licenseApproved": False, "redistributionRightsVerified": False,
+            "parentLicenseInheritanceVerified": False, "evidenceOnly": True,
             "cachedParentPOMReviewEvidence": [{
                 "coordinate": auditlib.PARENT_COORD, "status": "PARENT_POM_METADATA_ONLY",
                 "localPOMSha256": auditlib._sha(parent),
@@ -195,6 +198,16 @@ class Activation121Tests(unittest.TestCase):
     def test_ancestor_approved_flag_rejected(self):
         self.queue["reviewQueue"][-1]["cachedParentPOMReviewEvidence"][1]["licenseApproved"] = True
         with self.assertRaises(auditlib.AuditError): self.result()
+
+    def test_other_gap_must_not_be_silently_marked_approved(self):
+        self.queue["reviewQueue"][0]["licenseApproved"] = True
+        with self.assertRaisesRegex(auditlib.AuditError, "forged approval"):
+            self.result()
+
+    def test_duplicated_other_gap_identity_fails_closed(self):
+        self.queue["reviewQueue"][1]["purl"] = self.queue["reviewQueue"][0]["purl"]
+        with self.assertRaisesRegex(auditlib.AuditError, "duplicate"):
+            self.result()
 
     def test_42_gap_count_silent_shrink_rejected(self):
         self.queue["reviewQueue"].pop(1)
