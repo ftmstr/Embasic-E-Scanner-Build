@@ -8,6 +8,19 @@ The caller supplies a **pre-created, private, single-session application-owned d
 
 The app-private directory and its ancestors **MUST NOT** be writable by a malicious local process. Path swap/hardlink abuse by a hostile same-directory writer, directory entry durability after sudden power loss, and arbitrary Android filesystem provider guarantees are NOT VERIFIED; the code does not promise portable atomicity against these threats. Windows NTFS behavior is tested on CI Windows runner; Android unit tests execute on a Linux JVM and are NOT proof of Android-device provider semantics.
 
+## Mandatory pre-claim empty-root gate (follow-up security hardening)
+
+Before writing the `token.claim` marker, both platforms require the app-private
+session root to contain **zero entries**, checked on a pinned root identity
+before and after enumeration. A pre-existing orphan, unknown entry, staged
+blob, stale marker or partial crash trace rejects authentication **before**
+the in-memory ReceiveGate becomes authorized; the affected adapter instance
+is permanently stopped even if another actor later deletes that entry.
+This is independently tested in Android JUnit and Windows .NET self-test.
+A hostile same-directory writer who can race enumeration and creation remains
+outside this adapter's verified security boundary; the composition root
+must enforce private directory ownership and access controls.
+
 ## Token and receipt protocol
 
 - One-time token: SHA-256 digest verified in constant time before writing a CREATE_NEW `token.claim` tombstone. The ASCII marker records `v1|sessionId|tokenSha|issuedAt|expiresAt\n`; file data is flushed to storage before the in-memory gate is authorized. The raw token is **not stored**. An existing marker, even torn, prevents repeat token claim; torn markers poison recovery.
