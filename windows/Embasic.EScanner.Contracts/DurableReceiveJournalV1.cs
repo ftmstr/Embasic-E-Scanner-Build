@@ -246,8 +246,14 @@ public sealed class DurableReceiveJournalV1
         {
             using var handle = CreateFile(Path.GetFullPath(root), 0x80, 7, IntPtr.Zero,
                 3, 0x02000000 | 0x00200000, IntPtr.Zero); // BACKUP_SEMANTICS | OPEN_REPARSE_POINT
-            var id = HandleId(handle);
-            return id;
+            // GetFileInformationByHandle succeeds for regular files too: the
+            // trusted root MUST be a directory, never an arbitrary file.
+            if (handle.IsInvalid ||
+                !GetFileInformationByHandle(handle, out var info) ||
+                (info.Attributes & (uint)FileAttributes.ReparsePoint) != 0 ||
+                (info.Attributes & (uint)FileAttributes.Directory) == 0)
+                return null;
+            return new FileId(info.VolumeSerial, info.FileIndexHigh, info.FileIndexLow);
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
