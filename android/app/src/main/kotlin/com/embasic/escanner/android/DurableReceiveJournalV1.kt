@@ -65,6 +65,13 @@ class DurableReceiveJournalV1 private constructor(
     @Synchronized
     fun commit(rawJson: ByteArray?, bytes: ByteArray?, nowMillis: Long): Boolean {
         if (!claimed || stopped || !stableRoot(root, rootKey)) return false
+        // Re-audit every previous receipt and blob BEFORE accepting new bytes.
+        // Crash remnants, torn token claim or a modified earlier page permanently
+        // poison this instance. This is not a hostile-writer race guarantee.
+        val before = inspect(root, session, tokenSha, issuedAt, expiresAt,
+            maxBytes, maxPages)
+        if (before.status != RecoveryStatus.TOKEN_CONSUMED ||
+            before.confirmedPages != gate.confirmedPages) return poison()
         val envelope = PageWireV1.parse(rawJson, session, maxBytes) ?: return false
         if (bytes == null || !PageWireV1.verifyBody(envelope, maxBytes, bytes) ||
             gate.propose(rawJson, bytes, nowMillis) != ReceiveGateV1.Decision.ACCEPTED) return false
@@ -92,6 +99,11 @@ class DurableReceiveJournalV1 private constructor(
             if (!stableRoot(root, rootKey) ||
                 gate.confirmReread(reread, nowMillis) != ReceiveGateV1.Decision.ACCEPTED)
                 return poison()
+            // Check the complete new receipt chain, not merely the last page.
+            val after = inspect(root, session, tokenSha, issuedAt, expiresAt,
+                maxBytes, maxPages)
+            if (after.status != RecoveryStatus.TOKEN_CONSUMED ||
+                after.confirmedPages != gate.confirmedPages) return poison()
             return true
         } catch (_: Exception) { return poison() }
     }
