@@ -135,7 +135,7 @@ internal static class DurableReceiveJournalSelfTest
             }
             finally { Directory.Delete(root, recursive: true); }
         }
-        if (scenarios != 30 || actions != 64)
+        if (scenarios != 37 || actions != 90)
         {
             Console.Error.WriteLine("FAIL: incomplete durable receipt golden scenarios");
             return false;
