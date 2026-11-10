@@ -54,6 +54,13 @@ public sealed class DurableReceiveJournalV1
             if (_stopped || _claimed || !StableRoot() ||
                 !PageTransferIntegrity.IsCanonicalSha256(token) ||
                 now < _issued || now >= _expires) return false;
+            // Existing entries indicate a consumed/torn session or orphan staging.
+            // Refuse to authorize a new token even if the entries are not recognized.
+            if (!EmptyRoot())
+            {
+                _stopped = true;
+                return false;
+            }
             var digest = SHA256.HashData(Encoding.ASCII.GetBytes(token!));
             if (!CryptographicOperations.FixedTimeEquals(digest, Convert.FromHexString(_tokenSha)))
                 return false;
@@ -112,6 +119,17 @@ public sealed class DurableReceiveJournalV1
             catch (IOException) { return Poison(); }
             catch (UnauthorizedAccessException) { return Poison(); }
         }
+    }
+
+    private bool EmptyRoot()
+    {
+        try
+        {
+            return StableRoot() && !Directory.EnumerateFileSystemEntries(_root).Any() &&
+                StableRoot();
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 
     private bool Poison() { _stopped = true; return false; }
