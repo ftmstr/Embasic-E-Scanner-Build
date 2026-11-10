@@ -181,6 +181,27 @@ internal static class DurableReceiveJournalSelfTest
         }
         finally { Directory.Delete(privateRoot, recursive: true); }
 
+        string orphanRoot = Directory.CreateTempSubdirectory("escanner-orphan-start-").FullName;
+        try
+        {
+            string orphan = Path.Combine(orphanRoot, "orphan.tmp");
+            File.WriteAllText(orphan, "partial", Encoding.ASCII);
+            var gate = Open(orphanRoot);
+            if (gate.ClaimToken(Token, 1001) ||
+                Inspect(orphanRoot).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+            {
+                Console.Error.WriteLine("FAIL: pre-existing orphan unexpectedly granted token");
+                return false;
+            }
+            File.Delete(orphan);
+            if (gate.ClaimToken(Token, 1002))
+            {
+                Console.Error.WriteLine("FAIL: tampered folder revived previously denied token");
+                return false;
+            }
+        }
+        finally { Directory.Delete(orphanRoot, recursive: true); }
+
         string raceRoot = Directory.CreateTempSubdirectory("escanner-claim-race-").FullName;
         try
         {
