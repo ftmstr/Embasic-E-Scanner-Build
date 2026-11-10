@@ -233,6 +233,163 @@ if (PageWireV1.Parse(wireRaw, sessionId, 3) is null ||
 Console.WriteLine("PASS: " + validWires + " accepted, " + invalidWires +
     " rejected shared raw-wire golden cases; trusted session/cap enforced");
 
+
+{
+    // All raw policy/receipt traces run from one PUBLIC cross-platform TSV.
+    const string syntheticSession = "01234567-89ab-4cde-8f01-23456789abcd";
+    const string syntheticPage0 = "11234567-89ab-4cde-8f01-23456789abcd";
+    const string syntheticPage1 = "21234567-89ab-4cde-8f01-23456789abcd";
+    const string syntheticTokenSha = "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb";
+    const string syntheticHash = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    var syntheticToken = new string('a', 64);
+    var syntheticBody = Encoding.ASCII.GetBytes("abc");
+
+    ReceiveGateV1 NewGate() => ReceiveGateV1.Open(
+        syntheticSession, syntheticTokenSha, 1000, 2000, 1024, 2)
+        ?? throw new InvalidOperationException("Trusted golden policy is invalid");
+
+    byte[] Wire(string page, int order, string sid = syntheticSession, string hash = syntheticHash) =>
+        Encoding.ASCII.GetBytes($"{{\"protocolVersion\":1,\"sessionId\":\"{sid}\"," +
+            $"\"pageId\":\"{page}\",\"order\":{order},\"byteSize\":3," +
+            $"\"mime\":\"image/jpeg\",\"sha256\":\"{hash}\"}}");
+
+    ReceiveGateV1.Decision Action(ReceiveGateV1 gate, string name, long now) => name switch
+    {
+        "AUTH_GOOD" => gate.Authenticate(syntheticToken, now),
+        "AUTH_BAD" => gate.Authenticate(new string('b', 64), now),
+        "AUTH_UPPER" => gate.Authenticate(syntheticToken.ToUpperInvariant(), now),
+        "AUTH_EMPTY" => gate.Authenticate("", now),
+        "AUTH_NULL" => gate.Authenticate(null, now),
+        "STAGE0" => gate.Propose(Wire(syntheticPage0, 0), syntheticBody, now),
+        "STAGE0_BAD_BYTES" => gate.Propose(Wire(syntheticPage0, 0), Encoding.ASCII.GetBytes("abd"), now),
+        "STAGE0_PARTIAL" => gate.Propose(Wire(syntheticPage0, 0), Encoding.ASCII.GetBytes("ab"), now),
+        "STAGE0_NULL" => gate.Propose(Wire(syntheticPage0, 0), null, now),
+        "STAGE0_BAD_HASH" => gate.Propose(Wire(syntheticPage0, 0, hash: new string('0', 64)), syntheticBody, now),
+        "STAGE0_WRONG_SESSION" => gate.Propose(
+            Wire(syntheticPage0, 0, sid: "31234567-89ab-4cde-8f01-23456789abcd"), syntheticBody, now),
+        "STAGE1" => gate.Propose(Wire(syntheticPage1, 1), syntheticBody, now),
+        "STAGE1_DUPID" => gate.Propose(Wire(syntheticPage0, 1), syntheticBody, now),
+        "STAGE2" => gate.Propose(Wire(syntheticPage1, 2), syntheticBody, now),
+        "CONFIRM_GOOD" => gate.ConfirmReread(syntheticBody, now),
+        "CONFIRM_BAD" => gate.ConfirmReread(Encoding.ASCII.GetBytes("abd"), now),
+        "CONFIRM_NULL" => gate.ConfirmReread(null, now),
+        "CLOSE" => gate.Close(),
+        _ => throw new InvalidOperationException("Unknown golden action: " + name)
+    };
+
+    var traceRoot = Directory.GetCurrentDirectory();
+    string? tracePath = null;
+    for (int i = 0; i < 8; i++)
+    {
+        var candidate = Path.Combine(traceRoot, "tests", "golden", "receive-gate-v1.tsv");
+        if (File.Exists(candidate)) { tracePath = candidate; break; }
+        var parent = Directory.GetParent(traceRoot);
+        if (parent is null) break;
+        traceRoot = parent.FullName;
+    }
+    if (tracePath is null)
+    {
+        Console.Error.WriteLine("FAIL: missing shared receive-gate-v1.tsv");
+        return 1;
+    }
+    int traces = 0, decisions = 0;
+    var names = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var line in File.ReadAllLines(tracePath, Encoding.ASCII))
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+        var parts = line.Split('\t');
+        if (parts.Length != 5 || !names.Add(parts[0]))
+        {
+            Console.Error.WriteLine("FAIL: duplicate or malformed receive-gate golden row");
+            return 1;
+        }
+        var actions = parts[1].Split(',');
+        var expected = parts[2].Split(',');
+        if (actions.Length != expected.Length)
+        {
+            Console.Error.WriteLine("FAIL: truncated receive-gate fixture expectations");
+            return 1;
+        }
+        var gate = NewGate();
+        for (int i = 0; i < actions.Length; i++)
+        {
+            var step = actions[i].Split('@');
+            if (step.Length != 2 || !long.TryParse(step[1], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var now))
+                throw new InvalidOperationException("Invalid deterministic fixture clock");
+            var actual = Action(gate, step[0], now);
+            var label = actual == ReceiveGateV1.Decision.Accepted ? "A" : "R";
+            if (label != expected[i])
+            {
+                Console.Error.WriteLine("FAIL: " + parts[0] + " step " + i +
+                    " expected " + expected[i] + " got " + label);
+                return 1;
+            }
+            decisions++;
+        }
+        if (gate.CurrentPhase.ToString().ToUpperInvariant() != parts[3] ||
+            gate.ConfirmedPages.ToString(System.Globalization.CultureInfo.InvariantCulture) != parts[4])
+        {
+            Console.Error.WriteLine("FAIL: incorrect terminal receive-gate phase/count for " + parts[0]);
+            return 1;
+        }
+        traces++;
+    }
+    if (traces != 38 || decisions != 95)
+    {
+        Console.Error.WriteLine("FAIL: incomplete shared receive-gate matrix");
+        return 1;
+    }
+    var invalid = new ReceiveGateV1?[]
+    {
+        ReceiveGateV1.Open(null, syntheticTokenSha, 1000, 2000, 1024, 2),
+        ReceiveGateV1.Open(syntheticSession.ToUpperInvariant(), syntheticTokenSha, 1000, 2000, 1024, 2),
+        ReceiveGateV1.Open(syntheticSession, null, 1000, 2000, 1024, 2),
+        ReceiveGateV1.Open(syntheticSession, syntheticTokenSha.ToUpperInvariant(), 1000, 2000, 1024, 2),
+        ReceiveGateV1.Open(syntheticSession, syntheticTokenSha, -1, 2000, 1024, 2),
+        ReceiveGateV1.Open(syntheticSession, syntheticTokenSha, 1000, 1000, 1024, 2),
+        ReceiveGateV1.Open(syntheticSession, syntheticTokenSha, 1000, 301001, 1024, 2),
+        ReceiveGateV1.Open(syntheticSession, syntheticTokenSha, 1000, 2000, 0, 2),
+        ReceiveGateV1.Open(syntheticSession, syntheticTokenSha, 1000, 2000, 1024, 0),
+        ReceiveGateV1.Open(syntheticSession, syntheticTokenSha, 1000, 2000, 1024, 1001)
+    };
+    if (invalid.Any(x => x is not null))
+    {
+        Console.Error.WriteLine("FAIL: invalid trusted receive-gate policy admitted");
+        return 1;
+    }
+    var race = NewGate();
+    int accepted = 0;
+    System.Threading.Tasks.Parallel.For(0, 24, _ =>
+    {
+        if (race.Authenticate(syntheticToken, 1000) == ReceiveGateV1.Decision.Accepted)
+            System.Threading.Interlocked.Increment(ref accepted);
+    });
+    if (accepted != 1 || race.CurrentPhase != ReceiveGateV1.Phase.Authorized)
+    {
+        Console.Error.WriteLine("FAIL: one-shot token concurrent replay accepted");
+        return 1;
+    }
+    var stageRace = NewGate();
+    if (stageRace.Authenticate(syntheticToken, 1000) != ReceiveGateV1.Decision.Accepted)
+        return 1;
+    accepted = 0;
+    System.Threading.Tasks.Parallel.For(0, 20, _ =>
+    {
+        if (stageRace.Propose(Wire(syntheticPage0, 0), syntheticBody, 1001) ==
+            ReceiveGateV1.Decision.Accepted)
+            System.Threading.Interlocked.Increment(ref accepted);
+    });
+    if (accepted != 1 || stageRace.ConfirmReread(syntheticBody, 1002) !=
+        ReceiveGateV1.Decision.Accepted || stageRace.ConfirmedPages != 1)
+    {
+        Console.Error.WriteLine("FAIL: concurrent staging accepted multiple pending pages");
+        return 1;
+    }
+    Console.WriteLine($"PASS: {traces} shared receive-gate golden traces / {decisions} decisions; " +
+        "10 invalid policies and two concurrent single-winner races");
+}
+
 return 0;
 
 static byte[] ReplaceAscii(byte[] source, string target, string replacement)
