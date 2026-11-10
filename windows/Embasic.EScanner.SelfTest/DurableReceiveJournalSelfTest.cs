@@ -86,6 +86,21 @@ internal static class DurableReceiveJournalSelfTest
     private static extern bool CreateHardLinkNative(string newName, string existingName,
         IntPtr securityAttributes);
 
+    private static string[] AliasGoldenCase(string id)
+    {
+        var golden = GoldenPath() ?? throw new InvalidOperationException("Missing canonical trace fixture");
+        var path = Path.Combine(Path.GetDirectoryName(golden)!,
+            "private-root-alias-v1.tsv");
+        var rows = File.ReadAllLines(path, Encoding.ASCII)
+            .Where(x => !string.IsNullOrWhiteSpace(x) && !x.StartsWith('#'))
+            .Select(x => x.Split('\t')).ToArray();
+        if (rows.Length != 2 || rows.Any(x => x.Length != 4) ||
+            rows.Select(x => x[0]).ToHashSet(StringComparer.Ordinal)
+                .SetEquals(new[] { "ancestor_symlink", "external_token_hardlink" }) == false)
+            throw new InvalidOperationException("Shared alias-root golden matrix is incomplete");
+        return rows.Single(x => x[0] == id);
+    }
+
     public static bool Run()
     {
         string? golden = GoldenPath();
@@ -240,11 +255,15 @@ internal static class DurableReceiveJournalSelfTest
             {
                 Directory.CreateSymbolicLink(alias, real);
                 made = true;
-                if (DurableReceiveJournalV1.Open(sessionDir, Session, Digest, 1000, 2000, 1024, 2) is null ||
-                    DurableReceiveJournalV1.Open(Path.Combine(alias, "session"), Session,
-                        Digest, 1000, 2000, 1024, 2) is not null ||
-                    Inspect(Path.Combine(alias, "session")).Status !=
-                        DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+                var expected = AliasGoldenCase("ancestor_symlink");
+                var candidate = DurableReceiveJournalV1.Open(Path.Combine(alias, "session"),
+                    Session, Digest, 1000, 2000, 1024, 2);
+                var actualOpen = candidate is null ? "REJECT" : "ACCEPT";
+                var actualRecovery = Inspect(Path.Combine(alias, "session"))
+                    .Status.ToString().ToUpperInvariant();
+                if (DurableReceiveJournalV1.Open(sessionDir, Session,
+                        Digest, 1000, 2000, 1024, 2) is null ||
+                    actualOpen != expected[1] || actualRecovery != expected[2])
                 {
                     Console.Error.WriteLine("FAIL: symlinked ancestor reached private root");
                     return false;
@@ -279,8 +298,11 @@ internal static class DurableReceiveJournalSelfTest
                 Console.Error.WriteLine("FAIL: unable to prepare NTFS hardlink admission fixture");
                 return false;
             }
-            if (Inspect(hardlinkRoot).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned ||
-                journal.Commit(Wire(Page0, 0), Body, 1002))
+            var expected = AliasGoldenCase("external_token_hardlink");
+            var recovery = Inspect(hardlinkRoot).Status.ToString().ToUpperInvariant();
+            var actualCommit = journal.Commit(Wire(Page0, 0), Body, 1002) ?
+                "ACCEPT" : "REJECT";
+            if (recovery != expected[2] || actualCommit != expected[3])
             {
                 Console.Error.WriteLine("FAIL: external hardlink to token.claim admitted");
                 return false;
