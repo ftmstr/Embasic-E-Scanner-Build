@@ -1,9 +1,9 @@
 name: Windows bootstrap
 on:
   push:
-    paths: ['windows/**', 'tests/golden/**', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
+    paths: ['windows/**', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
   pull_request:
-    paths: ['windows/**', 'tests/golden/**', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
+    paths: ['windows/**', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
 permissions:
   contents: read
 jobs:
