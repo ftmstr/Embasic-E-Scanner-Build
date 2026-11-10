@@ -1,9 +1,9 @@
 name: Windows .NET Foundation
 'on':
   push:
-    paths: ['windows/**', '.github/workflows/windows-build.yml']
+    paths: ['windows/**', 'tests/golden/**', '.github/workflows/windows-build.yml']
   pull_request:
-    paths: ['windows/**', '.github/workflows/windows-build.yml']
+    paths: ['windows/**', 'tests/golden/**', '.github/workflows/windows-build.yml']
   workflow_dispatch:
 permissions:
   contents: read
