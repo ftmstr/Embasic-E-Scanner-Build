@@ -45,17 +45,33 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
+          import re
           xmls = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
           if not xmls:
               raise SystemExit("BLOCKED: JUnit XML absent; task may have been NO-SOURCE")
           tests = failures = errors = skipped = 0
+          perf = {}
           for xml in xmls:
               root = ET.parse(xml).getroot()
               tests += int(root.get("tests", "0"))
               failures += int(root.get("failures", "0"))
               errors += int(root.get("errors", "0"))
               skipped += int(root.get("skipped", "0"))
+              for node in root.iter("system-out"):
+                  for line in (node.text or "").splitlines():
+                      match = re.fullmatch(
+                          r"FOUNDATION_PERF_ANDROID_JVM pages=(20|100) elapsedMs=([0-9]+) syntheticBytesPerPage=3 noLatencySla=true",
+                          line.strip())
+                      if match:
+                          pages = int(match.group(1))
+                          if pages in perf:
+                              raise SystemExit("BLOCKED: duplicate synthetic Android performance evidence")
+                          perf[pages] = int(match.group(2))
           print(f"JUnit cases={tests}, failures={failures}, errors={errors}, skipped={skipped}")
+          if set(perf) != {20, 100}:
+              raise SystemExit("BLOCKED: expected 20/100-page JUnit system-out measurements missing")
+          for pages in (20, 100):
+              print(f"FOUNDATION_PERF_ANDROID_JVM pages={pages} elapsedMs={perf[pages]} syntheticBytesPerPage=3 noLatencySla=true")
           if tests == 0 or failures or errors or skipped:
               raise SystemExit("BLOCKED: JUnit not fully executed or not passing")
           PY
