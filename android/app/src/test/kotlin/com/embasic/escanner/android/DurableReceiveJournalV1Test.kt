@@ -203,6 +203,36 @@ class DurableReceiveJournalV1Test {
         }
     }
 
+    @Test fun syntheticLedgerRehashProfile20And100Pages() {
+        // This is a filesystem cost probe, NOT a latency SLA, Android-device QA
+        // or full-resolution scan benchmark. Extra 500/1000 opt-in may take long.
+        val sizes = if (System.getenv("EMBASIC_ESCANNER_PERF_EXTENDED") == "1")
+            intArrayOf(20, 100, 500, 1000) else intArrayOf(20, 100)
+        for (pages in sizes) {
+            val root = Files.createTempDirectory("escanner-perf-")
+            try {
+                val journal = DurableReceiveJournalV1.open(root, session, digest,
+                    1000, 2000, 1024, pages)!!
+                assertTrue("perf claim $pages", journal.claimToken(token, 1001))
+                val started = System.nanoTime()
+                repeat(pages) { index ->
+                    val id = (index + 1).toString(16).padStart(8, '0') +
+                        "-89ab-4cde-8f01-23456789abcd"
+                    assertTrue("perf page $index / $pages",
+                        journal.commit(wire(id, index), body, 1001))
+                }
+                val elapsed = (System.nanoTime() - started) / 1_000_000L
+                val recovery = DurableReceiveJournalV1.inspect(root, session, digest,
+                    1000, 2000, 1024, pages)
+                assertEquals(DurableReceiveJournalV1.RecoveryStatus.TOKEN_CONSUMED,
+                    recovery.status)
+                assertEquals(pages, recovery.confirmedPages)
+                println("FOUNDATION_PERF_ANDROID_JVM pages=$pages elapsedMs=$elapsed " +
+                    "syntheticBytesPerPage=3 noLatencySla=true")
+            } finally { deleteTree(root) }
+        }
+    }
+
     private fun deleteTree(root: Path) {
         if (Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
             Files.walk(root).use { walk ->
