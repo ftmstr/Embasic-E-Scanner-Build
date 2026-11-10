@@ -88,7 +88,7 @@ class DurableReceiveJournalV1Test {
     @Test fun sharedThirtyActualDiskRecoveryTraces() {
         val lines = Files.readAllLines(fixture(), Charsets.US_ASCII)
             .filter { it.isNotBlank() && !it.startsWith('#') }
-        assertEquals(30, lines.size)
+        assertEquals(37, lines.size)
         val names = HashSet<String>()
         var count = 0
         for (line in lines) {
@@ -111,7 +111,7 @@ class DurableReceiveJournalV1Test {
                 assertEquals(cells[0] + " committed pages", cells[4].toInt(), observed.confirmedPages)
             } finally { deleteTree(root) }
         }
-        assertEquals(64, count)
+        assertEquals(90, count)
     }
 
     @Test fun rejectsUntrustedDirectoriesAndOversizedPagePolicy() {
