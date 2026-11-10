@@ -5,7 +5,7 @@ by Android `DurableReceiveJournalV1Test` (JUnit/Gradle on Linux JVM) and
 Windows `DurableReceiveJournalSelfTest.Run` (real .NET on Windows CI).
 Every row contains five TAB-separated fields:
 `id<TAB>actions<TAB>A_or_R<TAB>recovery_status<TAB>confirmed_pages`.
-It has **30 non-comment rows with 64 ordered decisions**. Both suites reject
+It has **37 non-comment rows with 90 ordered decisions**. Both suites reject
 missing/duplicate cases or changed results. No real documents or secrets.
 
 The cases use pre-created, disposable test-private session directories and
@@ -35,3 +35,28 @@ precondition, and there is no self-service tombstone deletion.
 See `docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md`.
 **RELEASE NO-GO** until native apps, protocol security, product licensing and
 hardware release gates independently pass.
+
+## Live ledger revalidation (additional 7 adversarial traces)
+
+Seven new single-session test traces corrupt or add an unknown file *after*
+successful token admission or page-zero receipt, and then attempt another
+page commit. The receiver must reject that next commit even if the new page
+itself has a valid hash and order. The adversarial fixture names are
+`prior_blob_corruption_blocks_next`,
+`prior_receipt_corruption_blocks_next`,
+`token_claim_corruption_blocks_first`,
+`unknown_after_claim_blocks_first`,
+`unknown_after_page_blocks_next`,
+`gap_after_page_blocks_next` and
+`stale_stage_after_page_blocks_next`.
+This is a separate property from read-only restart inspection: unsafe
+pre-existing history must block *live* progress as well.
+
+Before and after each page commit the adapters now inspect the entire
+receipt+blob sequence, compare its page count to the in-memory gate and
+fail-closed poison the instance upon mismatch. This catches static tampering
+and interrupted/orphan entries without silently appending more pages.
+**NOT PROVED:** a hostile same-directory writer racing between inspection
+and a stage/rename; no portable directory fsync or full power-cut guarantee.
+Review the cumulative O(pages × historical byte volume) re-audit cost at
+20/100/500/1000 pages before allowing production use.
