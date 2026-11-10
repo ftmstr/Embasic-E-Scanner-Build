@@ -390,6 +390,8 @@ Console.WriteLine("PASS: " + validWires + " accepted, " + invalidWires +
         "10 invalid policies and two concurrent single-winner races");
 }
 
+if (!DurableReceiveJournalSelfTest.Run()) return 1;
+
 return 0;
 
 static byte[] ReplaceAscii(byte[] source, string target, string replacement)
