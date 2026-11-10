@@ -121,7 +121,7 @@ class JaxbApi232ExactTests(unittest.TestCase):
 
     def test_synthetic_legal_text_byte_parity_does_not_confer_rights(self):
         e = self.check()
-        self.assertEqual(e["status"], "EXACT_ISTACK308_MAVEN_TAG_LICENSE_NOTICE_PARITY_LEGAL_REVIEW_OPEN")
+        self.assertEqual(e["status"], "EXACT_JAXBAPI232_MAVEN_TAG_LICENSE_NOTICE_PARITY_LEGAL_REVIEW_OPEN")
         self.assertTrue(e["mavenJar"]["embeddedLicenseNoticeTagByteParity"])
         self.assertTrue(e["mavenChildPOM"]["tagSourceByteParity"])
         self.assertFalse(e["publisherSignatureVerified"])
