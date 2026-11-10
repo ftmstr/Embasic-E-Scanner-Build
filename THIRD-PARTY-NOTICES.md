@@ -210,6 +210,42 @@ signals are review prompts only; all 42 child licensing gaps, exact legal
 texts, third-party rights and NOTICE/SBOM closure remain NOT VERIFIED.
 No linked or embedded GPL/LGPL/MPL licence claim has been made.
 
+## Jakarta XML Bind API 2.3.2 — exact original EDL/BSD tag, Maven POM and JAR review (10 November 2026)
+
+Selected PUBLIC Gradle root/app BUILD-TOOL module
+pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@2.3.2 is one of
+42 child POM direct metadata gaps. Its immediate parent
+jakarta.xml.bind:jakarta.xml.bind-api-parent:2.3.2 declares
+Eclipse Distribution License - v 1.0 (EDL) in supplier POM metadata.
+Ancestor org.eclipse.ee4j:project:1.0.5 declares EPL 2.0
+and GPLv2 with Classpath Exception at ORGANIZATIONAL parent level.
+Do not infer effective child license or linked APK redistribution
+obligations from distant supplier parent metadata.
+
+Original 2.3.2 upstream jakartaee/jaxb-api annotated tag points at
+commit 18b50028fd7dbd1305c359cd5624b1cddb1724a8 and unsigned
+tag object 6e6292004b760313faf71973a3ccb578d73fe90a.
+Tagged source Git blobs: LICENSE.md
+6fb337cb014d5ae5d406194049b960982e307849,
+NOTICE.md 5aac171d23ff9e49976751b7952759233af8a29e,
+jaxb-api/pom.xml 9415ef692cc29acaa647ced0fae057d8e57e3968,
+root pom.xml 979df40b6d322f23dc632bdd59c7f5121eb74fed.
+The original tagged NOTICE labels EDL 1.0 and SPDX BSD-3-Clause;
+its project-wide Third-party Content states None. This does
+NOT prove Android/Windows release has no transitive dependencies.
+The source API POM declares jakarta.activation-api dependency.
+
+scripts/audit_jaxbapi232_exact_license.py and synthetic negative
+tests/test_jaxbapi232_exact_license.py check exact source Git blobs,
+Maven Central child/parent POM and JAR bytes against scoped local Gradle
+cache SHA-256 and the embedded META-INF/LICENSE.md and NOTICE.md against
+the original tagged source bytes. Unexpected runtime scope or forged
+licensing rights fail closed; release permission is NEVER inferred
+from an unsigned tag, supplier text names or byte parity.
+Detailed review: docs/JAXBAPI232-EXACT-TAG-EDL-BSD-LEGAL-REVIEW-20261110.md.
+All 42 child metadata reviews stay OPEN, full NOTICE/LICENSES/SBOM and
+commercial redistribution rights NOT VERIFIED, product release NO-GO.
+
 ## iStack Commons Runtime 3.0.8 — exact EDL/BSD tag and JAR-embedded legal text review (9 Nov 2026)
 
 The Gradle root/app BUILD-TOOL-only selected Maven module
