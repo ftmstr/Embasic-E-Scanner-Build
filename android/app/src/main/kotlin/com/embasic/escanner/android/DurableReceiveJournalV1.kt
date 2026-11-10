@@ -188,19 +188,35 @@ class DurableReceiveJournalV1 private constructor(
             } catch (_: Exception) { bad }
         }
 
-        private fun rootIdentity(path: Path): Any? =
-            try {
-                val attrs = Files.readAttributes(path, BasicFileAttributes::class.java,
-                    *noLinks)
-                if (!attrs.isDirectory || attrs.isSymbolicLink) null else attrs.fileKey()
+        private fun rootIdentity(path: Path): Any? {
+            return try {
+                // NOFOLLOW on the leaf alone is insufficient: /trusted/alias/session
+                // resolves through an untrusted symbolic-link ancestor. Check every
+                // lexical parent as well. A concurrent writer is NOT handled here.
+                var current: Path? = path.toAbsolutePath().normalize()
+                while (current != null) {
+                    val attrs = Files.readAttributes(current,
+                        BasicFileAttributes::class.java, *noLinks)
+                    if (!attrs.isDirectory || attrs.isSymbolicLink) return null
+                    current = current.parent
+                }
+                val rootAttrs = Files.readAttributes(path,
+                    BasicFileAttributes::class.java, *noLinks)
+                rootAttrs.fileKey()
             } catch (_: Exception) { null }
+        }
 
         private fun stableRoot(path: Path, key: Any): Boolean = rootIdentity(path) == key
 
         private fun safeKey(path: Path): Any? =
             try {
                 val a = Files.readAttributes(path, BasicFileAttributes::class.java, *noLinks)
-                if (!a.isRegularFile || a.isSymbolicLink) null else a.fileKey()
+                // Linux/Unix file providers expose hardlink count; reject an
+                // externally aliased token or receipt before reading it. If an
+                // Android provider lacks this view, fail closed (NOT device tested).
+                val nlink = Files.getAttribute(path, "unix:nlink", *noLinks) as? Number
+                if (!a.isRegularFile || a.isSymbolicLink ||
+                    nlink?.toLong() != 1L) null else a.fileKey()
             } catch (_: Exception) { null }
 
         private fun createAndForce(path: Path, content: ByteArray): Boolean =
