@@ -36,6 +36,12 @@ class DurableReceiveJournalV1 private constructor(
         if (stopped || claimed || !stableRoot(root, rootKey) ||
             !PageTransferIntegrity.isCanonicalSha256(token) ||
             nowMillis < issuedAt || nowMillis >= expiresAt) return false
+        // A suspicious pre-existing entry is evidence of an older interrupted
+        // or tampered session. Do not grant another token on that directory.
+        if (!unusedRoot()) {
+            stopped = true
+            return false
+        }
         val actual = MessageDigest.getInstance("SHA-256")
             .digest(token!!.toByteArray(Charsets.US_ASCII))
         if (!MessageDigest.isEqual(actual, decodeHex(tokenSha))) return false
@@ -89,6 +95,13 @@ class DurableReceiveJournalV1 private constructor(
             return true
         } catch (_: Exception) { return poison() }
     }
+
+    private fun unusedRoot(): Boolean =
+        try {
+            stableRoot(root, rootKey) &&
+                Files.newDirectoryStream(root).use { !it.iterator().hasNext() } &&
+                stableRoot(root, rootKey)
+        } catch (_: Exception) { false }
 
     private fun poison(): Boolean { stopped = true; return false }
 
