@@ -119,7 +119,7 @@ class DurableReceiveJournalV1Test {
         val file = root.resolve("not-a-directory")
         val link = root.resolve("symbolic-link")
         try {
-            Files.writeString(file, "notdir")
+            Files.write(file, "notdir".toByteArray(Charsets.US_ASCII))
             Files.createSymbolicLink(link, root)
             assertNull(DurableReceiveJournalV1.open(file, session, digest, 1000, 2000, 1024, 2))
             assertNull(DurableReceiveJournalV1.open(link, session, digest, 1000, 2000, 1024, 2))
