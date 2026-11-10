@@ -248,14 +248,14 @@ class Fastinfoset1216ExactTests(unittest.TestCase):
         self.blobs[mod.CHILD_JAR] = altered
         self.inv["modules"][0]["cachedFiles"][1].update(
             sha256=mod._sha(altered),byteSize=len(altered))
-        with self.assertRaisesRegex(mod.AuditError, "embedded legal-text"):self.check()
+        with self.assertRaisesRegex(mod.AuditError, "JAR embedded Apache"):self.check()
 
     def test_embedded_notice_changed_but_rehashed_rejected(self):
         altered = jar(self.blobs[mod.TAG_LICENSE], self.blobs[mod.TAG_NOTICE]+b"malicious")
         self.blobs[mod.CHILD_JAR] = altered
         self.inv["modules"][0]["cachedFiles"][1].update(
             sha256=mod._sha(altered),byteSize=len(altered))
-        with self.assertRaisesRegex(mod.AuditError, "embedded legal-text"):self.check()
+        with self.assertRaisesRegex(mod.AuditError, "JAR embedded Apache"):self.check()
 
     def test_fime_tagged_separate_bsd_licence_drift_is_blocked(self):
         self.blobs[mod.TAG_FIME_LICENSE] += b'altered'
@@ -284,11 +284,11 @@ class Fastinfoset1216ExactTests(unittest.TestCase):
         out = BytesIO()
         with zipfile.ZipFile(out, "w") as z:
             z.writestr("META-INF/LICENSE", license_bytes)
-        with self.assertRaises(mod.AuditError):mod._archive_legal_texts(out.getvalue())
+        with self.assertRaises(mod.AuditError):mod._jar_legal_texts(out.getvalue())
 
     def test_jar_zip_path_traversal_rejected(self):
-        with self.assertRaisesRegex(mod.AuditError, "unsafe JAR"):
-            mod._archive_legal_texts(jar(self.blobs[mod.TAG_LICENSE],
+        with self.assertRaisesRegex(mod.AuditError, "unsafe FastInfoset JAR"):
+            mod._jar_legal_texts(jar(self.blobs[mod.TAG_LICENSE],
                                          self.blobs[mod.TAG_NOTICE], [("../path", b"x")]))
 
     def test_jar_zip_symlink_rejected(self):
@@ -300,7 +300,7 @@ class Fastinfoset1216ExactTests(unittest.TestCase):
             info.create_system=3
             info.external_attr=(stat.S_IFLNK|0o777)<<16
             z.writestr(info, "../LICENSE")
-        with self.assertRaisesRegex(mod.AuditError, "unsafe JAR"):mod._archive_legal_texts(out.getvalue())
+        with self.assertRaisesRegex(mod.AuditError, "unsafe FastInfoset JAR"):mod._jar_legal_texts(out.getvalue())
 
     def test_unexpected_runtime_graph_appearance_rejected(self):
         self.rt["runtimeComponents"].append({"purl":mod.PURL})
