@@ -168,6 +168,18 @@ class DurableReceiveJournalV1Test {
         }
     }
 
+    /** Single PUBLIC fixture shared with Windows NTFS tests. Missing cases fail. */
+    private fun aliasGolden(id: String): List<String> {
+        val rows = Files.readAllLines(
+            fixture().parent.resolve("private-root-alias-v1.tsv"), Charsets.US_ASCII)
+            .filter { it.isNotBlank() && !it.startsWith('#') }
+            .map { it.split('\t') }
+        require(rows.size == 2 && rows.all { it.size == 4 } &&
+            rows.map { it[0] }.toSet() ==
+                setOf("ancestor_symlink", "external_token_hardlink"))
+        return rows.single { it[0] == id }
+    }
+
     @Test fun ancestorSymlinkMustNotProvidePrivateRoot() {
         val parent = Files.createTempDirectory("escanner-ancestor-")
         try {
@@ -177,11 +189,12 @@ class DurableReceiveJournalV1Test {
             Files.createSymbolicLink(alias, real)
             assertNotNull("control must be usable", DurableReceiveJournalV1.open(
                 sessionDir, session, digest, 1000, 2000, 1024, 2))
-            assertNull("symlink in PARENT cannot authenticate private root",
-                DurableReceiveJournalV1.open(alias.resolve("session"),
-                    session, digest, 1000, 2000, 1024, 2))
-            assertEquals(DurableReceiveJournalV1.RecoveryStatus.POISONED,
-                recover(alias.resolve("session")).status)
+            val expected = aliasGolden("ancestor_symlink")
+            val admitted = DurableReceiveJournalV1.open(alias.resolve("session"),
+                session, digest, 1000, 2000, 1024, 2)
+            assertEquals("symlink in PARENT cannot authenticate private root",
+                expected[1], if (admitted == null) "REJECT" else "ACCEPT")
+            assertEquals(expected[2], recover(alias.resolve("session")).status.name)
         } finally { deleteTree(parent) }
     }
 
@@ -193,10 +206,12 @@ class DurableReceiveJournalV1Test {
             val journal = open(root)
             assertTrue(journal.claimToken(token, 1001))
             Files.createLink(alias, root.resolve("token.claim"))
+            val expected = aliasGolden("external_token_hardlink")
             assertEquals("token with external hardlink must be poisoned",
-                DurableReceiveJournalV1.RecoveryStatus.POISONED, recover(root).status)
-            assertFalse("prior claim alias forbids new page", journal.commit(
-                wire(page0, 0), body, 1002))
+                expected[2], recover(root).status.name)
+            assertEquals("prior claim alias forbids new page",
+                expected[3], if (journal.commit(wire(page0, 0), body, 1002))
+                    "ACCEPT" else "REJECT")
         } finally {
             Files.deleteIfExists(alias)
             deleteTree(root)
