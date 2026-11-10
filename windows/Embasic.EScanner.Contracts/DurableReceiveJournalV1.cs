@@ -189,13 +189,20 @@ public sealed class DurableReceiveJournalV1
         try
         {
             if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) return null;
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
-                FileShare.None, 4096, FileOptions.SequentialScan);
-            var id = HandleId(stream.SafeFileHandle);
-            if (id is null || stream.Length < 0 || stream.Length > maxBytes) return null;
-            var bytes = new byte[checked((int)stream.Length)];
-            stream.ReadExactly(bytes);
-            if (stream.ReadByte() != -1 || GetFileId(path) != id) return null;
+            FileId? id;
+            byte[] bytes;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                       FileShare.None, 4096, FileOptions.SequentialScan))
+            {
+                id = HandleId(stream.SafeFileHandle);
+                if (id is null || stream.Length < 0 || stream.Length > maxBytes) return null;
+                bytes = new byte[checked((int)stream.Length)];
+                stream.ReadExactly(bytes);
+                if (stream.ReadByte() != -1) return null;
+            }
+            // Close the exclusive read handle before reopening by path for file-ID
+            // comparison; otherwise FileShare.None prevents the second open.
+            if (GetFileId(path) != id) return null;
             return bytes;
         }
         catch (IOException) { return null; }
