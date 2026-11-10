@@ -1,9 +1,9 @@
 name: Windows bootstrap
 on:
   push:
-    paths: ['windows/**', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
+    paths: ['windows/**', 'tests/golden/**', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
   pull_request:
-    paths: ['windows/**', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
+    paths: ['windows/**', 'tests/golden/**', '.github/workflows/windows-bootstrap.yml', 'scripts/audit_dotnet_foundation.py', 'tests/test_dotnet_foundation.py']
 permissions:
   contents: read
 jobs:
