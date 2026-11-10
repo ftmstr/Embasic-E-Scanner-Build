@@ -148,6 +148,91 @@ if (PageTransferIntegrity.VerifyCompleteBytes(sessionId, pageId, 0, 3,
     return 1;
 }
 Console.WriteLine($"PASS: 7 synthetic envelope positives + {badEnvelopes.Length + 1} fail-closed rejections");
+
+// Exact PUBLIC byte fixtures are shared with Android/JUnit.
+const string canonicalWire = "{\"protocolVersion\":1,\"sessionId\":\"01234567-89ab-4cde-8f01-23456789abcd\"," +
+    "\"pageId\":\"11234567-89ab-4cde-8f01-23456789abcd\",\"order\":0,\"byteSize\":3," +
+    "\"mime\":\"image/jpeg\",\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"}";
+var wireRoot = Directory.GetCurrentDirectory();
+string? goldenPath = null;
+for (var i = 0; i < 8; i++)
+{
+    var candidate = Path.Combine(wireRoot, "tests", "golden", "page-wire-v1.hex.tsv");
+    if (File.Exists(candidate)) { goldenPath = candidate; break; }
+    var parent = Directory.GetParent(wireRoot);
+    if (parent is null) break;
+    wireRoot = parent.FullName;
+}
+if (goldenPath is null)
+{
+    Console.Error.WriteLine("FAIL: missing cross-platform shared golden fixture");
+    return 1;
+}
+int validWires = 0, invalidWires = 0;
+var seenWires = new HashSet<string>(StringComparer.Ordinal);
+foreach (var line in File.ReadAllLines(goldenPath, Encoding.ASCII))
+{
+    if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+    var parts = line.Split('\t');
+    if (parts.Length != 3 || !seenWires.Add(parts[0]) ||
+        parts[1] is not ("PASS" or "REJECT"))
+    {
+        Console.Error.WriteLine("FAIL: invalid shared fixture metadata");
+        return 1;
+    }
+    byte[] bytes;
+    try { bytes = Convert.FromHexString(parts[2]); }
+    catch (FormatException)
+    {
+        Console.Error.WriteLine("FAIL: fixture must contain valid hex");
+        return 1;
+    }
+    var parsed = PageWireV1.Parse(bytes, sessionId, 1024);
+    if (parts[1] == "PASS")
+    {
+        validWires++;
+        if (parsed is null || parsed.ProtocolVersion != 1 || parsed.ByteSize != 3 ||
+            !PageWireV1.VerifyBody(parsed, 1024, abc) ||
+            PageWireV1.VerifyBody(parsed, 1024, Encoding.ASCII.GetBytes("abd")) ||
+            PageWireV1.VerifyBody(parsed, 1024, null) ||
+            PageWireV1.Parse(Encoding.ASCII.GetBytes(parsed.CanonicalJson), sessionId, 1024)?.CanonicalJson != parsed.CanonicalJson ||
+            (parts[0] is "valid_canonical" or "valid_reordered" or "valid_whitespace" && parsed.CanonicalJson != canonicalWire))
+        {
+            Console.Error.WriteLine("FAIL: accepted fixture changed meaning: " + parts[0]);
+            return 1;
+        }
+    }
+    else
+    {
+        invalidWires++;
+        if (parsed is not null)
+        {
+            Console.Error.WriteLine("FAIL: unsafe fixture admitted: " + parts[0]);
+            return 1;
+        }
+    }
+}
+if (seenWires.Count != 63 || validWires != 5 || invalidWires != 58)
+{
+    Console.Error.WriteLine("FAIL: truncated/altered shared fixture set");
+    return 1;
+}
+var wireRaw = Encoding.ASCII.GetBytes(canonicalWire);
+if (PageWireV1.Parse(wireRaw, sessionId, 3) is null ||
+    PageWireV1.Parse(wireRaw, sessionId, 2) is not null ||
+    PageWireV1.Parse(wireRaw, sessionId, 0) is not null ||
+    PageWireV1.Parse(wireRaw, sessionId, -1) is not null ||
+    PageWireV1.Parse(wireRaw, "21234567-89ab-4cde-8f01-23456789abcd", 1024) is not null ||
+    PageWireV1.Parse(wireRaw, sessionId.ToUpperInvariant(), 1024) is not null ||
+    PageWireV1.Parse(wireRaw, null, 1024) is not null ||
+    PageWireV1.Parse(null, sessionId, 1024) is not null)
+{
+    Console.Error.WriteLine("FAIL: caller-bound session/size policy bypass");
+    return 1;
+}
+Console.WriteLine("PASS: " + validWires + " accepted, " + invalidWires +
+    " rejected shared raw-wire golden cases; trusted session/cap enforced");
+
 return 0;
 
 static byte[] ReplaceAscii(byte[] source, string target, string replacement)
