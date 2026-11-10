@@ -293,6 +293,51 @@ internal static class DurableReceiveJournalSelfTest
             Directory.Delete(hardlinkRoot, recursive: true);
         }
 
+        // Real NTFS/temp-file profiling, NOT a product latency target.
+        // Extended 500/1000 rounds are opt-in to avoid excessive CI load.
+        var sizes = Environment.GetEnvironmentVariable("EMBASIC_ESCANNER_PERF_EXTENDED") == "1"
+            ? new[] { 20, 100, 500, 1000 }
+            : new[] { 20, 100 };
+        foreach (int pages in sizes)
+        {
+            string perfRoot = Directory.CreateTempSubdirectory("escanner-perf-").FullName;
+            try
+            {
+                var gate = DurableReceiveJournalV1.Open(perfRoot, Session, Digest,
+                    1000, 2000, 1024, pages);
+                if (gate is null || !gate.ClaimToken(Token, 1001))
+                {
+                    Console.Error.WriteLine("FAIL: synthetic perf session setup " + pages);
+                    return false;
+                }
+                long started = System.Diagnostics.Stopwatch.GetTimestamp();
+                for (int i = 0; i < pages; i++)
+                {
+                    string syntheticId = (i + 1).ToString("x8",
+                        System.Globalization.CultureInfo.InvariantCulture) +
+                        "-89ab-4cde-8f01-23456789abcd";
+                    if (!gate.Commit(Wire(syntheticId, i), Body, 1001))
+                    {
+                        Console.Error.WriteLine("FAIL: synthetic perf page " + i + "/" + pages);
+                        return false;
+                    }
+                }
+                long milliseconds = (long)System.Diagnostics.Stopwatch
+                    .GetElapsedTime(started).TotalMilliseconds;
+                var recovery = DurableReceiveJournalV1.Inspect(perfRoot, Session,
+                    Digest, 1000, 2000, 1024, pages);
+                if (recovery.Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
+                    recovery.ConfirmedPages != pages)
+                {
+                    Console.Error.WriteLine("FAIL: synthetic perf receipt accounting " + pages);
+                    return false;
+                }
+                Console.WriteLine($"FOUNDATION_PERF_WINDOWS_NTFS pages={pages} " +
+                    $"elapsedMs={milliseconds} syntheticBytesPerPage=3 noLatencySla=true");
+            }
+            finally { Directory.Delete(perfRoot, recursive: true); }
+        }
+
         Console.WriteLine($"PASS: {scenarios} actual-file cross-platform durable receipt cases / " +
             $"{actions} decisions; private-root policy and 24-instance exclusive token race");
         return true;
