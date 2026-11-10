@@ -265,7 +265,10 @@ public sealed class DurableReceiveJournalV1
     private static FileId? HandleId(SafeFileHandle handle)
     {
         if (handle.IsInvalid || !GetFileInformationByHandle(handle, out var info) ||
-            (info.Attributes & (uint)FileAttributes.ReparsePoint) != 0) return null;
+            (info.Attributes & (uint)FileAttributes.ReparsePoint) != 0 ||
+            // Refuse hardlinks to immutable token/page records, even when
+            // bytes still match. Other names enable out-of-root mutation.
+            info.LinkCount != 1) return null;
         return new FileId(info.VolumeSerial, info.FileIndexHigh, info.FileIndexLow);
     }
 
@@ -274,6 +277,17 @@ public sealed class DurableReceiveJournalV1
         if (!OperatingSystem.IsWindows()) return null;
         try
         {
+            // OPEN_REPARSE_POINT guards the final component, not its parents.
+            // Windows can otherwise follow C:\\base\\alias\\session even if the
+            // final "session" directory itself is a normal directory.
+            var current = new DirectoryInfo(Path.GetFullPath(root));
+            while (current is not null)
+            {
+                var attributes = File.GetAttributes(current.FullName);
+                if ((attributes & FileAttributes.ReparsePoint) != 0 ||
+                    (attributes & FileAttributes.Directory) == 0) return null;
+                current = current.Parent;
+            }
             using var handle = CreateFile(Path.GetFullPath(root), 0x80, 7, IntPtr.Zero,
                 3, 0x02000000 | 0x00200000, IntPtr.Zero); // BACKUP_SEMANTICS | OPEN_REPARSE_POINT
             // GetFileInformationByHandle succeeds for regular files too: the
