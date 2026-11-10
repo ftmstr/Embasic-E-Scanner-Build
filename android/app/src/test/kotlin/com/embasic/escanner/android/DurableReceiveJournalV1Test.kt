@@ -131,6 +131,23 @@ class DurableReceiveJournalV1Test {
         } finally { deleteTree(root) }
     }
 
+    @Test fun orphanFolderFailsClosedBeforeAnyTokenGrant() {
+        val root = Files.createTempDirectory("escanner-orphan-start-")
+        val unknown = root.resolve("orphan.tmp")
+        try {
+            Files.write(unknown, "partial".toByteArray(Charsets.US_ASCII),
+                StandardOpenOption.CREATE_NEW)
+            val journal = open(root)
+            assertFalse("existing orphan must block claim", journal.claimToken(token, 1001))
+            assertEquals(DurableReceiveJournalV1.RecoveryStatus.POISONED,
+                recover(root).status)
+            // Same in-memory instance remains terminal even if an external actor
+            // later deletes the orphan. No silent recovery or token grant.
+            Files.delete(unknown)
+            assertFalse(journal.claimToken(token, 1002))
+        } finally { deleteTree(root) }
+    }
+
     @Test fun exclusiveTokenCreateNewHasSingleWinnerAcrossInstances() {
         val root = Files.createTempDirectory("escanner-race-")
         val pool = Executors.newFixedThreadPool(8)
