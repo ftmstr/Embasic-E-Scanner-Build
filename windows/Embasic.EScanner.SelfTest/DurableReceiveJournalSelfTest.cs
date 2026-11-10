@@ -81,6 +81,11 @@ internal static class DurableReceiveJournalSelfTest
         return null;
     }
 
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "CreateHardLinkW",
+        CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLinkNative(string newName, string existingName,
+        IntPtr securityAttributes);
+
     public static bool Run()
     {
         string? golden = GoldenPath();
@@ -220,6 +225,73 @@ internal static class DurableReceiveJournalSelfTest
             }
         }
         finally { Directory.Delete(raceRoot, recursive: true); }
+
+        // A symlink in an ANCESTOR is different from the existing root-link test.
+        // Windows symlink privilege is runner-dependent; absent privilege means NOT VERIFIED.
+        string ancestorParent = Directory.CreateTempSubdirectory("escanner-parent-").FullName;
+        try
+        {
+            var real = Path.Combine(ancestorParent, "real");
+            var sessionDir = Path.Combine(real, "session");
+            Directory.CreateDirectory(sessionDir);
+            var alias = Path.Combine(ancestorParent, "alias");
+            bool made = false;
+            try
+            {
+                Directory.CreateSymbolicLink(alias, real);
+                made = true;
+                if (DurableReceiveJournalV1.Open(sessionDir, Session, Digest, 1000, 2000, 1024, 2) is null ||
+                    DurableReceiveJournalV1.Open(Path.Combine(alias, "session"), Session,
+                        Digest, 1000, 2000, 1024, 2) is not null ||
+                    Inspect(Path.Combine(alias, "session")).Status !=
+                        DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+                {
+                    Console.Error.WriteLine("FAIL: symlinked ancestor reached private root");
+                    return false;
+                }
+                Console.WriteLine("PASS: Windows parent-directory symlink rejected");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Console.WriteLine("NOT VERIFIED: Windows parent symlink privilege unavailable");
+            }
+            catch (IOException)
+            {
+                Console.WriteLine("NOT VERIFIED: Windows parent symlink creation unavailable");
+            }
+            finally { if (made) Directory.Delete(alias); }
+        }
+        finally { Directory.Delete(ancestorParent, recursive: true); }
+
+        // A token-claim with an outside hardlink is an unsafe alias even when
+        // its bytes have not changed yet. Windows NTFS supports this without
+        // elevated privilege; failed fixture creation is NOT a PASS.
+        string hardlinkRoot = Directory.CreateTempSubdirectory("escanner-hardlink-").FullName;
+        string hardlinkAlias = Path.Combine(Path.GetDirectoryName(hardlinkRoot)!,
+            Path.GetRandomFileName() + ".hardlink");
+        try
+        {
+            var journal = Open(hardlinkRoot);
+            if (!journal.ClaimToken(Token, 1001) ||
+                !CreateHardLinkNative(hardlinkAlias, Path.Combine(hardlinkRoot, "token.claim"),
+                    IntPtr.Zero))
+            {
+                Console.Error.WriteLine("FAIL: unable to prepare NTFS hardlink admission fixture");
+                return false;
+            }
+            if (Inspect(hardlinkRoot).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned ||
+                journal.Commit(Wire(Page0, 0), Body, 1002))
+            {
+                Console.Error.WriteLine("FAIL: external hardlink to token.claim admitted");
+                return false;
+            }
+            Console.WriteLine("PASS: external hardlink marker rejected before further commit");
+        }
+        finally
+        {
+            if (File.Exists(hardlinkAlias)) File.Delete(hardlinkAlias);
+            Directory.Delete(hardlinkRoot, recursive: true);
+        }
 
         Console.WriteLine($"PASS: {scenarios} actual-file cross-platform durable receipt cases / " +
             $"{actions} decisions; private-root policy and 24-instance exclusive token race");
