@@ -45,8 +45,9 @@ object PageTransferIntegrity {
     ): Boolean {
         if (!isConsistentMetadata(sessionId, pageId, order, declaredBytes, mime, sha256, maxBytes) ||
             bytes == null || bytes.size.toLong() != declaredBytes) return false
+        val canonicalHash = sha256 ?: return false
         val expected = ByteArray(32) { i ->
-            ((nibble(sha256!![i * 2]) shl 4) or nibble(sha256[i * 2 + 1])).toByte()
+            ((nibble(canonicalHash[i * 2]) shl 4) or nibble(canonicalHash[i * 2 + 1])).toByte()
         }
         val actual = MessageDigest.getInstance("SHA-256").digest(bytes)
         return MessageDigest.isEqual(actual, expected)
