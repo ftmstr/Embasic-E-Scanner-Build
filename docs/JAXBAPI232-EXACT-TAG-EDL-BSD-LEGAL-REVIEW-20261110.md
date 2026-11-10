@@ -23,16 +23,16 @@ for this child, an elected license or a legally reviewed redistribution grant.
 
 ## Original source version, pinned to peeled commit
 
-Upstream eclipse-ee4j/jaxb-jakarta.xml.bind-api-parent annotated tag 2.3.2:
+Upstream jakartaee/jaxb-api annotated tag 2.3.2:
 Git tag object 6e6292004b760313faf71973a3ccb578d73fe90a,
 peeled commit 18b50028fd7dbd1305c359cd5624b1cddb1724a8.
 GitHub's upstream tag verification reported unsigned / NOT VERIFIED.
 Immutable pinned Git source blobs at this commit:
 - LICENSE.md: 6fb337cb014d5ae5d406194049b960982e307849.
 - NOTICE.md: 5aac171d23ff9e49976751b7952759233af8a29e.
-- jakarta.xml.bind-api-parent/jaxb-api/pom.xml:
+- jaxb-api/pom.xml:
   9415ef692cc29acaa647ced0fae057d8e57e3968.
-- jakarta.xml.bind-api-parent/pom.xml:
+- pom.xml:
   979df40b6d322f23dc632bdd59c7f5121eb74fed.
 
 The source LICENSE.md contains BSD three-clause-style attribution,
