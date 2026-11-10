@@ -87,6 +87,13 @@ public sealed class DurableReceiveJournalV1
         lock (_mutex)
         {
             if (!_claimed || _stopped || !StableRoot()) return false;
+            // A successful earlier receipt is not an immutable trust grant.
+            // Revalidate the entire existing ledger before accepting the next
+            // page; this requires a private root without a hostile same-dir writer.
+            var previous = Inspect(_root, _session, _tokenSha, _issued, _expires,
+                _limit, _maxPages);
+            if (previous.Status != RecoveryStatus.TokenConsumed ||
+                previous.ConfirmedPages != _gate.ConfirmedPages) return Poison();
             var envelope = PageWireV1.Parse(rawJson, _session, _limit);
             if (envelope is null || bytes is null ||
                 !PageWireV1.VerifyBody(envelope, _limit, bytes) ||
@@ -114,6 +121,11 @@ public sealed class DurableReceiveJournalV1
                     !StableRoot() ||
                     _gate.ConfirmReread(reread, now) != ReceiveGateV1.Decision.Accepted)
                     return Poison();
+                // Freshly read back the full chain after writing a receipt.
+                var after = Inspect(_root, _session, _tokenSha, _issued, _expires,
+                    _limit, _maxPages);
+                if (after.Status != RecoveryStatus.TokenConsumed ||
+                    after.ConfirmedPages != _gate.ConfirmedPages) return Poison();
                 return true;
             }
             catch (IOException) { return Poison(); }
