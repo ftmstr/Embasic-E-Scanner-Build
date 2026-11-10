@@ -210,6 +210,45 @@ signals are review prompts only; all 42 child licensing gaps, exact legal
 texts, third-party rights and NOTICE/SBOM closure remain NOT VERIFIED.
 No linked or embedded GPL/LGPL/MPL licence claim has been made.
 
+## FastInfoset 1.2.16 — original Apache root LICENSE, EDL NOTICE, FIME BSD file and EE4J GPL ancestor (10 Nov 2026)
+
+PUBLIC Android Gradle ROOT/APP **buildEnvironment** selects
+pkg:maven/com.sun.xml.fastinfoset/FastInfoset@1.2.16.
+It is ONE of the **42 unresolved direct child Maven POM licence metadata
+review items**; this selection is NOT proof of APK/AAB/MSIX inclusion.
+
+Original upstream eclipse-ee4j/jaxb-fi tag 1.2.16 is pinned to
+commit df8b153272fd07a5e584c04a774afc8f4e67905c,
+annotated tag object d7f66b8461f13509f1f3d2763533bfa5a57570ad.
+Tag verified=false/unsigned; publisher cryptographic signature NOT VERIFIED.
+Original root LICENSE (Apache-2.0) Git SHA1:
+b5c38428d3486cd7c4f8adb0f3824a39a9987372;
+root NOTICE.md (project-wide supplier EDL-1.0/SPDX BSD-3-Clause):
+85121e7dd8aac65432eec604c6fe12cce454e79c;
+separately FIME/LICENSE-FIME.md (BSD three-clause-style):
+c739f78bc05856bfbfe35a5b76f2d4e6242cea66.
+Original source child POM is Apache-2.0 header, but has no direct
+Maven license element. Parent fastinfoset-project:1.2.16 supplier
+POM names BOTH Apache 2.0 and EDL 1.0. The remote organization-wide
+EE4J 1.0.5 parent POM lists EPLv2 and GPLv2 with Classpath Exception;
+do NOT treat these distant parent names as effective linked runtime
+licences without file-level and shipping-boundary review.
+
+scripts/audit_fastinfoset1216_exact_license.py, 38 synthetic negative
+tests and Android CI check exact immutable original source blobs,
+Maven Central child+parent+ancestor POM and JAR vs selected Gradle cache,
+bounded Maven JAR META-INF/LICENSE and META-INF/NOTICE.md bytes vs
+the original Apache LICENSE/EDL NOTICE sources. FIME-specific source
+applicability, chosen legal route, exact copyright notices,
+publisher signature and real commercial redistribution rights remain
+NOT VERIFIED. Detailed investigation:
+docs/FASTINFOSET1216-EXACT-APACHE-EDL-FIME-ANCESTOR-LICENCE-REVIEW-20261110.md.
+
+This document remains an INCOMPLETE supplier-research NOTE, not
+the full third-party LICENSES/NOTICE package, not a completed
+SPDX/CycloneDX SBOM or a commercial distribution permission.
+42/42 selected legal review items OPEN. Product release NO-GO.
+
 ## Jakarta XML Bind API 2.3.2 — exact original EDL/BSD tag, Maven POM and JAR review (10 November 2026)
 
 Selected PUBLIC Gradle root/app BUILD-TOOL module
