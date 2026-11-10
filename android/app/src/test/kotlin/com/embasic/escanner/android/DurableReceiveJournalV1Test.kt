@@ -168,6 +168,41 @@ class DurableReceiveJournalV1Test {
         }
     }
 
+    @Test fun ancestorSymlinkMustNotProvidePrivateRoot() {
+        val parent = Files.createTempDirectory("escanner-ancestor-")
+        try {
+            val real = Files.createDirectory(parent.resolve("real"))
+            val sessionDir = Files.createDirectory(real.resolve("session"))
+            val alias = parent.resolve("alias")
+            Files.createSymbolicLink(alias, real)
+            assertNotNull("control must be usable", DurableReceiveJournalV1.open(
+                sessionDir, session, digest, 1000, 2000, 1024, 2))
+            assertNull("symlink in PARENT cannot authenticate private root",
+                DurableReceiveJournalV1.open(alias.resolve("session"),
+                    session, digest, 1000, 2000, 1024, 2))
+            assertEquals(DurableReceiveJournalV1.RecoveryStatus.POISONED,
+                recover(alias.resolve("session")).status)
+        } finally { deleteTree(parent) }
+    }
+
+    @Test fun externalHardlinkToConsumedTokenMustPoisonJournal() {
+        val root = Files.createTempDirectory("escanner-hardlink-")
+        val alias = Files.createTempFile(root.parent, "escanner-outside-", ".link")
+        Files.delete(alias)
+        try {
+            val journal = open(root)
+            assertTrue(journal.claimToken(token, 1001))
+            Files.createLink(alias, root.resolve("token.claim"))
+            assertEquals("token with external hardlink must be poisoned",
+                DurableReceiveJournalV1.RecoveryStatus.POISONED, recover(root).status)
+            assertFalse("prior claim alias forbids new page", journal.commit(
+                wire(page0, 0), body, 1002))
+        } finally {
+            Files.deleteIfExists(alias)
+            deleteTree(root)
+        }
+    }
+
     private fun deleteTree(root: Path) {
         if (Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
             Files.walk(root).use { walk ->
