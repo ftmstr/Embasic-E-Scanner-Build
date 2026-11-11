@@ -286,6 +286,9 @@ public sealed class DurableReceiveJournalV1
             var directory = new DirectoryInfo(root);
             var acl = directory.GetAccessControl(
                 AccessControlSections.Owner | AccessControlSections.Access);
+            // A NULL DACL implicitly grants everyone complete access.
+            var descriptor = new RawSecurityDescriptor(acl.GetSecurityDescriptorBinaryForm(), 0);
+            if (descriptor.DiscretionaryAcl is null) return false;
             var owner = acl.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier;
             var processUser = WindowsIdentity.GetCurrent().User;
             if (owner is null || processUser is null || !owner.Equals(processUser))
@@ -294,9 +297,13 @@ public sealed class DurableReceiveJournalV1
             var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
             var administrators = new SecurityIdentifier(
                 WellKnownSidType.BuiltinAdministratorsSid, null);
+            // Use ONLY mutating bits. The composite Modify flag also
+            // includes READ bits, which would incorrectly reject read-only
+            // inherited ACEs on a normal Windows profile directory.
             const FileSystemRights mutatingRights =
-                FileSystemRights.Write | FileSystemRights.Modify |
-                FileSystemRights.DeleteSubdirectoriesAndFiles |
+                FileSystemRights.WriteData | FileSystemRights.AppendData |
+                FileSystemRights.WriteExtendedAttributes | FileSystemRights.WriteAttributes |
+                FileSystemRights.Delete | FileSystemRights.DeleteSubdirectoriesAndFiles |
                 FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership;
             foreach (var rule in acl.GetAccessRules(true, true, typeof(SecurityIdentifier))
                 .OfType<FileSystemAccessRule>())
