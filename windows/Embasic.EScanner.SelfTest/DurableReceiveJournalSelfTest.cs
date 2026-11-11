@@ -105,13 +105,15 @@ internal static class DurableReceiveJournalSelfTest
 
     // Test fixture must actually satisfy the production owner/DACL contract:
     // inherited write grants on GitHub runner TEMP may be broader than app-private.
-    private static DirectoryInfo CreatePrivateTempSubdirectory(string prefix)
+    private static DirectoryInfo CreatePrivateTempSubdirectory(string prefix) =>
+        HardenTestDirectory(Directory.CreateTempSubdirectory(prefix));
+
+    private static DirectoryInfo HardenTestDirectory(DirectoryInfo directory)
     {
         // Platform guard is required by CA1416 under TreatWarningsAsErrors.
         // The SelfTest is intentionally a Windows/NTFS-only physical fixture.
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("Private NTFS ACL fixture needs Windows");
-        var directory = Directory.CreateTempSubdirectory(prefix);
         var acl = directory.GetAccessControl(
             AccessControlSections.Access | AccessControlSections.Owner);
         acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
@@ -344,7 +346,7 @@ internal static class DurableReceiveJournalSelfTest
         {
             var real = Path.Combine(ancestorParent, "real");
             var sessionDir = Path.Combine(real, "session");
-            Directory.CreateDirectory(sessionDir);
+            HardenTestDirectory(Directory.CreateDirectory(sessionDir));
             var alias = Path.Combine(ancestorParent, "alias");
             bool made = false;
             try
