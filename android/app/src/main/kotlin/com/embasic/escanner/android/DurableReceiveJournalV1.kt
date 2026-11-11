@@ -202,6 +202,22 @@ class DurableReceiveJournalV1 private constructor(
                 }
                 val rootAttrs = Files.readAttributes(path,
                     BasicFileAttributes::class.java, *noLinks)
+                // Refuse caller-supplied roots whose POSIX owner is not THIS
+                // process. /proc/self resolves to the calling PID; no app-supplied
+                // UID is accepted. Unsupported proc/unix providers FAIL CLOSED.
+                val rootUid = Files.getAttribute(path, "unix:uid", *noLinks) as? Number
+                    ?: return null
+                val processUid = Files.getAttribute(Path.of("/proc/self"), "unix:uid") as? Number
+                    ?: return null
+                if (rootUid.toLong() != processUid.toLong()) return null
+                // An app-private session cannot be group/world accessible.
+                // Require owner rwx (0700); no ambient chmod normalization.
+                val mode = Files.getPosixFilePermissions(path, *noLinks)
+                val privateMode = setOf(
+                    java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                    java.nio.file.attribute.PosixFilePermission.OWNER_WRITE,
+                    java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE)
+                if (mode != privateMode) return null
                 rootAttrs.fileKey()
             } catch (_: Exception) { null }
         }
