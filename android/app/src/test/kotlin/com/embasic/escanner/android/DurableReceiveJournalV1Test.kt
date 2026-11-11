@@ -257,4 +257,27 @@ class DurableReceiveJournalV1Test {
             }
         }
     }
+    @Test fun insecureWorldWritableRootMustNotBeAdmitted() {
+        // Android/JVM owner-owned 0700 sandbox is the positive control. A
+        // chmod-open directory must NEVER be trusted merely for its inode.
+        val root = Files.createTempDirectory("escanner-private-mode-")
+        try {
+            val privateMode =
+                java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")
+            val hostileMode =
+                java.nio.file.attribute.PosixFilePermissions.fromString("rwxrwxrwx")
+            Files.setPosixFilePermissions(root, privateMode)
+            assertNotNull("0700 owner-private control should open", open(root))
+            Files.setPosixFilePermissions(root, hostileMode)
+            assertNull("0777 admits an untrusted writer", DurableReceiveJournalV1.open(
+                root, session, digest, 1000, 2000, 1024, 2))
+            assertEquals(DurableReceiveJournalV1.RecoveryStatus.POISONED,
+                recover(root).status)
+        } finally {
+            Files.setPosixFilePermissions(root,
+                java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))
+            deleteTree(root)
+        }
+    }
+
 }
