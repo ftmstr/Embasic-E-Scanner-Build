@@ -101,6 +101,21 @@ internal static class DurableReceiveJournalSelfTest
         return rows.Single(x => x[0] == id);
     }
 
+    private static string[] PermissionGoldenCase(string id)
+    {
+        var golden = GoldenPath() ?? throw new InvalidOperationException("Missing durable fixture");
+        var path = Path.Combine(Path.GetDirectoryName(golden)!,
+            "private-root-permission-v1.tsv");
+        var rows = File.ReadAllLines(path, Encoding.ASCII)
+            .Where(x => !string.IsNullOrWhiteSpace(x) && !x.StartsWith('#'))
+            .Select(x => x.Split('\t')).ToArray();
+        if (rows.Length != 2 || rows.Any(x => x.Length != 3) ||
+            !rows.Select(x => x[0]).ToHashSet(StringComparer.Ordinal)
+                .SetEquals(new[] { "owner_private_0700", "world_writer_grant" }))
+            throw new InvalidOperationException("Missing/duplicate private-root permission golden");
+        return rows.Single(x => x[0] == id);
+    }
+
     public static bool Run()
     {
         string? golden = GoldenPath();
@@ -167,6 +182,15 @@ internal static class DurableReceiveJournalSelfTest
         string aclRoot = Directory.CreateTempSubdirectory("escanner-acl-").FullName;
         try
         {
+            var secure = PermissionGoldenCase("owner_private_0700");
+            bool secureOpen = DurableReceiveJournalV1.Open(aclRoot, Session, Digest,
+                1000, 2000, 1024, 2) is not null;
+            if ((secureOpen ? "ACCEPT" : "REJECT") != secure[1] ||
+                Inspect(aclRoot).Status.ToString().ToUpperInvariant() != secure[2])
+            {
+                Console.Error.WriteLine("FAIL: secure owner-only NTFS root rejected");
+                return false;
+            }
             var psi = new System.Diagnostics.ProcessStartInfo("icacls.exe")
             {
                 UseShellExecute = false,
@@ -181,8 +205,11 @@ internal static class DurableReceiveJournalSelfTest
                 Console.Error.WriteLine("NOT VERIFIED: hostile icacls process failed");
                 return false;
             }
-            if (DurableReceiveJournalV1.Open(aclRoot, Session, Digest, 1000, 2000, 1024, 2)
-                is not null || Inspect(aclRoot).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+            var hostile = PermissionGoldenCase("world_writer_grant");
+            bool hostileOpen = DurableReceiveJournalV1.Open(aclRoot, Session, Digest,
+                1000, 2000, 1024, 2) is not null;
+            if ((hostileOpen ? "ACCEPT" : "REJECT") != hostile[1] ||
+                Inspect(aclRoot).Status.ToString().ToUpperInvariant() != hostile[2])
             {
                 Console.Error.WriteLine("FAIL: world-writable NTFS DACL reached private root");
                 return false;
