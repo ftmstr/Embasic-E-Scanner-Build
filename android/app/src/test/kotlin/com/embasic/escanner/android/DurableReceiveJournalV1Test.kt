@@ -264,11 +264,14 @@ class DurableReceiveJournalV1Test {
         try {
             val privateMode =
                 java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")
-            val hostileMode =
-                java.nio.file.attribute.PosixFilePermissions.fromString("rwxrwxrwx")
             Files.setPosixFilePermissions(root, privateMode)
             assertNotNull("0700 owner-private control should open", open(root))
-            Files.setPosixFilePermissions(root, hostileMode)
+            // Deliberately invoke an INDEPENDENT chmod process on the host
+            // Linux filesystem; not an Android device or a live race proof.
+            val attacker = ProcessBuilder("chmod", "0777", root.toString()).start()
+            assertTrue("external chmod timed out", attacker.waitFor(15,
+                java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals("external chmod failed", 0, attacker.exitValue())
             assertNull("0777 admits an untrusted writer", DurableReceiveJournalV1.open(
                 root, session, digest, 1000, 2000, 1024, 2))
             assertEquals(DurableReceiveJournalV1.RecoveryStatus.POISONED,
