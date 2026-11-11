@@ -120,6 +120,10 @@ internal static class DurableReceiveJournalSelfTest
             acl.RemoveAccessRuleSpecific(rule);
         var user = WindowsIdentity.GetCurrent().User ??
             throw new InvalidOperationException("Windows current user SID unavailable");
+        // A temporary directory can default to a creator-group OWNER SID
+        // even after inherited ACEs are removed. Explicitly align its owner
+        // with the test process, matching the real admission policy.
+        acl.SetOwner(user);
         const InheritanceFlags inherit =
             InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
         acl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl,
