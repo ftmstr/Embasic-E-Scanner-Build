@@ -185,6 +185,10 @@ class DurableReceiveJournalV1Test {
         try {
             val real = Files.createDirectory(parent.resolve("real"))
             val sessionDir = Files.createDirectory(real.resolve("session"))
+            // Root must meet the actual new private-root admission contract.
+            // The alias test targets a SYMLINK ancestor, not a permissive 0755 leaf.
+            Files.setPosixFilePermissions(sessionDir,
+                java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))
             val alias = parent.resolve("alias")
             Files.createSymbolicLink(alias, real)
             assertNotNull("control must be usable", DurableReceiveJournalV1.open(
