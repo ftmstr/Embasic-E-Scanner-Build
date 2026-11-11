@@ -107,6 +107,10 @@ internal static class DurableReceiveJournalSelfTest
     // inherited write grants on GitHub runner TEMP may be broader than app-private.
     private static DirectoryInfo CreatePrivateTempSubdirectory(string prefix)
     {
+        // Platform guard is required by CA1416 under TreatWarningsAsErrors.
+        // The SelfTest is intentionally a Windows/NTFS-only physical fixture.
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Private NTFS ACL fixture needs Windows");
         var directory = Directory.CreateTempSubdirectory(prefix);
         var acl = directory.GetAccessControl(
             AccessControlSections.Access | AccessControlSections.Owner);
