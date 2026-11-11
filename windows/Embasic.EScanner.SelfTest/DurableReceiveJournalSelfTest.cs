@@ -161,6 +161,36 @@ internal static class DurableReceiveJournalSelfTest
             return false;
         }
 
+        // Separate OS PROCESS mutates the DACL; the adapter must refuse an
+        // attacker-writable NTFS directory even when its path/inode is stable.
+        // This is an ACL admission fixture, NOT an exhaustive TOCTOU proof.
+        string aclRoot = Directory.CreateTempSubdirectory("escanner-acl-").FullName;
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("icacls.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            psi.ArgumentList.Add(aclRoot);
+            psi.ArgumentList.Add("/grant");
+            psi.ArgumentList.Add("*S-1-1-0:(W)"); // World SID: write
+            using var attacker = System.Diagnostics.Process.Start(psi);
+            if (attacker is null || !attacker.WaitForExit(15000) || attacker.ExitCode != 0)
+            {
+                Console.Error.WriteLine("NOT VERIFIED: hostile icacls process failed");
+                return false;
+            }
+            if (DurableReceiveJournalV1.Open(aclRoot, Session, Digest, 1000, 2000, 1024, 2)
+                is not null || Inspect(aclRoot).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+            {
+                Console.Error.WriteLine("FAIL: world-writable NTFS DACL reached private root");
+                return false;
+            }
+            Console.WriteLine("PASS: separate-process hostile NTFS DACL rejected");
+        }
+        finally { Directory.Delete(aclRoot, recursive: true); }
+
         string privateRoot = Directory.CreateTempSubdirectory("escanner-dir-").FullName;
         try
         {
