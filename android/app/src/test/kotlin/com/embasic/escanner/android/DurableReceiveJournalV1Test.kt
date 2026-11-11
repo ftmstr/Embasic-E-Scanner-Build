@@ -257,6 +257,17 @@ class DurableReceiveJournalV1Test {
             }
         }
     }
+    private fun permissionGolden(id: String): List<String> {
+        val rows = Files.readAllLines(
+            fixture().parent.resolve("private-root-permission-v1.tsv"), Charsets.US_ASCII)
+            .filter { it.isNotBlank() && !it.startsWith('#') }
+            .map { it.split('\t') }
+        require(rows.size == 2 && rows.all { it.size == 3 } &&
+            rows.map { it[0] }.toSet() ==
+                setOf("owner_private_0700", "world_writer_grant"))
+        return rows.single { it[0] == id }
+    }
+
     @Test fun insecureWorldWritableRootMustNotBeAdmitted() {
         // Android/JVM owner-owned 0700 sandbox is the positive control. A
         // chmod-open directory must NEVER be trusted merely for its inode.
@@ -265,17 +276,20 @@ class DurableReceiveJournalV1Test {
             val privateMode =
                 java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")
             Files.setPosixFilePermissions(root, privateMode)
-            assertNotNull("0700 owner-private control should open", open(root))
+            val control = permissionGolden("owner_private_0700")
+            assertEquals(control[1], if (DurableReceiveJournalV1.open(root,
+                session, digest, 1000, 2000, 1024, 2) != null) "ACCEPT" else "REJECT")
+            assertEquals(control[2], recover(root).status.name)
             // Deliberately invoke an INDEPENDENT chmod process on the host
             // Linux filesystem; not an Android device or a live race proof.
             val attacker = ProcessBuilder("chmod", "0777", root.toString()).start()
             assertTrue("external chmod timed out", attacker.waitFor(15,
                 java.util.concurrent.TimeUnit.SECONDS))
             assertEquals("external chmod failed", 0, attacker.exitValue())
-            assertNull("0777 admits an untrusted writer", DurableReceiveJournalV1.open(
-                root, session, digest, 1000, 2000, 1024, 2))
-            assertEquals(DurableReceiveJournalV1.RecoveryStatus.POISONED,
-                recover(root).status)
+            val hostile = permissionGolden("world_writer_grant")
+            assertEquals(hostile[1], if (DurableReceiveJournalV1.open(root,
+                session, digest, 1000, 2000, 1024, 2) != null) "ACCEPT" else "REJECT")
+            assertEquals(hostile[2], recover(root).status.name)
         } finally {
             Files.setPosixFilePermissions(root,
                 java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))
