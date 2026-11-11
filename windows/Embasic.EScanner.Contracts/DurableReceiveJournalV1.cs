@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
@@ -272,6 +274,56 @@ public sealed class DurableReceiveJournalV1
         return new FileId(info.VolumeSerial, info.FileIndexHigh, info.FileIndexLow);
     }
 
+    // Windows-only admission check. No external NuGet package is introduced.
+    // A world-/group-writable or foreign-owner DACL cannot be called app-private.
+    // This is an admission guard, NOT pinned HANDLE-relative IO or a defense
+    // against a malicious same-user process changing ACLs after validation.
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static bool PrivateRootAcl(string root)
+    {
+        try
+        {
+            var directory = new DirectoryInfo(root);
+            var acl = directory.GetAccessControl(
+                AccessControlSections.Owner | AccessControlSections.Access);
+            var owner = acl.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier;
+            var processUser = WindowsIdentity.GetCurrent().User;
+            if (owner is null || processUser is null || !owner.Equals(processUser))
+                return false;
+
+            var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            var administrators = new SecurityIdentifier(
+                WellKnownSidType.BuiltinAdministratorsSid, null);
+            const FileSystemRights mutatingRights =
+                FileSystemRights.Write | FileSystemRights.Modify |
+                FileSystemRights.DeleteSubdirectoriesAndFiles |
+                FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership;
+            foreach (var rule in acl.GetAccessRules(true, true, typeof(SecurityIdentifier))
+                .OfType<FileSystemAccessRule>())
+            {
+                if (rule.AccessControlType != AccessControlType.Allow ||
+                    // Inherit-only ACE does not apply to this directory itself.
+                    (rule.PropagationFlags & PropagationFlags.InheritOnly) != 0 ||
+                    (rule.FileSystemRights & mutatingRights) == 0)
+                    continue;
+                var principal = rule.IdentityReference as SecurityIdentifier;
+                if (principal is null ||
+                    !(principal.Equals(processUser) || principal.Equals(system) ||
+                      principal.Equals(administrators)))
+                    return false;
+            }
+            return true;
+        }
+        catch (Exception e) when (e is IOException ||
+            e is UnauthorizedAccessException ||
+            e is System.Security.SecurityException ||
+            e is PlatformNotSupportedException ||
+            e is InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     private static FileId? GetRootId(string root)
     {
         if (!OperatingSystem.IsWindows()) return null;
@@ -288,6 +340,7 @@ public sealed class DurableReceiveJournalV1
                     (attributes & FileAttributes.Directory) == 0) return null;
                 current = current.Parent;
             }
+            if (!PrivateRootAcl(root)) return null;
             using var handle = CreateFile(Path.GetFullPath(root), 0x80, 7, IntPtr.Zero,
                 3, 0x02000000 | 0x00200000, IntPtr.Zero); // BACKUP_SEMANTICS | OPEN_REPARSE_POINT
             // GetFileInformationByHandle succeeds for regular files too: the
