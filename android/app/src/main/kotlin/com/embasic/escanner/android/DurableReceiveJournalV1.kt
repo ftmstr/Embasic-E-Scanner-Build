@@ -207,7 +207,7 @@ class DurableReceiveJournalV1 private constructor(
                 // UID is accepted. Unsupported proc/unix providers FAIL CLOSED.
                 val rootUid = Files.getAttribute(path, "unix:uid", *noLinks) as? Number
                     ?: return null
-                val processUid = Files.getAttribute(Path.of("/proc/self"), "unix:uid") as? Number
+                val processUid = Files.getAttribute(java.nio.file.Paths.get("/proc/self"), "unix:uid") as? Number
                     ?: return null
                 if (rootUid.toLong() != processUid.toLong()) return null
                 // An app-private session cannot be group/world accessible.
