@@ -1,3 +1,5 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using Embasic.EScanner.Contracts;
 
@@ -101,6 +103,35 @@ internal static class DurableReceiveJournalSelfTest
         return rows.Single(x => x[0] == id);
     }
 
+    // Test fixture must actually satisfy the production owner/DACL contract:
+    // inherited write grants on GitHub runner TEMP may be broader than app-private.
+    private static DirectoryInfo CreatePrivateTempSubdirectory(string prefix)
+    {
+        var directory = Directory.CreateTempSubdirectory(prefix);
+        var acl = directory.GetAccessControl(
+            AccessControlSections.Access | AccessControlSections.Owner);
+        acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        foreach (var rule in acl.GetAccessRules(true, false, typeof(SecurityIdentifier))
+                     .OfType<FileSystemAccessRule>().ToArray())
+            acl.RemoveAccessRuleSpecific(rule);
+        var user = WindowsIdentity.GetCurrent().User ??
+            throw new InvalidOperationException("Windows current user SID unavailable");
+        const InheritanceFlags inherit =
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        acl.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl,
+            inherit, PropagationFlags.None, AccessControlType.Allow));
+        acl.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            FileSystemRights.FullControl, inherit, PropagationFlags.None,
+            AccessControlType.Allow));
+        acl.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+            FileSystemRights.FullControl, inherit, PropagationFlags.None,
+            AccessControlType.Allow));
+        directory.SetAccessControl(acl);
+        return directory;
+    }
+
     private static string[] PermissionGoldenCase(string id)
     {
         var golden = GoldenPath() ?? throw new InvalidOperationException("Missing durable fixture");
@@ -137,7 +168,7 @@ internal static class DurableReceiveJournalSelfTest
             }
             string[] events = fields[1].Split(','), expectations = fields[2].Split(',');
             if (events.Length != expectations.Length) return false;
-            string root = Directory.CreateTempSubdirectory("escanner-receipt-").FullName;
+            string root = CreatePrivateTempSubdirectory("escanner-receipt-").FullName;
             try
             {
                 var gate = Open(root);
@@ -179,7 +210,7 @@ internal static class DurableReceiveJournalSelfTest
         // Separate OS PROCESS mutates the DACL; the adapter must refuse an
         // attacker-writable NTFS directory even when its path/inode is stable.
         // This is an ACL admission fixture, NOT an exhaustive TOCTOU proof.
-        string aclRoot = Directory.CreateTempSubdirectory("escanner-acl-").FullName;
+        string aclRoot = CreatePrivateTempSubdirectory("escanner-acl-").FullName;
         try
         {
             var secure = PermissionGoldenCase("owner_private_0700");
@@ -218,7 +249,7 @@ internal static class DurableReceiveJournalSelfTest
         }
         finally { Directory.Delete(aclRoot, recursive: true); }
 
-        string privateRoot = Directory.CreateTempSubdirectory("escanner-dir-").FullName;
+        string privateRoot = CreatePrivateTempSubdirectory("escanner-dir-").FullName;
         try
         {
             string badFile = Path.Combine(privateRoot, "file.txt");
@@ -258,7 +289,7 @@ internal static class DurableReceiveJournalSelfTest
         }
         finally { Directory.Delete(privateRoot, recursive: true); }
 
-        string orphanRoot = Directory.CreateTempSubdirectory("escanner-orphan-start-").FullName;
+        string orphanRoot = CreatePrivateTempSubdirectory("escanner-orphan-start-").FullName;
         try
         {
             string orphan = Path.Combine(orphanRoot, "orphan.tmp");
@@ -279,7 +310,7 @@ internal static class DurableReceiveJournalSelfTest
         }
         finally { Directory.Delete(orphanRoot, recursive: true); }
 
-        string raceRoot = Directory.CreateTempSubdirectory("escanner-claim-race-").FullName;
+        string raceRoot = CreatePrivateTempSubdirectory("escanner-claim-race-").FullName;
         try
         {
             var gates = Enumerable.Range(0, 24).Select(_ => Open(raceRoot)).ToArray();
@@ -300,7 +331,7 @@ internal static class DurableReceiveJournalSelfTest
 
         // A symlink in an ANCESTOR is different from the existing root-link test.
         // Windows symlink privilege is runner-dependent; absent privilege means NOT VERIFIED.
-        string ancestorParent = Directory.CreateTempSubdirectory("escanner-parent-").FullName;
+        string ancestorParent = CreatePrivateTempSubdirectory("escanner-parent-").FullName;
         try
         {
             var real = Path.Combine(ancestorParent, "real");
@@ -342,7 +373,7 @@ internal static class DurableReceiveJournalSelfTest
         // A token-claim with an outside hardlink is an unsafe alias even when
         // its bytes have not changed yet. Windows NTFS supports this without
         // elevated privilege; failed fixture creation is NOT a PASS.
-        string hardlinkRoot = Directory.CreateTempSubdirectory("escanner-hardlink-").FullName;
+        string hardlinkRoot = CreatePrivateTempSubdirectory("escanner-hardlink-").FullName;
         string hardlinkAlias = Path.Combine(Path.GetDirectoryName(hardlinkRoot)!,
             Path.GetRandomFileName() + ".hardlink");
         try
@@ -379,7 +410,7 @@ internal static class DurableReceiveJournalSelfTest
             : new[] { 20, 100 };
         foreach (int pages in sizes)
         {
-            string perfRoot = Directory.CreateTempSubdirectory("escanner-perf-").FullName;
+            string perfRoot = CreatePrivateTempSubdirectory("escanner-perf-").FullName;
             try
             {
                 var gate = DurableReceiveJournalV1.Open(perfRoot, Session, Digest,
