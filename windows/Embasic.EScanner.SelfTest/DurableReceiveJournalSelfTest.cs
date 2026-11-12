@@ -291,6 +291,157 @@ internal static class DurableReceiveJournalSelfTest
         return child.ExitCode != 0 && File.Exists(Path.Combine(root, "stage-0000.tmp"));
     }
 
+    // This executable is the REAL JOURNAL OWNER in a separate OS process.
+    // A supervising SelfTest parent kills its process at a deterministic,
+    // signaled checkpoint. A callback throwing is not a process crash.
+    internal static int RunJournalOwnerChild(string[] args)
+    {
+        if (args.Length != 4 || args[0] != "--journal-owner-crash-child" ||
+            args[1] is not ("normal" or "stage-prefix" or "after-rename"))
+            return 64;
+        try
+        {
+            using var journal = Open(args[2]);
+            if (!journal.ClaimToken(Token, 1001)) return 65;
+            if (args[1] != "normal")
+            {
+                void SignalAndBlock()
+                {
+                    using (var stream = new FileStream(args[3], FileMode.CreateNew,
+                        FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                    {
+                        var markerBytes = Encoding.ASCII.GetBytes("ready:" + args[1]);
+                        stream.Write(markerBytes);
+                        stream.Flush(flushToDisk: true);
+                    }
+                    // A live journal with open handles must be killed by the
+                    // parent process, never by a synthetic IOException.
+                    System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
+                    throw new InvalidOperationException("Unreachable crash-owner checkpoint");
+                }
+                if (args[1] == "stage-prefix")
+                    journal.AfterStagePrefixWrittenForTest = SignalAndBlock;
+                else
+                    journal.AfterBlobRenamedForTest = SignalAndBlock;
+            }
+            return journal.Commit(Wire(Page0, 0), Body, 1002) ? 0 : 66;
+        }
+        catch (Exception)
+        {
+            return 67;
+        }
+    }
+
+    private static bool RealJournalOwnerKillAndRestart(string phase)
+    {
+        string root = CreatePrivateTempSubdirectory("escanner-real-owner-").FullName;
+        string signal = Path.Combine(Path.GetTempPath(),
+            "escanner-owner-ready-" + Guid.NewGuid().ToString("N") + ".signal");
+        System.Diagnostics.Process? owner = null;
+        try
+        {
+            // Child executes ONLY RunJournalOwnerChild instead of re-entering
+            // the entire suite. This is the same .NET test binary, same SID,
+            // same app-private journal implementation, and an independent PID.
+            var psi = new System.Diagnostics.ProcessStartInfo("dotnet")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            psi.ArgumentList.Add(typeof(DurableReceiveJournalSelfTest).Assembly.Location);
+            psi.ArgumentList.Add("--journal-owner-crash-child");
+            psi.ArgumentList.Add(phase);
+            psi.ArgumentList.Add(root);
+            psi.ArgumentList.Add(signal);
+            owner = System.Diagnostics.Process.Start(psi);
+            if (owner is null)
+            {
+                Console.Error.WriteLine("NOT VERIFIED: real journal-owner child did not launch");
+                return false;
+            }
+            if (phase == "normal")
+            {
+                if (!owner.WaitForExit(20000) || owner.ExitCode != 0 ||
+                    Inspect(root).Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
+                    Inspect(root).ConfirmedPages != 1 ||
+                    AttemptConsumedReplay(root))
+                {
+                    Console.Error.WriteLine("FAIL: independent journal-owner normal control");
+                    return false;
+                }
+                return true;
+            }
+            bool signaled = false;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (timer.ElapsedMilliseconds < 20000)
+            {
+                if (owner.HasExited) break;
+                if (File.Exists(signal) &&
+                    File.ReadAllText(signal, Encoding.ASCII) == "ready:" + phase)
+                {
+                    signaled = true;
+                    break;
+                }
+                System.Threading.Thread.Sleep(20);
+            }
+            if (!signaled || owner.HasExited)
+            {
+                Console.Error.WriteLine("NOT VERIFIED: real owner checkpoint absent: " + phase);
+                return false;
+            }
+            // Actually terminate the process that owns the active journal
+            // and wait for the OS to release its root/ancestor/file handles.
+            owner.Kill(entireProcessTree: true);
+            if (!owner.WaitForExit(15000) || owner.ExitCode == 0)
+            {
+                Console.Error.WriteLine("NOT VERIFIED: journal owner not killed: " + phase);
+                return false;
+            }
+
+            string stage = Path.Combine(root, "stage-0000.tmp");
+            string blob = Path.Combine(root, "page-0000.blob");
+            string receipt = Path.Combine(root, "page-0000.rec");
+            bool expectedFiles = phase switch
+            {
+                "stage-prefix" => File.Exists(stage) && new FileInfo(stage).Length == 1 &&
+                    !File.Exists(blob) && !File.Exists(receipt),
+                "after-rename" => !File.Exists(stage) && File.Exists(blob) &&
+                    File.ReadAllBytes(blob).AsSpan().SequenceEqual(Body) &&
+                    !File.Exists(receipt),
+                _ => false
+            };
+            if (!expectedFiles ||
+                Inspect(root).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned ||
+                AttemptConsumedReplay(root))
+            {
+                Console.Error.WriteLine(
+                    "FAIL: owner-kill " + phase +
+                    " failed durable orphan/poison/replay assertions" +
+                    " stageBytes=" + (File.Exists(stage) ? new FileInfo(stage).Length : -1) +
+                    " blobBytes=" + (File.Exists(blob) ? new FileInfo(blob).Length : -1));
+                return false;
+            }
+            Console.WriteLine("PASS: REAL journal-owner PID killed at " + phase +
+                "; read-only restart POISONED and token replay denied");
+            return true;
+        }
+        finally
+        {
+            if (owner is not null)
+            {
+                if (!owner.HasExited)
+                {
+                    owner.Kill(entireProcessTree: true);
+                    if (!owner.WaitForExit(15000))
+                        throw new InvalidOperationException("Journal owner did not terminate");
+                }
+                owner.Dispose();
+            }
+            if (File.Exists(signal)) File.Delete(signal);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     public static bool Run()
     {
         string? golden = GoldenPath();
@@ -896,6 +1047,14 @@ internal static class DurableReceiveJournalSelfTest
             if (File.Exists(hardlinkAlias)) File.Delete(hardlinkAlias);
             Directory.Delete(hardlinkRoot, recursive: true);
         }
+
+        // Normal independent owner subprocess is the positive control.
+        // Each interrupted case launches a FRESH owner process and requires
+        // actual external PID termination plus read-only restart checks.
+        if (!RealJournalOwnerKillAndRestart("normal") ||
+            !RealJournalOwnerKillAndRestart("stage-prefix") ||
+            !RealJournalOwnerKillAndRestart("after-rename"))
+            return false;
 
         // Real NTFS/temp-file profiling, NOT a product latency target.
         // Extended 500/1000 rounds are opt-in to avoid excessive CI load.
