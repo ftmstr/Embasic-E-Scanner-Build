@@ -457,6 +457,11 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                     // A thrown IOException leaves an orphan and is fail-closed.
                     int prefix = Math.Min(1, data.Length);
                     stream.Write(data.AsSpan(0, prefix));
+                    // Real owner-process Kill must observe a flushed prefix,
+                    // not bytes held solely in FileStream's managed buffer.
+                    // This is an INTERNAL TEST checkpoint only; it does NOT
+                    // assert power-cut/directory metadata fsync durability.
+                    stream.Flush(flushToDisk: true);
                     afterPrefixWritten();
                     stream.Write(data.AsSpan(prefix));
                 }
