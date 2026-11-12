@@ -488,6 +488,44 @@ internal static class DurableReceiveJournalSelfTest
         }
         finally { Directory.Delete(replacedClaimRoot, recursive: true); }
 
+        // TEST-FIRST RED: a second same-SID process swaps a previously
+        // CONFIRMED blob or receipt for a different NTFS inode containing
+        // exactly identical bytes. Hash-chain and read-only recovery still
+        // match; only the LIVE journal may pin the original file identities.
+        foreach (string assetName in new[] { "page-0000.blob", "page-0000.rec" })
+        {
+            string root = CreatePrivateTempSubdirectory("escanner-page-id-swap-").FullName;
+            try
+            {
+                using var live = Open(root);
+                if (!live.ClaimToken(Token, 1001) ||
+                    !live.Commit(Wire(Page0, 0), Body, 1002))
+                {
+                    Console.Error.WriteLine("FAIL: page-id-swap positive control incomplete");
+                    return false;
+                }
+                string asset = Path.Combine(root, assetName);
+                byte[] original = File.ReadAllBytes(asset);
+                if (!HostileReplaceSameBytesFromSecondProcess(asset) ||
+                    !File.ReadAllBytes(asset).AsSpan().SequenceEqual(original) ||
+                    Directory.EnumerateFileSystemEntries(root).Count() != 3)
+                {
+                    Console.Error.WriteLine(
+                        "NOT VERIFIED: separate-process page asset swap did not complete");
+                    return false;
+                }
+                if (live.Commit(Wire(Page1, 1), Body, 1003))
+                {
+                    Console.Error.WriteLine(
+                        "FAIL: same-bytes hostile prior-page " + assetName +
+                        " file-ID substitution admitted another page");
+                    return false;
+                }
+            }
+            finally { Directory.Delete(root, recursive: true); }
+        }
+        Console.WriteLine("PASS: live prior-page blob and receipt identity swaps rejected");
+
         // Same common golden row as Android JVM test. The attacking writer is
         // a real independent Windows process terminated after emitting an
         // orphan staging record. Not a low-disk/power-cut simulation.
