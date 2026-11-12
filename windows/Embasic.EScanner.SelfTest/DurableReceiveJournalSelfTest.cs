@@ -197,6 +197,34 @@ internal static class DurableReceiveJournalSelfTest
     }
 
 
+    // A separate same-SID PowerShell writer changes the NTFS FILE ID but
+    // restores EXACTLY the same claim bytes. A byte/hash-only verifier has
+    // no evidence that its immutable tombstone was swapped.
+    private static bool HostileReplaceSameBytesFromSecondProcess(string path)
+    {
+        static string Quote(string s) => s.Replace("'", "''", StringComparison.Ordinal);
+        var safe = Quote(path);
+        var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false, CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("try { $p='" + safe + "'; $old=$p+'.prior'; " +
+            "[System.IO.File]::Move($p,$old); " +
+            "[System.IO.File]::Copy($old,$p); " +
+            "[System.IO.File]::Delete($old); exit 0 } catch { exit 17 }");
+        using var attacker = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("Hostile marker-swap process unavailable");
+        if (!attacker.WaitForExit(15000))
+        {
+            attacker.Kill(entireProcessTree: true);
+            throw new InvalidOperationException("Hostile marker-swap timed out");
+        }
+        return attacker.ExitCode == 0;
+    }
+
     private static string[] KilledWriterGolden()
     {
         var canonical = GoldenPath() ?? throw new InvalidOperationException("Missing golden base");
@@ -425,6 +453,40 @@ internal static class DurableReceiveJournalSelfTest
             Console.WriteLine("PASS: separate-process hostile ancestor DACL rejected");
         }
         finally { Directory.Delete(unsafeParent, recursive: true); }
+
+        // TEST-FIRST RED. The immutable claim's bytes and SHA still match,
+        // but an independent same-SID process replaced its NTFS file identity.
+        // No nondeterministic race or privileged account is required.
+        string replacedClaimRoot =
+            CreatePrivateTempSubdirectory("escanner-claim-id-swap-").FullName;
+        try
+        {
+            using var active = Open(replacedClaimRoot);
+            if (!active.ClaimToken(Token, 1001))
+            {
+                Console.Error.WriteLine("FAIL: claim-swap positive control failed");
+                return false;
+            }
+            string marker = Path.Combine(replacedClaimRoot, "token.claim");
+            byte[] original = File.ReadAllBytes(marker);
+            if (!HostileReplaceSameBytesFromSecondProcess(marker) ||
+                !File.ReadAllBytes(marker).AsSpan().SequenceEqual(original) ||
+                Directory.EnumerateFileSystemEntries(replacedClaimRoot).Count() != 1)
+            {
+                Console.Error.WriteLine(
+                    "NOT VERIFIED: separate-process exact-byte NTFS marker swap not prepared");
+                return false;
+            }
+            if (active.Commit(Wire(Page0, 0), Body, 1002))
+            {
+                Console.Error.WriteLine(
+                    "FAIL: same-bytes hostile token.claim identity swap admitted a page");
+                return false;
+            }
+            Console.WriteLine(
+                "PASS: replaced same-bytes token.claim denied by live journal");
+        }
+        finally { Directory.Delete(replacedClaimRoot, recursive: true); }
 
         // Same common golden row as Android JVM test. The attacking writer is
         // a real independent Windows process terminated after emitting an
