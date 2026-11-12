@@ -293,7 +293,8 @@ internal static class DurableReceiveJournalSelfTest
                     bool pass = Action(root, gate, events[i]);
                     if ((pass ? "A" : "R") != expectations[i])
                     {
-                        Console.Error.WriteLine("FAIL: " + fields[0] + " action " + events[i]);
+                        Console.Error.WriteLine("FAIL: " + fields[0] + " action " + events[i] +
+                            " native-stage=" + (gate.LastNativeFailureStage ?? "none"));
                         return false;
                     }
                     actions++;
