@@ -28,6 +28,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // No FILE_SHARE_DELETE: an independent process cannot rename this
     // session's root while the journal owns the directory handle.
     private readonly SafeFileHandle _rootPin;
+    // Pin every lexical ancestor of the private root to prohibit a separate
+    // process from renaming any path component while the journal is live.
+    private readonly SafeFileHandle[] _ancestorPins;
     private bool _disposed;
     private readonly long _issued, _expires, _limit;
     private readonly int _maxPages;
@@ -35,10 +38,11 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     private bool _claimed, _stopped;
 
     private DurableReceiveJournalV1(string root, FileId rootId, SafeFileHandle rootPin,
-        string session, string tokenSha, long issued, long expires, long limit,
-        int maxPages, ReceiveGateV1 gate)
+        SafeFileHandle[] ancestorPins, string session, string tokenSha, long issued,
+        long expires, long limit, int maxPages, ReceiveGateV1 gate)
     {
         _root = root; _rootId = rootId; _rootPin = rootPin;
+        _ancestorPins = ancestorPins;
         _session = session; _tokenSha = tokenSha;
         _issued = issued; _expires = expires; _limit = limit; _maxPages = maxPages;
         _gate = gate;
@@ -54,8 +58,14 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         if (rootId is null) return null;
         var pin = PinRootForSession(fullRoot, rootId.Value);
         if (pin is null) return null;
-        return new DurableReceiveJournalV1(fullRoot, rootId.Value, pin, session!,
-            tokenSha!, issuedAt, expiresAt, maxBytes, maxPages, gate);
+        var ancestors = PinAncestorsForSession(fullRoot, rootId.Value);
+        if (ancestors is null)
+        {
+            pin.Dispose();
+            return null;
+        }
+        return new DurableReceiveJournalV1(fullRoot, rootId.Value, pin,
+            ancestors, session!, tokenSha!, issuedAt, expiresAt, maxBytes, maxPages, gate);
     }
 
     public bool ClaimToken(string? token, long now)
@@ -154,6 +164,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             _disposed = true;
             _stopped = true;
             _rootPin.Dispose();
+            foreach (var pin in _ancestorPins) pin.Dispose();
         }
         GC.SuppressFinalize(this);
     }
@@ -171,7 +182,8 @@ public sealed class DurableReceiveJournalV1 : IDisposable
 
     private bool Poison() { _stopped = true; return false; }
     private bool StableRoot() => !_disposed && !_rootPin.IsClosed &&
-        !_rootPin.IsInvalid && GetRootId(_root) == _rootId;
+        !_rootPin.IsInvalid && _ancestorPins.All(pin => !pin.IsClosed && !pin.IsInvalid) &&
+        GetRootId(_root) == _rootId;
 
     /// <summary>Read-only recovery. Never grants fresh transport authority.</summary>
     public static Recovery Inspect(string? root, string? session, string? tokenSha,
@@ -303,7 +315,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // This is an admission guard, NOT pinned HANDLE-relative IO or a defense
     // against a malicious same-user process changing ACLs after validation.
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    private static bool PrivateRootAcl(string root)
+    private static bool PrivateRootAcl(string root, bool requireCallerOwner = true)
     {
         try
         {
@@ -315,12 +327,16 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             if (descriptor.DiscretionaryAcl is null) return false;
             var owner = acl.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier;
             var processUser = WindowsIdentity.GetCurrent().User;
-            if (owner is null || processUser is null || !owner.Equals(processUser))
-                return false;
-
+            if (owner is null || processUser is null) return false;
             var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
             var administrators = new SecurityIdentifier(
                 WellKnownSidType.BuiltinAdministratorsSid, null);
+            // The session leaf MUST be owned by this process. Its parent may
+            // be an OS-owned trust boundary, but never an unknown foreign owner.
+            if (requireCallerOwner
+                ? !owner.Equals(processUser)
+                : !(owner.Equals(processUser) || owner.Equals(system) ||
+                    owner.Equals(administrators))) return false;
             // Use ONLY mutating bits. The composite Modify flag also
             // includes READ bits, which would incorrectly reject read-only
             // inherited ACEs on a normal Windows profile directory.
@@ -390,6 +406,56 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         catch (UnauthorizedAccessException) { handle?.Dispose(); return null; }
     }
 
+    // CreateFileW with FILE_LIST_DIRECTORY, not attribute-only metadata,
+    // ensures Windows share-mode checks enforce NO FILE_SHARE_DELETE for each
+    // lexical ancestor. Fail closed if even one ancestor cannot be pinned.
+    // Parent handles do not yet make child file operations HANDLE-relative.
+    private static SafeFileHandle[]? PinAncestorsForSession(string root, FileId expected)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        var pinned = new List<SafeFileHandle>();
+        bool accepted = false;
+        try
+        {
+            var current = Directory.GetParent(root);
+            while (current is not null)
+            {
+                if ((File.GetAttributes(current.FullName) & FileAttributes.ReparsePoint) != 0)
+                    return null;
+                var handle = CreateFile(current.FullName, 0x0001, 0x0001 | 0x0002,
+                    IntPtr.Zero, 3, 0x02000000 | 0x00200000, IntPtr.Zero);
+                if (handle.IsInvalid)
+                {
+                    handle.Dispose();
+                    return null;
+                }
+                if (!GetFileInformationByHandle(handle, out var info) ||
+                    (info.Attributes & (uint)FileAttributes.Directory) == 0 ||
+                    (info.Attributes & (uint)FileAttributes.ReparsePoint) != 0)
+                {
+                    handle.Dispose();
+                    return null;
+                }
+                pinned.Add(handle);
+                current = current.Parent;
+            }
+            // After every ancestor handle is held, recheck original leaf ID,
+            // owner, private DACL and lexical reparse chain as one admission.
+            if (GetRootId(root) != expected) return null;
+            accepted = true;
+            return pinned.ToArray();
+        }
+        catch (Exception e) when (e is IOException ||
+            e is UnauthorizedAccessException || e is System.Security.SecurityException)
+        {
+            return null;
+        }
+        finally
+        {
+            if (!accepted) foreach (var handle in pinned) handle.Dispose();
+        }
+    }
+
     private static FileId? GetRootId(string root)
     {
         if (!OperatingSystem.IsWindows()) return null;
@@ -406,7 +472,12 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                     (attributes & FileAttributes.Directory) == 0) return null;
                 current = current.Parent;
             }
-            if (!PrivateRootAcl(root)) return null;
+            // Harden the immediate ancestor: a private leaf inside a writable
+            // parent can be redirected BEFORE its handle is acquired. Other
+            // ancestors are handle-pinned for the live session below.
+            var parent = Directory.GetParent(Path.GetFullPath(root));
+            if (parent is null || !PrivateRootAcl(parent.FullName, requireCallerOwner: false) ||
+                !PrivateRootAcl(root)) return null;
             using var handle = CreateFile(Path.GetFullPath(root), 0x80, 7, IntPtr.Zero,
                 3, 0x02000000 | 0x00200000, IntPtr.Zero); // BACKUP_SEMANTICS | OPEN_REPARSE_POINT
             // GetFileInformationByHandle succeeds for regular files too: the
