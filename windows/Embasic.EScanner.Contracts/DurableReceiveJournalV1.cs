@@ -28,6 +28,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // A live claim is not only a byte-identical tombstone: its NTFS FILE ID
     // must remain the same as the one created by this journal instance.
     private FileId? _liveClaimId;
+    // The previously committed assets must retain NTFS identity even if an
+    // attacker substitutes exactly the same bytes under the same name.
+    private readonly Dictionary<int, (FileId Blob, FileId Receipt)> _livePageIds = new();
     // No FILE_SHARE_DELETE: an independent process cannot rename this
     // session's root while the journal owns the directory handle.
     private readonly SafeFileHandle _rootPin;
@@ -155,6 +158,17 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                     _limit, _maxPages);
                 if (after.Status != RecoveryStatus.TokenConsumed ||
                     after.ConfirmedPages != _gate.ConfirmedPages) return Poison();
+                // Cache the exact identities of this confirmed page; future
+                // admissions require every previously accepted inode to match.
+                var confirmedBlobId = GetRelativeFileId(_rootPin, "page-" + index + ".blob");
+                var confirmedReceiptId = GetRelativeFileId(_rootPin, "page-" + index + ".rec");
+                if (confirmedBlobId is null || confirmedReceiptId is null ||
+                    confirmedBlobId != stageId ||
+                    GetFileId(blob) != confirmedBlobId ||
+                    GetFileId(rec) != confirmedReceiptId ||
+                    !_livePageIds.TryAdd(envelope.Order,
+                        (confirmedBlobId.Value, confirmedReceiptId.Value)) ||
+                    !StableRoot()) return Poison();
                 return true;
             }
             catch (IOException) { return Poison(); }
@@ -189,11 +203,23 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     }
 
     private bool Poison() { _stopped = true; return false; }
-    private bool StableRoot() => !_disposed && !_rootPin.IsClosed &&
-        !_rootPin.IsInvalid && _ancestorPins.All(pin => !pin.IsClosed && !pin.IsInvalid) &&
-        GetRootId(_root) == _rootId && (!_claimed ||
-        (_liveClaimId is not null &&
-         GetRelativeFileId(_rootPin, ClaimFile) == _liveClaimId));
+    private bool StableRoot()
+    {
+        if (_disposed || _rootPin.IsClosed || _rootPin.IsInvalid ||
+            _ancestorPins.Any(pin => pin.IsClosed || pin.IsInvalid) ||
+            GetRootId(_root) != _rootId ||
+            (_claimed && (_liveClaimId is null ||
+                GetRelativeFileId(_rootPin, ClaimFile) != _liveClaimId)))
+            return false;
+        foreach (var (order, expected) in _livePageIds)
+        {
+            string index = order.ToString("D4", CultureInfo.InvariantCulture);
+            if (GetRelativeFileId(_rootPin, "page-" + index + ".blob") != expected.Blob ||
+                GetRelativeFileId(_rootPin, "page-" + index + ".rec") != expected.Receipt)
+                return false;
+        }
+        return true;
+    }
 
     /// <summary>Read-only recovery. Never grants fresh transport authority.</summary>
     public static Recovery Inspect(string? root, string? session, string? tokenSha,
