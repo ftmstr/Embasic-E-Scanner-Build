@@ -341,6 +341,50 @@ internal static class DurableReceiveJournalSelfTest
         }
 
 
+        // RED: the root HANDLE alone does not authorize a path through an
+        // ancestor that an independent writer can rename. A real same-user
+        // process attempts the rename while the leaf journal is OPEN. The
+        // same process MUST be able to rename after deterministic Dispose,
+        // proving that a blocked attack is not an unavailable-process false PASS.
+        string parentPinFixture = CreatePrivateTempSubdirectory("escanner-parent-pin-").FullName;
+        string parentNode = Path.Combine(parentPinFixture, "parent");
+        string movedParent = Path.Combine(parentPinFixture, "parent.moved");
+        try
+        {
+            string nestedRoot = Path.Combine(parentNode, "session");
+            HardenTestDirectory(Directory.CreateDirectory(nestedRoot));
+            using (var active = Open(nestedRoot))
+            {
+                if (HostileRenameFromSecondProcess(parentNode, movedParent) ||
+                    !Directory.Exists(nestedRoot) || Directory.Exists(movedParent))
+                {
+                    Console.Error.WriteLine(
+                        "FAIL: hostile subprocess renamed ANCESTOR of an OPEN private root");
+                    return false;
+                }
+                if (!active.ClaimToken(Token, 1001))
+                {
+                    Console.Error.WriteLine("FAIL: live pinned journal lost claimed token");
+                    return false;
+                }
+            }
+            if (!HostileRenameFromSecondProcess(parentNode, movedParent) ||
+                Directory.Exists(parentNode) || !Directory.Exists(movedParent))
+            {
+                Console.Error.WriteLine("FAIL: ancestor rename positive control after Dispose");
+                return false;
+            }
+            Console.WriteLine(
+                "PASS: pinned Windows ancestor denies external rename until Dispose");
+        }
+        finally
+        {
+            if (Directory.Exists(movedParent) && !Directory.Exists(parentNode))
+                Directory.Move(movedParent, parentNode);
+            if (Directory.Exists(parentPinFixture))
+                Directory.Delete(parentPinFixture, recursive: true);
+        }
+
         // Same common golden row as Android JVM test. The attacking writer is
         // a real independent Windows process terminated after emitting an
         // orphan staging record. Not a low-disk/power-cut simulation.
