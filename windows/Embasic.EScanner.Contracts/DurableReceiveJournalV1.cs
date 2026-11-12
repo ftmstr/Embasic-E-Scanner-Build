@@ -25,6 +25,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     private readonly object _mutex = new();
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
+    // A live claim is not only a byte-identical tombstone: its NTFS FILE ID
+    // must remain the same as the one created by this journal instance.
+    private FileId? _liveClaimId;
     // No FILE_SHARE_DELETE: an independent process cannot rename this
     // session's root while the journal owns the directory handle.
     private readonly SafeFileHandle _rootPin;
@@ -92,7 +95,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 _stopped = true;
                 return false;
             }
-            if (!StableRoot() || _gate.Authenticate(token, now) != ReceiveGateV1.Decision.Accepted)
+            _liveClaimId = GetFileId(Path.Combine(_root, ClaimFile));
+            if (_liveClaimId is null || !StableRoot() ||
+                _gate.Authenticate(token, now) != ReceiveGateV1.Decision.Accepted)
             {
                 _stopped = true;
                 return false;
@@ -107,7 +112,10 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     {
         lock (_mutex)
         {
-            if (!_claimed || _stopped || !StableRoot()) return false;
+            if (!_claimed || _stopped) return false;
+            // A failed ID/ACL admission is a permanent failure for this
+            // instance; a malicious process cannot revive it by restoration.
+            if (!StableRoot()) return Poison();
             // A successful earlier receipt is not an immutable trust grant.
             // Revalidate the entire existing ledger before accepting the next
             // page; this requires a private root without a hostile same-dir writer.
@@ -183,7 +191,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     private bool Poison() { _stopped = true; return false; }
     private bool StableRoot() => !_disposed && !_rootPin.IsClosed &&
         !_rootPin.IsInvalid && _ancestorPins.All(pin => !pin.IsClosed && !pin.IsInvalid) &&
-        GetRootId(_root) == _rootId;
+        GetRootId(_root) == _rootId && (!_claimed ||
+        (_liveClaimId is not null &&
+         GetFileId(Path.Combine(_root, ClaimFile)) == _liveClaimId));
 
     /// <summary>Read-only recovery. Never grants fresh transport authority.</summary>
     public static Recovery Inspect(string? root, string? session, string? tokenSha,
