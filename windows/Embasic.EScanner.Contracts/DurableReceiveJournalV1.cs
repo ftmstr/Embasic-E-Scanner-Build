@@ -95,7 +95,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 _stopped = true;
                 return false;
             }
-            _liveClaimId = GetFileId(Path.Combine(_root, ClaimFile));
+            _liveClaimId = GetRelativeFileId(_rootPin, ClaimFile);
             if (_liveClaimId is null || !StableRoot() ||
                 _gate.Authenticate(token, now) != ReceiveGateV1.Decision.Accepted)
             {
@@ -193,7 +193,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         !_rootPin.IsInvalid && _ancestorPins.All(pin => !pin.IsClosed && !pin.IsInvalid) &&
         GetRootId(_root) == _rootId && (!_claimed ||
         (_liveClaimId is not null &&
-         GetFileId(Path.Combine(_root, ClaimFile)) == _liveClaimId));
+         GetRelativeFileId(_rootPin, ClaimFile) == _liveClaimId));
 
     /// <summary>Read-only recovery. Never grants fresh transport authority.</summary>
     public static Recovery Inspect(string? root, string? session, string? tokenSha,
@@ -320,6 +320,99 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         return new FileId(info.VolumeSerial, info.FileIndexHigh, info.FileIndexLow);
     }
 
+    // Windows user-mode documented Native API. The live journal root SafeFileHandle
+    // is the RootDirectory object, so the trusted child name is resolved against
+    // THAT directory handle rather than reconstructing a mutable absolute path.
+    // This method is deliberately only an immutable-claim FILE-ID probe:
+    // staging/open/write/rename are NOT yet fully handle-relative.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeUnicodeString
+    {
+        public ushort Length, MaximumLength;
+        public IntPtr Buffer;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeObjectAttributes
+    {
+        public uint Length;
+        public IntPtr RootDirectory, ObjectName;
+        public uint Attributes;
+        public IntPtr SecurityDescriptor, SecurityQualityOfService;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeIoStatusBlock
+    {
+        public IntPtr Status, Information;
+    }
+
+    [DllImport("ntdll.dll", ExactSpelling = true)]
+    private static extern int NtCreateFile(
+        out SafeFileHandle handle, uint desiredAccess,
+        ref NativeObjectAttributes attributes, out NativeIoStatusBlock ioStatus,
+        IntPtr allocationSize, uint fileAttributes, uint shareAccess,
+        uint createDisposition, uint createOptions,
+        IntPtr eaBuffer, uint eaLength);
+
+    private static FileId? GetRelativeFileId(SafeFileHandle rootHandle, string name)
+    {
+        if (!OperatingSystem.IsWindows() || rootHandle.IsInvalid || rootHandle.IsClosed ||
+            string.IsNullOrEmpty(name) || name.Length > 40 ||
+            name is "." or ".." ||
+            name.Any(c => !((c >= 'a' && c <= 'z') ||
+                            (c >= '0' && c <= '9') || c == '.' || c == '-')))
+            return null;
+        IntPtr buffer = IntPtr.Zero, namePointer = IntPtr.Zero;
+        try
+        {
+            buffer = Marshal.StringToHGlobalUni(name);
+            var unicode = new NativeUnicodeString
+            {
+                Length = checked((ushort)(name.Length * 2)),
+                MaximumLength = checked((ushort)((name.Length + 1) * 2)),
+                Buffer = buffer
+            };
+            namePointer = Marshal.AllocHGlobal(Marshal.SizeOf<NativeUnicodeString>());
+            Marshal.StructureToPtr(unicode, namePointer, false);
+            var attributes = new NativeObjectAttributes
+            {
+                Length = (uint)Marshal.SizeOf<NativeObjectAttributes>(),
+                RootDirectory = rootHandle.DangerousGetHandle(),
+                ObjectName = namePointer,
+                // Case-insensitive match + refuse reparses in the object-name
+                // resolution path. The opened handle is still checked below.
+                Attributes = 0x0040 | 0x1000
+            };
+            // FILE_READ_ATTRIBUTES | SYNCHRONIZE.
+            // FILE_OPEN + FILE_NON_DIRECTORY_FILE + FILE_OPEN_REPARSE_POINT
+            // + FILE_SYNCHRONOUS_IO_NONALERT. No CREATE/overwrite fallback.
+            int status = NtCreateFile(out var child, 0x00000080 | 0x00100000,
+                ref attributes, out _, IntPtr.Zero, 0,
+                0x00000001 | 0x00000002, 1,
+                0x00000040 | 0x00200000 | 0x00000020, IntPtr.Zero, 0);
+            GC.KeepAlive(rootHandle);
+            if (status != 0)
+            {
+                child?.Dispose();
+                return null;
+            }
+            using (child)
+                return HandleId(child);
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException ||
+            e is ArgumentException || e is OverflowException ||
+            e is EntryPointNotFoundException || e is DllNotFoundException)
+        {
+            return null;
+        }
+        finally
+        {
+            if (namePointer != IntPtr.Zero) Marshal.FreeHGlobal(namePointer);
+            if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
+        }
+    }
+
     // Windows-only admission check. No external NuGet package is introduced.
     // A world-/group-writable or foreign-owner DACL cannot be called app-private.
     // This is an admission guard, NOT pinned HANDLE-relative IO or a defense
@@ -399,7 +492,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             const uint shareReadWrite = 0x01 | 0x02; // intentionally no FILE_SHARE_DELETE
             const uint openExisting = 3;
             const uint directoryAndNoFollow = 0x02000000 | 0x00200000;
-            handle = CreateFile(fullRoot, fileListDirectory, shareReadWrite,
+            // FILE_TRAVERSE is needed for explicit RootDirectory-relative
+            // NtCreateFile child admission (not just directory enumeration).
+            handle = CreateFile(fullRoot, fileListDirectory | 0x0020, shareReadWrite,
                 IntPtr.Zero, openExisting, directoryAndNoFollow, IntPtr.Zero);
             if (handle.IsInvalid || !GetFileInformationByHandle(handle, out var info) ||
                 (info.Attributes & (uint)FileAttributes.Directory) == 0 ||
