@@ -333,4 +333,51 @@ class DurableReceiveJournalV1Test {
         } finally { deleteTree(root) }
     }
 
+    @Test fun linuxJvmSecureDirectoryStreamHandleRelativeFeasibility() {
+        // Feasibility only: Java NIO SecureDirectoryStream is provider-dependent.
+        // A Linux GitHub runner is NOT proof of Android device API/provider
+        // support. Production DurableReceiveJournalV1 still uses path strings.
+        val root = Files.createTempDirectory("escanner-nio-fd-probe-")
+        val relocated = root.resolveSibling(root.fileName.toString() + ".moved")
+        try {
+            Files.write(root.resolve("actual.bin"), body)
+            Files.createSymbolicLink(root.resolve("alias.bin"),
+                root.resolve("actual.bin"))
+            Files.newDirectoryStream(root).use { stream ->
+                assertTrue("Linux JVM provider has no SecureDirectoryStream; fd-relative " +
+                    "platform adapter feasibility is NOT VERIFIED",
+                    stream is java.nio.file.SecureDirectoryStream<*>)
+                @Suppress("UNCHECKED_CAST")
+                val secure = stream as java.nio.file.SecureDirectoryStream<Path>
+                val opts = setOf<java.nio.file.OpenOption>(
+                    StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)
+                // Linux permits renaming an opened directory. A pinned
+                // directory descriptor must continue reading ORIGINAL bytes,
+                // not follow a newly substituted root pathname.
+                Files.move(root, relocated)
+                Files.createDirectory(root)
+                Files.write(root.resolve("actual.bin"),
+                    "BAD".toByteArray(Charsets.US_ASCII))
+                secure.newByteChannel(java.nio.file.Paths.get("actual.bin"), opts).use {
+                    val buffer = java.nio.ByteBuffer.allocate(body.size)
+                    while (buffer.hasRemaining()) {
+                        assertTrue("short native descriptor read", it.read(buffer) > 0)
+                    }
+                    assertTrue("pinned fd did not refer to original directory",
+                        buffer.array().contentEquals(body))
+                }
+                var linkRejected = false
+                try {
+                    secure.newByteChannel(java.nio.file.Paths.get("alias.bin"), opts)
+                        .use { it.read(java.nio.ByteBuffer.allocate(body.size)) }
+                } catch (_: java.io.IOException) { linkRejected = true }
+                assertTrue("NOFOLLOW_LINKS was bypassed under dirfd", linkRejected)
+            }
+        } finally {
+            if (Files.exists(root, LinkOption.NOFOLLOW_LINKS)) deleteTree(root)
+            if (Files.exists(relocated, LinkOption.NOFOLLOW_LINKS)) deleteTree(relocated)
+        }
+    }
+
+
 }
