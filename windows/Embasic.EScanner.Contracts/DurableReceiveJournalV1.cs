@@ -366,11 +366,14 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         SafeFileHandle? handle = null;
         try
         {
-            const uint fileReadAttributes = 0x80;
+            // FILE_READ_ATTRIBUTES (0x80) alone is a metadata-only open and
+            // is exempt from Win32 share-mode conflicts. To ACTUALLY deny
+            // another process DELETE/rename, request directory list/read access.
+            const uint fileListDirectory = 0x0001;
             const uint shareReadWrite = 0x01 | 0x02; // intentionally no FILE_SHARE_DELETE
             const uint openExisting = 3;
             const uint directoryAndNoFollow = 0x02000000 | 0x00200000;
-            handle = CreateFile(fullRoot, fileReadAttributes, shareReadWrite,
+            handle = CreateFile(fullRoot, fileListDirectory, shareReadWrite,
                 IntPtr.Zero, openExisting, directoryAndNoFollow, IntPtr.Zero);
             if (handle.IsInvalid || !GetFileInformationByHandle(handle, out var info) ||
                 (info.Attributes & (uint)FileAttributes.Directory) == 0 ||
