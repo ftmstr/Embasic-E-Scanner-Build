@@ -158,7 +158,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 // No File.Move and no copy across volumes; directory durability
                 // against sudden power loss remains NOT VERIFIED.
                 if (!RenameNoReplaceRelative(_rootPin, temp, blob, stageId.Value))
-                    return Poison("stage-rename");
+                    return Poison("stage-rename:" + (LastNativeFailureStage ?? "unspecified"));
                 if (GetRelativeFileId(_rootPin, blob) != stageId ||
                     ReadBoundedRelative(_rootPin, blob, _limit) is not byte[] reread ||
                     !PageWireV1.VerifyBody(envelope, _limit, reread)) return Poison("blob-reread");
@@ -541,7 +541,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
 
     // Atomic same-directory no-overwrite rename by SOURCE HANDLE, never
     // File.Move(sourcePath, destPath). Caller checks the pinned FILE ID first.
-    private static bool RenameNoReplaceRelative(SafeFileHandle root,
+    private bool RenameNoReplaceRelative(SafeFileHandle root,
         string sourceName, string destName, FileId expected)
     {
         if (destName.Length == 0 || destName.Length > 40 ||
@@ -551,8 +551,10 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         // DELETE | FILE_READ_ATTRIBUTES | SYNCHRONIZE
         using var source = OpenRelativeFile(root, sourceName,
             0x00010000 | 0x80 | 0x00100000, 1);
-        if (source is null || HandleId(source) != expected ||
-            GetRelativeFileId(root, destName) is not null) return false;
+        if (source is null) { LastNativeFailureStage = "source-open"; return false; }
+        if (HandleId(source) != expected) { LastNativeFailureStage = "source-id"; return false; }
+        if (GetRelativeFileId(root, destName) is not null)
+        { LastNativeFailureStage = "destination-exists"; return false; }
         IntPtr infoPointer = IntPtr.Zero;
         try
         {
@@ -571,9 +573,14 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             Marshal.Copy(filename, 0, IntPtr.Add(infoPointer, offset), filename.Length);
             // FileRenameInfo = 3. The NTFS destination must NOT be replaced.
             if (!SetFileInformationByHandle(source, 3, infoPointer, checked((uint)total)))
+            {
+                LastNativeFailureStage = "win32-" + Marshal.GetLastPInvokeError();
                 return false;
+            }
             GC.KeepAlive(root);
-            return HandleId(source) == expected;
+            if (HandleId(source) != expected)
+            { LastNativeFailureStage = "post-id-mismatch"; return false; }
+            return true;
         }
         catch (Exception e) when (e is IOException || e is UnauthorizedAccessException ||
             e is ArgumentException || e is OverflowException ||
