@@ -29,6 +29,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // Internal adversarial TEST barrier; never assigned by production composition root.
     // Test runner synchronously launches a separate same-SID hostile writer here.
     internal Action? AfterStageCreatedForAdversarialTest { get; set; }
+    internal string? LastNativeFailureStage { get; private set; }
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
     // A live claim is not only a byte-identical tombstone: its NTFS FILE ID
@@ -132,7 +133,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             var previous = Inspect(_root, _session, _tokenSha, _issued, _expires,
                 _limit, _maxPages);
             if (previous.Status != RecoveryStatus.TokenConsumed ||
-                previous.ConfirmedPages != _gate.ConfirmedPages) return Poison();
+                previous.ConfirmedPages != _gate.ConfirmedPages) return Poison("prior-inspect");
             var envelope = PageWireV1.Parse(rawJson, _session, _limit);
             if (envelope is null || bytes is null ||
                 !PageWireV1.VerifyBody(envelope, _limit, bytes) ||
@@ -148,29 +149,31 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 // is still held. Another process cannot replace it silently
                 // with an identical-but-distinct NTFS inode before this ID.
                 var stageId = WriteNewRelative(_rootPin, temp, bytes);
-                if (stageId is null) return Poison();
+                if (stageId is null) return Poison("stage-create");
                 AfterStageCreatedForAdversarialTest?.Invoke();
                 if (GetRelativeFileId(_rootPin, temp) != stageId ||
                     ReadBoundedRelative(_rootPin, temp, _limit) is not byte[] staged ||
-                    !CryptographicOperations.FixedTimeEquals(staged, bytes)) return Poison();
+                    !CryptographicOperations.FixedTimeEquals(staged, bytes)) return Poison("stage-reread");
                 // Atomic, no-overwrite same-root rename by pinned SOURCE HANDLE.
                 // No File.Move and no copy across volumes; directory durability
                 // against sudden power loss remains NOT VERIFIED.
-                if (!RenameNoReplaceRelative(_rootPin, temp, blob, stageId.Value) ||
-                    GetRelativeFileId(_rootPin, blob) != stageId ||
+                if (!RenameNoReplaceRelative(_rootPin, temp, blob, stageId.Value))
+                    return Poison("stage-rename");
+                if (GetRelativeFileId(_rootPin, blob) != stageId ||
                     ReadBoundedRelative(_rootPin, blob, _limit) is not byte[] reread ||
-                    !PageWireV1.VerifyBody(envelope, _limit, reread)) return Poison();
+                    !PageWireV1.VerifyBody(envelope, _limit, reread)) return Poison("blob-reread");
                 string data = $"v1|{envelope.Order}|{envelope.PageId}|{envelope.ByteSize}|{envelope.Mime}|{envelope.Sha256}\n";
                 var writtenReceiptId = WriteNewRelative(_rootPin, rec,
                     Encoding.ASCII.GetBytes(data));
-                if (writtenReceiptId is null || !StableRoot() ||
+                if (writtenReceiptId is null) return Poison("receipt-create");
+                if (!StableRoot() ||
                     _gate.ConfirmReread(reread, now) != ReceiveGateV1.Decision.Accepted)
-                    return Poison();
+                    return Poison("receipt-confirm");
                 // Freshly read back the full chain after writing a receipt.
                 var after = Inspect(_root, _session, _tokenSha, _issued, _expires,
                     _limit, _maxPages);
                 if (after.Status != RecoveryStatus.TokenConsumed ||
-                    after.ConfirmedPages != _gate.ConfirmedPages) return Poison();
+                    after.ConfirmedPages != _gate.ConfirmedPages) return Poison("post-inspect");
                 // Cache the exact identities of this confirmed page; future
                 // admissions require every previously accepted inode to match.
                 var confirmedBlobId = GetRelativeFileId(_rootPin, blob);
@@ -180,7 +183,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                     confirmedReceiptId != writtenReceiptId ||
                     !_livePageIds.TryAdd(envelope.Order,
                         (confirmedBlobId.Value, confirmedReceiptId.Value)) ||
-                    !StableRoot()) return Poison();
+                    !StableRoot()) return Poison("final-identities");
                 return true;
             }
             catch (IOException) { return Poison(); }
@@ -214,7 +217,12 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         catch (UnauthorizedAccessException) { return false; }
     }
 
-    private bool Poison() { _stopped = true; return false; }
+    private bool Poison(string stage = "unclassified")
+    {
+        LastNativeFailureStage = stage;
+        _stopped = true;
+        return false;
+    }
     private bool StableRoot()
     {
         if (_disposed || _rootPin.IsClosed || _rootPin.IsInvalid ||
