@@ -29,6 +29,8 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // Internal adversarial TEST barrier; never assigned by production composition root.
     // Test runner synchronously launches a separate same-SID hostile writer here.
     internal Action? AfterStageCreatedForAdversarialTest { get; set; }
+    // Fault injection is internal-only; no production path attaches this delegate.
+    internal Action? AfterStagePrefixWrittenForTest { get; set; }
     internal string? LastNativeFailureStage { get; private set; }
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
@@ -148,7 +150,8 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 // Capture the stage FILE ID while the original CREATE handle
                 // is still held. Another process cannot replace it silently
                 // with an identical-but-distinct NTFS inode before this ID.
-                var stageId = WriteNewRelative(_rootPin, temp, bytes);
+                var stageId = WriteNewRelative(_rootPin, temp, bytes,
+                    AfterStagePrefixWrittenForTest);
                 if (stageId is null) return Poison("stage-create");
                 AfterStageCreatedForAdversarialTest?.Invoke();
                 if (GetRelativeFileId(_rootPin, temp) != stageId ||
@@ -430,7 +433,8 @@ public sealed class DurableReceiveJournalV1 : IDisposable
 
     // FILE_CREATE = 2: no overwrite, even when a hostile process races the
     // existence check. The FILE ID is sampled before our write handle closes.
-    private static FileId? WriteNewRelative(SafeFileHandle root, string name, byte[] data)
+    private static FileId? WriteNewRelative(SafeFileHandle root, string name,
+        byte[] data, Action? afterPrefixWritten = null)
     {
         try
         {
@@ -441,7 +445,17 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             if (id is null) return null;
             using (var stream = new FileStream(handle, FileAccess.Write, 4096, false))
             {
-                stream.Write(data);
+                if (afterPrefixWritten is null)
+                    stream.Write(data);
+                else
+                {
+                    // Synthetic ENOSPC/error after a real one-byte write.
+                    // A thrown IOException leaves an orphan and is fail-closed.
+                    int prefix = Math.Min(1, data.Length);
+                    stream.Write(data.AsSpan(0, prefix));
+                    afterPrefixWritten();
+                    stream.Write(data.AsSpan(prefix));
+                }
                 stream.Flush(flushToDisk: true);
                 if (HandleId(stream.SafeFileHandle) != id) return null;
             }
