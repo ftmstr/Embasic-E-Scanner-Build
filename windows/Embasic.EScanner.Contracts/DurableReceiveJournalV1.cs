@@ -658,9 +658,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             const uint shareReadWrite = 0x01 | 0x02; // intentionally no FILE_SHARE_DELETE
             const uint openExisting = 3;
             const uint directoryAndNoFollow = 0x02000000 | 0x00200000;
-            // FILE_TRAVERSE is needed for explicit RootDirectory-relative
-            // NtCreateFile child admission (not just directory enumeration).
-            handle = CreateFile(fullRoot, fileListDirectory | 0x0020, shareReadWrite,
+            // FILE_TRAVERSE plus FILE_ADD_FILE is needed when a native
+            // FileRenameInfo places a child into this pinned RootDirectory.
+            handle = CreateFile(fullRoot, fileListDirectory | 0x0020 | 0x0002, shareReadWrite,
                 IntPtr.Zero, openExisting, directoryAndNoFollow, IntPtr.Zero);
             if (handle.IsInvalid || !GetFileInformationByHandle(handle, out var info) ||
                 (info.Attributes & (uint)FileAttributes.Directory) == 0 ||
