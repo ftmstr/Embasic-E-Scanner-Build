@@ -293,46 +293,6 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         catch (UnauthorizedAccessException) { return bad; }
     }
 
-    private static bool WriteNew(string path, byte[] data)
-    {
-        try
-        {
-            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write,
-                FileShare.None, 4096, FileOptions.WriteThrough);
-            stream.Write(data);
-            stream.Flush(flushToDisk: true);
-            return true;
-        }
-        catch (IOException) { return false; }
-        catch (UnauthorizedAccessException) { return false; }
-    }
-
-    private static byte[]? ReadBounded(string path, long maxBytes)
-    {
-        if (maxBytes < 0 || maxBytes > MaxStageBytes) return null;
-        try
-        {
-            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) return null;
-            FileId? id;
-            byte[] bytes;
-            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
-                       FileShare.None, 4096, FileOptions.SequentialScan))
-            {
-                id = HandleId(stream.SafeFileHandle);
-                if (id is null || stream.Length < 0 || stream.Length > maxBytes) return null;
-                bytes = new byte[checked((int)stream.Length)];
-                stream.ReadExactly(bytes);
-                if (stream.ReadByte() != -1) return null;
-            }
-            // Close the exclusive read handle before reopening by path for file-ID
-            // comparison; otherwise FileShare.None prevents the second open.
-            if (GetFileId(path) != id) return null;
-            return bytes;
-        }
-        catch (IOException) { return null; }
-        catch (UnauthorizedAccessException) { return null; }
-    }
-
     // Native Windows NTFS identity: volume serial + 64-bit file index (not a path string).
     // The caller must still provide an app-private, non-hostile directory. Path swap
     // and multi-process adversarial filesystem tampering are NOT proved safe.
@@ -786,15 +746,5 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         catch (UnauthorizedAccessException) { return null; }
     }
 
-    private static FileId? GetFileId(string path)
-    {
-        try
-        {
-            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) return null;
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
-            return HandleId(fs.SafeFileHandle);
-        }
-        catch (IOException) { return null; }
-        catch (UnauthorizedAccessException) { return null; }
-    }
+
 }
