@@ -225,6 +225,34 @@ internal static class DurableReceiveJournalSelfTest
         return attacker.ExitCode == 0;
     }
 
+    // Actual separate same-account process plants a destination AFTER stage
+    // creation. A native no-overwrite rename must refuse without modifying it.
+    private static bool HostilePlantDestinationFromSecondProcess(string path)
+    {
+        static string Quote(string s) => s.Replace("'", "''", StringComparison.Ordinal);
+        var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false, CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("try { $p='" + Quote(path) + "'; " +
+            "$f=[System.IO.File]::Open($p, [System.IO.FileMode]::CreateNew, " +
+            "[System.IO.FileAccess]::Write, [System.IO.FileShare]::None); " +
+            "try { $b=[System.Text.Encoding]::ASCII.GetBytes('ADVERSARY'); " +
+            "$f.Write($b,0,$b.Length); $f.Flush($true) } finally { $f.Dispose() }; " +
+            "exit 0 } catch { exit 17 }");
+        using var child = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("Hostile destination process missing");
+        if (!child.WaitForExit(15000))
+        {
+            child.Kill(entireProcessTree: true);
+            throw new InvalidOperationException("Hostile destination process timed out");
+        }
+        return child.ExitCode == 0;
+    }
+
     private static string[] KilledWriterGolden()
     {
         var canonical = GoldenPath() ?? throw new InvalidOperationException("Missing golden base");
@@ -566,6 +594,45 @@ internal static class DurableReceiveJournalSelfTest
                 "PASS: synchronized external stage inode swap rejected BEFORE page confirmation");
         }
         finally { Directory.Delete(stageSwapRoot, recursive: true); }
+
+        // Real independent OS adversary creates a previously absent blob
+        // destination after the scanner has durably created its stage. The
+        // source HANDLE rename MUST fail (ReplaceIfExists=FALSE) and preserve
+        // the attacker's existing bytes without creating a false receipt.
+        string plantedDestinationRoot =
+            CreatePrivateTempSubdirectory("escanner-no-overwrite-").FullName;
+        try
+        {
+            using var live = Open(plantedDestinationRoot);
+            if (!live.ClaimToken(Token, 1001))
+            {
+                Console.Error.WriteLine("FAIL: no-overwrite positive token control");
+                return false;
+            }
+            bool attackerRan = false;
+            string destination = Path.Combine(plantedDestinationRoot, "page-0000.blob");
+            live.AfterStageCreatedForAdversarialTest = () =>
+            {
+                if (!HostilePlantDestinationFromSecondProcess(destination) ||
+                    File.ReadAllText(destination, Encoding.ASCII) != "ADVERSARY")
+                    throw new InvalidOperationException(
+                        "NOT VERIFIED: hostile destination create positive control failed");
+                attackerRan = true;
+            };
+            if (live.Commit(Wire(Page0, 0), Body, 1002) || !attackerRan ||
+                File.ReadAllText(destination, Encoding.ASCII) != "ADVERSARY" ||
+                File.Exists(Path.Combine(plantedDestinationRoot, "page-0000.rec")) ||
+                Inspect(plantedDestinationRoot).Status !=
+                    DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+            {
+                Console.Error.WriteLine(
+                    "FAIL: native rename overwrote hostile destination or committed receipt");
+                return false;
+            }
+            Console.WriteLine(
+                "PASS: real separate-process destination collision preserved no-overwrite");
+        }
+        finally { Directory.Delete(plantedDestinationRoot, recursive: true); }
 
         // Same common golden row as Android JVM test. The attacking writer is
         // a real independent Windows process terminated after emitting an
