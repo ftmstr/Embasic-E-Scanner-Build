@@ -1,5 +1,10 @@
 using System.Text;
 using Embasic.EScanner.Contracts;
+// Real child journal-owner mode: run exactly this physical process, bypass the
+// normal synthetic suite, and let the parent test KILL the owned process.
+if (args.Length > 0 && args[0] == "--journal-owner-crash-child")
+    return DurableReceiveJournalSelfTest.RunJournalOwnerChild(args);
+
 if (!ScanContract.IsSupportedVersion(1) || ScanContract.IsSupportedVersion(0) || ScanContract.IsSupportedVersion(2) || !ScanContract.IsValidPageOrder(0) || ScanContract.IsValidPageOrder(-1))
 {
     Console.Error.WriteLine("FAIL: contract boundary");
