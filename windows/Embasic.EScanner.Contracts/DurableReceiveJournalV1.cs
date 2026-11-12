@@ -388,9 +388,13 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         uint createDisposition, uint createOptions,
         IntPtr eaBuffer, uint eaLength);
 
-    private static FileId? GetRelativeFileId(SafeFileHandle rootHandle, string name)
+    // File create/open is anchored to the already authenticated root HANDLE.
+    // Names are locally generated, single-component ASCII; no slash, reparse,
+    // absolute path, alternate data stream or caller-controlled basename.
+    private static SafeFileHandle? OpenRelativeFile(SafeFileHandle root, string name,
+        uint access, uint disposition, bool writeThrough = false)
     {
-        if (!OperatingSystem.IsWindows() || rootHandle.IsInvalid || rootHandle.IsClosed ||
+        if (!OperatingSystem.IsWindows() || root.IsClosed || root.IsInvalid ||
             string.IsNullOrEmpty(name) || name.Length > 40 ||
             name is "." or ".." ||
             name.Any(c => !((c >= 'a' && c <= 'z') ||
@@ -411,27 +415,24 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             var attributes = new NativeObjectAttributes
             {
                 Length = (uint)Marshal.SizeOf<NativeObjectAttributes>(),
-                RootDirectory = rootHandle.DangerousGetHandle(),
+                RootDirectory = root.DangerousGetHandle(),
                 ObjectName = namePointer,
-                // Case-insensitive match + refuse reparses in the object-name
-                // resolution path. The opened handle is still checked below.
-                Attributes = 0x0040 | 0x1000
+                Attributes = 0x0040 | 0x1000 // OBJ_CASE_INSENSITIVE | OBJ_DONT_REPARSE
             };
-            // FILE_READ_ATTRIBUTES | SYNCHRONIZE.
-            // FILE_OPEN + FILE_NON_DIRECTORY_FILE + FILE_OPEN_REPARSE_POINT
-            // + FILE_SYNCHRONOUS_IO_NONALERT. No CREATE/overwrite fallback.
-            int status = NtCreateFile(out var child, 0x00000080 | 0x00100000,
-                ref attributes, out _, IntPtr.Zero, 0,
-                0x00000001 | 0x00000002, 1,
-                0x00000040 | 0x00200000 | 0x00000020, IntPtr.Zero, 0);
-            GC.KeepAlive(rootHandle);
-            if (status != 0)
+            // Open only non-directory files; never follow reparse points.
+            // FILE_SYNCHRONOUS_IO_NONALERT requires SYNCHRONIZE access.
+            uint options = 0x00000040 | 0x00200000 | 0x00000020;
+            if (writeThrough) options |= 0x00000002; // FILE_WRITE_THROUGH
+            int status = NtCreateFile(out var child, access, ref attributes,
+                out _, IntPtr.Zero, 0x00000080, 0, disposition, options,
+                IntPtr.Zero, 0);
+            GC.KeepAlive(root);
+            if (status != 0 || child is null || child.IsInvalid)
             {
                 child?.Dispose();
                 return null;
             }
-            using (child)
-                return HandleId(child);
+            return child;
         }
         catch (Exception e) when (e is IOException || e is UnauthorizedAccessException ||
             e is ArgumentException || e is OverflowException ||
@@ -443,6 +444,133 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         {
             if (namePointer != IntPtr.Zero) Marshal.FreeHGlobal(namePointer);
             if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static FileId? GetRelativeFileId(SafeFileHandle rootHandle, string name)
+    {
+        // FILE_OPEN = 1. Query identity from a pinned directory rather than
+        // from a pathname. No path fallback on native API failure.
+        using var child = OpenRelativeFile(rootHandle, name, 0x80 | 0x00100000, 1);
+        return child is null ? null : HandleId(child);
+    }
+
+    // FILE_CREATE = 2: no overwrite, even when a hostile process races the
+    // existence check. The FILE ID is sampled before our write handle closes.
+    private static FileId? WriteNewRelative(SafeFileHandle root, string name, byte[] data)
+    {
+        try
+        {
+            using var handle = OpenRelativeFile(root, name,
+                0x00000002 | 0x00000080 | 0x00100000, 2, writeThrough: true);
+            if (handle is null) return null;
+            var id = HandleId(handle);
+            if (id is null) return null;
+            using (var stream = new FileStream(handle, FileAccess.Write, 4096, false))
+            {
+                stream.Write(data);
+                stream.Flush(flushToDisk: true);
+                if (HandleId(stream.SafeFileHandle) != id) return null;
+            }
+            return id;
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException ||
+            e is ArgumentException || e is NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static byte[]? ReadBoundedRelative(SafeFileHandle root, string name, long maxBytes)
+    {
+        if (maxBytes < 0 || maxBytes > MaxStageBytes) return null;
+        try
+        {
+            using var handle = OpenRelativeFile(root, name,
+                0x00000001 | 0x00000080 | 0x00100000, 1);
+            if (handle is null) return null;
+            var id = HandleId(handle);
+            if (id is null) return null;
+            byte[] data;
+            using (var stream = new FileStream(handle, FileAccess.Read, 4096, false))
+            {
+                if (stream.Length < 0 || stream.Length > maxBytes) return null;
+                data = new byte[checked((int)stream.Length)];
+                stream.ReadExactly(data);
+                if (stream.ReadByte() != -1 ||
+                    HandleId(stream.SafeFileHandle) != id) return null;
+            }
+            // Detect a name substitution between the HANDLE read and our
+            // final stable-name check. This is not a continuous race proof.
+            if (GetRelativeFileId(root, name) != id) return null;
+            return data;
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException ||
+            e is ArgumentException || e is NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRenameInfo
+    {
+        public byte ReplaceIfExists; // FALSE: never overwrite a destination
+        public IntPtr RootDirectory;
+        public uint FileNameLength;
+        public ushort FirstChar; // UTF-16 flexible array starts here
+    }
+
+    [DllImport("kernel32.dll", EntryPoint = "SetFileInformationByHandle",
+        SetLastError = true)]
+    private static extern bool SetFileInformationByHandle(SafeFileHandle handle,
+        uint infoClass, IntPtr info, uint infoSize);
+
+    // Atomic same-directory no-overwrite rename by SOURCE HANDLE, never
+    // File.Move(sourcePath, destPath). Caller checks the pinned FILE ID first.
+    private static bool RenameNoReplaceRelative(SafeFileHandle root,
+        string sourceName, string destName, FileId expected)
+    {
+        if (destName.Length == 0 || destName.Length > 40 ||
+            destName.Any(c => !((c >= 'a' && c <= 'z') ||
+                                (c >= '0' && c <= '9') || c == '.' || c == '-')))
+            return false;
+        // DELETE | FILE_READ_ATTRIBUTES | SYNCHRONIZE
+        using var source = OpenRelativeFile(root, sourceName,
+            0x00010000 | 0x80 | 0x00100000, 1);
+        if (source is null || HandleId(source) != expected ||
+            GetRelativeFileId(root, destName) is not null) return false;
+        IntPtr infoPointer = IntPtr.Zero;
+        try
+        {
+            var filename = Encoding.Unicode.GetBytes(destName);
+            int offset = (int)Marshal.OffsetOf<NativeRenameInfo>(
+                nameof(NativeRenameInfo.FirstChar));
+            int total = checked(offset + filename.Length);
+            infoPointer = Marshal.AllocHGlobal(total);
+            var info = new NativeRenameInfo
+            {
+                ReplaceIfExists = 0,
+                RootDirectory = root.DangerousGetHandle(),
+                FileNameLength = checked((uint)filename.Length)
+            };
+            Marshal.StructureToPtr(info, infoPointer, false);
+            Marshal.Copy(filename, 0, IntPtr.Add(infoPointer, offset), filename.Length);
+            // FileRenameInfo = 3. The NTFS destination must NOT be replaced.
+            if (!SetFileInformationByHandle(source, 3, infoPointer, checked((uint)total)))
+                return false;
+            GC.KeepAlive(root);
+            return HandleId(source) == expected;
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException ||
+            e is ArgumentException || e is OverflowException ||
+            e is EntryPointNotFoundException || e is DllNotFoundException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (infoPointer != IntPtr.Zero) Marshal.FreeHGlobal(infoPointer);
         }
     }
 
