@@ -31,6 +31,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     internal Action? AfterStageCreatedForAdversarialTest { get; set; }
     // Fault injection is internal-only; no production path attaches this delegate.
     internal Action? AfterStagePrefixWrittenForTest { get; set; }
+    // Internal, deterministic checkpoint after native handle-relative rename
+    // and before receipt creation. Never configured by production callers.
+    internal Action? AfterBlobRenamedForTest { get; set; }
     internal string? LastNativeFailureStage { get; private set; }
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
@@ -162,6 +165,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 // against sudden power loss remains NOT VERIFIED.
                 if (!RenameNoReplaceRelative(_rootPin, temp, blob, stageId.Value))
                     return Poison("stage-rename:" + (LastNativeFailureStage ?? "unspecified"));
+                AfterBlobRenamedForTest?.Invoke();
                 if (GetRelativeFileId(_rootPin, blob) != stageId ||
                     ReadBoundedRelative(_rootPin, blob, _limit) is not byte[] reread ||
                     !PageWireV1.VerifyBody(envelope, _limit, reread)) return Poison("blob-reread");
