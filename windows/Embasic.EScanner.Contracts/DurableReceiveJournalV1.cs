@@ -99,12 +99,13 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 return false;
             string record = $"v1|{_session}|{_tokenSha}|{_issued}|{_expires}\n";
             // No overwrite; any interrupted marker is consumed/poisoned on reopen.
-            if (!WriteNew(Path.Combine(_root, ClaimFile), Encoding.ASCII.GetBytes(record)))
+            _liveClaimId = WriteNewRelative(_rootPin, ClaimFile,
+                Encoding.ASCII.GetBytes(record));
+            if (_liveClaimId is null)
             {
                 _stopped = true;
                 return false;
             }
-            _liveClaimId = GetRelativeFileId(_rootPin, ClaimFile);
             if (_liveClaimId is null || !StableRoot() ||
                 _gate.Authenticate(token, now) != ReceiveGateV1.Decision.Accepted)
             {
@@ -138,26 +139,31 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 _gate.Propose(rawJson, bytes, now) != ReceiveGateV1.Decision.Accepted)
                 return false;
             string index = envelope.Order.ToString("D4", CultureInfo.InvariantCulture);
-            string temp = Path.Combine(_root, "stage-" + index + ".tmp");
-            string blob = Path.Combine(_root, "page-" + index + ".blob");
-            string rec = Path.Combine(_root, "page-" + index + ".rec");
+            string temp = "stage-" + index + ".tmp";
+            string blob = "page-" + index + ".blob";
+            string rec = "page-" + index + ".rec";
             try
             {
-                if (File.Exists(temp) || File.Exists(blob) || File.Exists(rec) ||
-                    !WriteNew(temp, bytes)) return Poison();
+                // Capture the stage FILE ID while the original CREATE handle
+                // is still held. Another process cannot replace it silently
+                // with an identical-but-distinct NTFS inode before this ID.
+                var stageId = WriteNewRelative(_rootPin, temp, bytes);
+                if (stageId is null) return Poison();
                 AfterStageCreatedForAdversarialTest?.Invoke();
-                var stageId = GetFileId(temp);
-                if (stageId is null || ReadBounded(temp, _limit) is not byte[] staged ||
+                if (GetRelativeFileId(_rootPin, temp) != stageId ||
+                    ReadBoundedRelative(_rootPin, temp, _limit) is not byte[] staged ||
                     !CryptographicOperations.FixedTimeEquals(staged, bytes)) return Poison();
-                // File.Move with no overwrite on the SAME private volume. No copy fallback.
-                // Windows directory flush and power-loss guarantee remain NOT VERIFIED.
-                File.Move(temp, blob);
-                if (GetFileId(blob) != stageId ||
-                    ReadBounded(blob, _limit) is not byte[] reread ||
+                // Atomic, no-overwrite same-root rename by pinned SOURCE HANDLE.
+                // No File.Move and no copy across volumes; directory durability
+                // against sudden power loss remains NOT VERIFIED.
+                if (!RenameNoReplaceRelative(_rootPin, temp, blob, stageId.Value) ||
+                    GetRelativeFileId(_rootPin, blob) != stageId ||
+                    ReadBoundedRelative(_rootPin, blob, _limit) is not byte[] reread ||
                     !PageWireV1.VerifyBody(envelope, _limit, reread)) return Poison();
                 string data = $"v1|{envelope.Order}|{envelope.PageId}|{envelope.ByteSize}|{envelope.Mime}|{envelope.Sha256}\n";
-                if (!WriteNew(rec, Encoding.ASCII.GetBytes(data)) ||
-                    !StableRoot() ||
+                var writtenReceiptId = WriteNewRelative(_rootPin, rec,
+                    Encoding.ASCII.GetBytes(data));
+                if (writtenReceiptId is null || !StableRoot() ||
                     _gate.ConfirmReread(reread, now) != ReceiveGateV1.Decision.Accepted)
                     return Poison();
                 // Freshly read back the full chain after writing a receipt.
@@ -167,12 +173,11 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                     after.ConfirmedPages != _gate.ConfirmedPages) return Poison();
                 // Cache the exact identities of this confirmed page; future
                 // admissions require every previously accepted inode to match.
-                var confirmedBlobId = GetRelativeFileId(_rootPin, "page-" + index + ".blob");
-                var confirmedReceiptId = GetRelativeFileId(_rootPin, "page-" + index + ".rec");
+                var confirmedBlobId = GetRelativeFileId(_rootPin, blob);
+                var confirmedReceiptId = GetRelativeFileId(_rootPin, rec);
                 if (confirmedBlobId is null || confirmedReceiptId is null ||
                     confirmedBlobId != stageId ||
-                    GetFileId(blob) != confirmedBlobId ||
-                    GetFileId(rec) != confirmedReceiptId ||
+                    confirmedReceiptId != writtenReceiptId ||
                     !_livePageIds.TryAdd(envelope.Order,
                         (confirmedBlobId.Value, confirmedReceiptId.Value)) ||
                     !StableRoot()) return Poison();
@@ -242,7 +247,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             if (!gate.StableRoot()) return bad;
             if (names.Count == 0) return new Recovery(RecoveryStatus.Fresh, 0);
             if (!names.Contains(ClaimFile)) return bad;
-            var claim = ReadBounded(Path.Combine(gate._root, ClaimFile), MaxRecordBytes);
+            var claim = ReadBoundedRelative(gate._rootPin, ClaimFile, MaxRecordBytes);
             string expectedClaim = $"v1|{session}|{tokenSha}|{issuedAt}|{expiresAt}\n";
             if (claim is null || !CryptographicOperations.FixedTimeEquals(
                     claim, Encoding.ASCII.GetBytes(expectedClaim))) return bad;
@@ -255,7 +260,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 string rec = "page-" + number + ".rec", blob = "page-" + number + ".blob";
                 if (!names.Contains(rec) && !names.Contains(blob)) break;
                 if (!names.Contains(rec) || !names.Contains(blob)) return bad;
-                var data = ReadBounded(Path.Combine(gate._root, rec), MaxRecordBytes);
+                var data = ReadBoundedRelative(gate._rootPin, rec, MaxRecordBytes);
                 if (data is null) return bad;
                 var line = Encoding.ASCII.GetString(data);
                 if (!line.EndsWith('\n')) return bad;
@@ -268,7 +273,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                     parts[3] != length.ToString(CultureInfo.InvariantCulture) ||
                     !PageTransferIntegrity.IsConsistentMetadata(session, parts[2], count,
                         length, parts[4], parts[5], maxBytes)) return bad;
-                var body = ReadBounded(Path.Combine(gate._root, blob), maxBytes);
+                var body = ReadBoundedRelative(gate._rootPin, blob, maxBytes);
                 if (!PageTransferIntegrity.VerifyCompleteBytes(session, parts[2], count,
                         length, parts[4], parts[5], maxBytes, body)) return bad;
                 seenFiles.Add(rec); seenFiles.Add(blob); count++;
