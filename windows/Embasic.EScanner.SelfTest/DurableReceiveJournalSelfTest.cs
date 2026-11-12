@@ -376,11 +376,20 @@ internal static class DurableReceiveJournalSelfTest
             while (timer.ElapsedMilliseconds < 20000)
             {
                 if (owner.HasExited) break;
-                if (File.Exists(signal) &&
-                    File.ReadAllText(signal, Encoding.ASCII) == "ready:" + phase)
+                // The child creates its signal with FileShare.None, writes,
+                // fsyncs and CLOSES it. Existence may precede Close; a sharing
+                // violation is a normal transient, not an app failure.
+                if (File.Exists(signal))
                 {
-                    signaled = true;
-                    break;
+                    try
+                    {
+                        if (File.ReadAllText(signal, Encoding.ASCII) == "ready:" + phase)
+                        {
+                            signaled = true;
+                            break;
+                        }
+                    }
+                    catch (IOException) { /* producer still holds the signal file */ }
                 }
                 System.Threading.Thread.Sleep(20);
             }
