@@ -301,4 +301,36 @@ class DurableReceiveJournalV1Test {
         }
     }
 
+    @Test fun killedExternalStageWriterPoisonsRestart() {
+        // Linux JVM host regression: a SEPARATE process writes an orphan stage
+        // and is killed. This is NOT a test of actual Android process SIGKILL,
+        // ENOSPC, directory fsync, or sudden hardware power loss.
+        val row = Files.readAllLines(
+            fixture().parent.resolve("crash-orphan-v1.tsv"), Charsets.US_ASCII)
+            .filter { it.isNotBlank() && !it.startsWith('#') }
+            .map { it.split('\t') }
+        require(row.size == 1 && row.single().size == 4 &&
+            row.single()[0] == "killed_external_stage_writer")
+        val root = Files.createTempDirectory("escanner-external-kill-")
+        try {
+            val gate = open(root)
+            assertTrue(gate.claimToken(token, 1001))
+            val child = ProcessBuilder("sh", "-c",
+                "printf partial > stage-0000.tmp; kill -9 $$")
+                .directory(root.toFile()).start()
+            assertTrue("hostile child timeout", child.waitFor(15, TimeUnit.SECONDS))
+            assertTrue("child unexpectedly exited normally", child.exitValue() != 0)
+            assertTrue("synthetic orphan was not written",
+                Files.isRegularFile(root.resolve("stage-0000.tmp"), LinkOption.NOFOLLOW_LINKS))
+            assertEquals(row.single()[1], recover(root).status.name)
+            assertEquals(row.single()[2],
+                if (gate.commit(wire(page0, 0), body, 1002)) "ACCEPT" else "REJECT")
+            assertEquals(row.single()[3],
+                if (Files.exists(root.resolve("stage-0000.tmp"), LinkOption.NOFOLLOW_LINKS))
+                    "PRESENT" else "ABSENT")
+            assertFalse("new instance must not revive consumed token",
+                open(root).claimToken(token, 1002))
+        } finally { deleteTree(root) }
+    }
+
 }
