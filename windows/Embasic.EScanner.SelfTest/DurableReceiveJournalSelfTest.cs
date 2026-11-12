@@ -634,6 +634,44 @@ internal static class DurableReceiveJournalSelfTest
         }
         finally { Directory.Delete(plantedDestinationRoot, recursive: true); }
 
+        // Deterministic SYNTHETIC ERROR_DISK_FULL fault: the journal's own
+        // write handle writes one byte and throws a Windows-style IOException
+        // before completing the stage. This is NOT physical disk ENOSPC.
+        string injectedDiskFullRoot =
+            CreatePrivateTempSubdirectory("escanner-injected-diskfull-").FullName;
+        try
+        {
+            using var gate = Open(injectedDiskFullRoot);
+            if (!gate.ClaimToken(Token, 1001))
+            {
+                Console.Error.WriteLine("FAIL: simulated diskfull positive claim failed");
+                return false;
+            }
+            bool injected = false;
+            gate.AfterStagePrefixWrittenForTest = () =>
+            {
+                injected = true;
+                throw new IOException("synthetic ERROR_DISK_FULL test fault",
+                    unchecked((int)0x80070070));
+            };
+            if (gate.Commit(Wire(Page0, 0), Body, 1002) || !injected ||
+                !File.Exists(Path.Combine(injectedDiskFullRoot, "stage-0000.tmp")) ||
+                new FileInfo(Path.Combine(injectedDiskFullRoot, "stage-0000.tmp")).Length != 1 ||
+                File.Exists(Path.Combine(injectedDiskFullRoot, "page-0000.blob")) ||
+                File.Exists(Path.Combine(injectedDiskFullRoot, "page-0000.rec")) ||
+                Inspect(injectedDiskFullRoot).Status !=
+                    DurableReceiveJournalV1.RecoveryStatus.Poisoned ||
+                AttemptConsumedReplay(injectedDiskFullRoot))
+            {
+                Console.Error.WriteLine(
+                    "FAIL: injected partial-stage ERROR_DISK_FULL was not fail-closed");
+                return false;
+            }
+            Console.WriteLine(
+                "PASS: synthetic diskfull after one stage byte poisons read-only restart");
+        }
+        finally { Directory.Delete(injectedDiskFullRoot, recursive: true); }
+
         // Same common golden row as Android JVM test. The attacking writer is
         // a real independent Windows process terminated after emitting an
         // orphan staging record. Not a low-disk/power-cut simulation.
