@@ -157,6 +157,32 @@ internal static class DurableReceiveJournalSelfTest
         return rows.Single(x => x[0] == id);
     }
 
+
+    // The adversary is a REAL, separately launched OS process. Both blocked
+    // and allowed outcomes are checked, avoiding false PASS from missing pwsh.
+    private static bool HostileRenameFromSecondProcess(string from, string to)
+    {
+        static string Quote(string value) => value.Replace("'", "''", StringComparison.Ordinal);
+        var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("try { [System.IO.Directory]::Move('" +
+            Quote(from) + "', '" + Quote(to) + "'); exit 0 } catch { exit 17 }");
+        using var process = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("Missing adversarial subprocess");
+        if (!process.WaitForExit(15000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new InvalidOperationException("Hostile rename timeout, not a PASS");
+        }
+        return process.ExitCode == 0;
+    }
+
     public static bool Run()
     {
         string? golden = GoldenPath();
@@ -215,6 +241,51 @@ internal static class DurableReceiveJournalSelfTest
         {
             Console.Error.WriteLine("FAIL: incomplete durable receipt golden scenarios");
             return false;
+        }
+
+
+        // Test-FIRST RED: prior Open() only sampled a directory file ID and
+        // released its handle. An external same-user process could rename that
+        // authenticated root and substitute a different path afterward.
+        string pinnedRoot = CreatePrivateTempSubdirectory("escanner-pin-").FullName;
+        string movedRoot = pinnedRoot + ".outside";
+        try
+        {
+            var journal = Open(pinnedRoot);
+            try
+            {
+                if (HostileRenameFromSecondProcess(pinnedRoot, movedRoot) ||
+                    !Directory.Exists(pinnedRoot) || Directory.Exists(movedRoot))
+                {
+                    Console.Error.WriteLine(
+                        "FAIL: hostile subprocess renamed OPEN Windows private root");
+                    return false;
+                }
+            }
+            finally
+            {
+                // Test compiles against the pre-fix implementation (RED)
+                // while verifying that the GREEN implementation is IDisposable.
+                ((object)journal as IDisposable)?.Dispose();
+            }
+            // A blocked subprocess alone is not evidence: prove that this
+            // same hostile process CAN rename once our handle is released.
+            if (!HostileRenameFromSecondProcess(pinnedRoot, movedRoot) ||
+                Directory.Exists(pinnedRoot) || !Directory.Exists(movedRoot))
+            {
+                Console.Error.WriteLine(
+                    "FAIL: positive-control adversary could not rename after release");
+                return false;
+            }
+            Console.WriteLine(
+                "PASS: pinned Windows directory denies separate-process rename until dispose");
+        }
+        finally
+        {
+            if (Directory.Exists(movedRoot) && !Directory.Exists(pinnedRoot))
+                Directory.Move(movedRoot, pinnedRoot);
+            if (Directory.Exists(pinnedRoot))
+                Directory.Delete(pinnedRoot, recursive: true);
         }
 
         // Separate OS PROCESS mutates the DACL; the adapter must refuse an
