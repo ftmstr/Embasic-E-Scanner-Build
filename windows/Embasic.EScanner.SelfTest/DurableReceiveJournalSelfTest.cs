@@ -196,6 +196,45 @@ internal static class DurableReceiveJournalSelfTest
         return process.ExitCode == 0;
     }
 
+
+    private static string[] KilledWriterGolden()
+    {
+        var canonical = GoldenPath() ?? throw new InvalidOperationException("Missing golden base");
+        var path = Path.Combine(Path.GetDirectoryName(canonical)!, "crash-orphan-v1.tsv");
+        var rows = File.ReadAllLines(path, Encoding.ASCII)
+            .Where(x => !string.IsNullOrWhiteSpace(x) && !x.StartsWith('#'))
+            .Select(x => x.Split('\t')).ToArray();
+        if (rows.Length != 1 || rows[0].Length != 4 ||
+            rows[0][0] != "killed_external_stage_writer")
+            throw new InvalidOperationException("Missing/duplicate killed-writer fixture");
+        return rows[0];
+    }
+
+    private static bool HostileWriterDiesAfterStage(string root)
+    {
+        var stage = Path.Combine(root, "stage-0000.tmp").Replace("'", "''",
+            StringComparison.Ordinal);
+        var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("try { [System.IO.File]::WriteAllText('" + stage +
+            "', 'partial'); [System.Diagnostics.Process]::GetCurrentProcess().Kill(); " +
+            "exit 0 } catch { exit 19 }");
+        using var child = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to spawn external writer");
+        if (!child.WaitForExit(15000))
+        {
+            child.Kill(entireProcessTree: true);
+            throw new InvalidOperationException("Killed-writer subprocess timed out");
+        }
+        return child.ExitCode != 0 && File.Exists(Path.Combine(root, "stage-0000.tmp"));
+    }
+
     public static bool Run()
     {
         string? golden = GoldenPath();
@@ -300,6 +339,37 @@ internal static class DurableReceiveJournalSelfTest
             if (Directory.Exists(pinnedRoot))
                 Directory.Delete(pinnedRoot, recursive: true);
         }
+
+
+        // Same common golden row as Android JVM test. The attacking writer is
+        // a real independent Windows process terminated after emitting an
+        // orphan staging record. Not a low-disk/power-cut simulation.
+        string killedRoot = CreatePrivateTempSubdirectory("escanner-kill-").FullName;
+        try
+        {
+            using var journal = Open(killedRoot);
+            if (!journal.ClaimToken(Token, 1001) ||
+                !HostileWriterDiesAfterStage(killedRoot))
+            {
+                Console.Error.WriteLine("FAIL: real killed-writer fixture did not execute");
+                return false;
+            }
+            var goldenKilled = KilledWriterGolden();
+            var recovered = Inspect(killedRoot).Status.ToString().ToUpperInvariant();
+            var next = journal.Commit(Wire(Page0, 0), Body, 1002)
+                ? "ACCEPT" : "REJECT";
+            var presence = File.Exists(Path.Combine(killedRoot, "stage-0000.tmp"))
+                ? "PRESENT" : "ABSENT";
+            if (recovered != goldenKilled[1] || next != goldenKilled[2] ||
+                presence != goldenKilled[3] || AttemptConsumedReplay(killedRoot))
+            {
+                Console.Error.WriteLine("FAIL: killed external writer reopened poisoned journal");
+                return false;
+            }
+            Console.WriteLine(
+                "PASS: externally killed writer leaves orphan and poisons restart");
+        }
+        finally { Directory.Delete(killedRoot, recursive: true); }
 
         // Separate OS PROCESS mutates the DACL; the adapter must refuse an
         // attacker-writable NTFS directory even when its path/inode is stable.
