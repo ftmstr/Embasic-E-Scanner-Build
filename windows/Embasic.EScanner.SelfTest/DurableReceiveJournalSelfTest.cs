@@ -385,6 +385,46 @@ internal static class DurableReceiveJournalSelfTest
                 Directory.Delete(parentPinFixture, recursive: true);
         }
 
+        // RED: a secure leaf below an attacker-writable ancestor is not a
+        // private path. Run icacls in a SEPARATE Windows OS process to grant
+        // Everyone write on the PARENT ONLY. The child is DACL-protected, so
+        // leaf-only admission misses the ancestor poisoning.
+        string unsafeParent = CreatePrivateTempSubdirectory("escanner-hostile-parent-").FullName;
+        try
+        {
+            string protectedChild = Path.Combine(unsafeParent, "private-session");
+            HardenTestDirectory(Directory.CreateDirectory(protectedChild));
+            if (!CanOpen(protectedChild))
+            {
+                Console.Error.WriteLine("FAIL: private child positive control did not open");
+                return false;
+            }
+            var hostileAcl = new System.Diagnostics.ProcessStartInfo("icacls.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            hostileAcl.ArgumentList.Add(unsafeParent);
+            hostileAcl.ArgumentList.Add("/grant");
+            hostileAcl.ArgumentList.Add("*S-1-1-0:(W)");
+            using var hostileProcess = System.Diagnostics.Process.Start(hostileAcl);
+            if (hostileProcess is null || !hostileProcess.WaitForExit(15000) ||
+                hostileProcess.ExitCode != 0)
+            {
+                Console.Error.WriteLine("NOT VERIFIED: ancestor DACL hostile process unavailable");
+                return false;
+            }
+            if (CanOpen(protectedChild) ||
+                Inspect(protectedChild).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+            {
+                Console.Error.WriteLine(
+                    "FAIL: hostile ancestor NTFS DACL admitted secure child root");
+                return false;
+            }
+            Console.WriteLine("PASS: separate-process hostile ancestor DACL rejected");
+        }
+        finally { Directory.Delete(unsafeParent, recursive: true); }
+
         // Same common golden row as Android JVM test. The attacking writer is
         // a real independent Windows process terminated after emitting an
         // orphan staging record. Not a low-disk/power-cut simulation.
