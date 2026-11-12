@@ -15,7 +15,7 @@ namespace Embasic.EScanner.Contracts;
 /// Does not establish directory fsync, full power-loss safety, TLS, image decode or
 /// protection from a hostile process holding write access to the private directory.
 /// </summary>
-public sealed class DurableReceiveJournalV1
+public sealed class DurableReceiveJournalV1 : IDisposable
 {
     public enum RecoveryStatus { Fresh, TokenConsumed, Poisoned }
     public sealed record Recovery(RecoveryStatus Status, int ConfirmedPages);
@@ -25,15 +25,21 @@ public sealed class DurableReceiveJournalV1
     private readonly object _mutex = new();
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
+    // No FILE_SHARE_DELETE: an independent process cannot rename this
+    // session's root while the journal owns the directory handle.
+    private readonly SafeFileHandle _rootPin;
+    private bool _disposed;
     private readonly long _issued, _expires, _limit;
     private readonly int _maxPages;
     private readonly ReceiveGateV1 _gate;
     private bool _claimed, _stopped;
 
-    private DurableReceiveJournalV1(string root, FileId rootId, string session,
-        string tokenSha, long issued, long expires, long limit, int maxPages, ReceiveGateV1 gate)
+    private DurableReceiveJournalV1(string root, FileId rootId, SafeFileHandle rootPin,
+        string session, string tokenSha, long issued, long expires, long limit,
+        int maxPages, ReceiveGateV1 gate)
     {
-        _root = root; _rootId = rootId; _session = session; _tokenSha = tokenSha;
+        _root = root; _rootId = rootId; _rootPin = rootPin;
+        _session = session; _tokenSha = tokenSha;
         _issued = issued; _expires = expires; _limit = limit; _maxPages = maxPages;
         _gate = gate;
     }
@@ -43,9 +49,12 @@ public sealed class DurableReceiveJournalV1
     {
         var gate = ReceiveGateV1.Open(session, tokenSha, issuedAt, expiresAt, maxBytes, maxPages);
         if (root is null || gate is null || maxBytes > MaxStageBytes) return null;
-        var rootId = GetRootId(root);
+        var fullRoot = Path.GetFullPath(root);
+        var rootId = GetRootId(fullRoot);
         if (rootId is null) return null;
-        return new DurableReceiveJournalV1(Path.GetFullPath(root), rootId.Value, session!,
+        var pin = PinRootForSession(fullRoot, rootId.Value);
+        if (pin is null) return null;
+        return new DurableReceiveJournalV1(fullRoot, rootId.Value, pin, session!,
             tokenSha!, issuedAt, expiresAt, maxBytes, maxPages, gate);
     }
 
@@ -135,6 +144,20 @@ public sealed class DurableReceiveJournalV1
         }
     }
 
+    // Required for deterministic release of the Win32 rename lock. SafeFileHandle
+    // also has a finalizer as a last resort, but callers MUST dispose sessions.
+    public void Dispose()
+    {
+        lock (_mutex)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _stopped = true;
+            _rootPin.Dispose();
+        }
+        GC.SuppressFinalize(this);
+    }
+
     private bool EmptyRoot()
     {
         try
@@ -147,14 +170,15 @@ public sealed class DurableReceiveJournalV1
     }
 
     private bool Poison() { _stopped = true; return false; }
-    private bool StableRoot() => GetRootId(_root) == _rootId;
+    private bool StableRoot() => !_disposed && !_rootPin.IsClosed &&
+        !_rootPin.IsInvalid && GetRootId(_root) == _rootId;
 
     /// <summary>Read-only recovery. Never grants fresh transport authority.</summary>
     public static Recovery Inspect(string? root, string? session, string? tokenSha,
         long issuedAt, long expiresAt, long maxBytes, int maxPages)
     {
         var bad = new Recovery(RecoveryStatus.Poisoned, 0);
-        var gate = Open(root, session, tokenSha, issuedAt, expiresAt, maxBytes, maxPages);
+        using var gate = Open(root, session, tokenSha, issuedAt, expiresAt, maxBytes, maxPages);
         if (gate is null) return bad;
         try
         {
@@ -329,6 +353,38 @@ public sealed class DurableReceiveJournalV1
         {
             return false;
         }
+    }
+
+    // Pin the authenticated leaf for the WHOLE live journal session. Opening
+    // without FILE_SHARE_DELETE makes MoveFileEx/Directory.Move from a separate
+    // process fail while held; no privileged API or new dependency is needed.
+    // This does not pin its ancestors, secure same-root child names against a
+    // malicious same-user writer, or provide directory fsync durability.
+    private static SafeFileHandle? PinRootForSession(string fullRoot, FileId expected)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        SafeFileHandle? handle = null;
+        try
+        {
+            const uint fileReadAttributes = 0x80;
+            const uint shareReadWrite = 0x01 | 0x02; // intentionally no FILE_SHARE_DELETE
+            const uint openExisting = 3;
+            const uint directoryAndNoFollow = 0x02000000 | 0x00200000;
+            handle = CreateFile(fullRoot, fileReadAttributes, shareReadWrite,
+                IntPtr.Zero, openExisting, directoryAndNoFollow, IntPtr.Zero);
+            if (handle.IsInvalid || !GetFileInformationByHandle(handle, out var info) ||
+                (info.Attributes & (uint)FileAttributes.Directory) == 0 ||
+                (info.Attributes & (uint)FileAttributes.ReparsePoint) != 0 ||
+                new FileId(info.VolumeSerial, info.FileIndexHigh, info.FileIndexLow) != expected ||
+                GetRootId(fullRoot) != expected)
+            {
+                handle.Dispose();
+                return null;
+            }
+            return handle;
+        }
+        catch (IOException) { handle?.Dispose(); return null; }
+        catch (UnauthorizedAccessException) { handle?.Dispose(); return null; }
     }
 
     private static FileId? GetRootId(string root)
