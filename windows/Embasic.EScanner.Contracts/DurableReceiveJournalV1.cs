@@ -1,10 +1,13 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
+
+[assembly: InternalsVisibleTo("Embasic.EScanner.SelfTest")]
 
 namespace Embasic.EScanner.Contracts;
 
@@ -23,6 +26,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     private const string ClaimFile = "token.claim";
     private const int MaxRecordBytes = 256;
     private readonly object _mutex = new();
+    // Internal adversarial TEST barrier; never assigned by production composition root.
+    // Test runner synchronously launches a separate same-SID hostile writer here.
+    internal Action? AfterStageCreatedForAdversarialTest { get; set; }
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
     // A live claim is not only a byte-identical tombstone: its NTFS FILE ID
@@ -139,6 +145,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             {
                 if (File.Exists(temp) || File.Exists(blob) || File.Exists(rec) ||
                     !WriteNew(temp, bytes)) return Poison();
+                AfterStageCreatedForAdversarialTest?.Invoke();
                 var stageId = GetFileId(temp);
                 if (stageId is null || ReadBounded(temp, _limit) is not byte[] staged ||
                     !CryptographicOperations.FixedTimeEquals(staged, bytes)) return Poison();
