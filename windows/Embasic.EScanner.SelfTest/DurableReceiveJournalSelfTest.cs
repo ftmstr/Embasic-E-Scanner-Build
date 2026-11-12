@@ -18,6 +18,19 @@ internal static class DurableReceiveJournalSelfTest
         DurableReceiveJournalV1.Open(dir, Session, Digest, 1000, 2000, 1024, 2)
         ?? throw new InvalidOperationException("Valid synthetic policy rejected");
 
+    private static bool CanOpen(string dir, long maxBytes = 1024, int maxPages = 2)
+    {
+        using var gate = DurableReceiveJournalV1.Open(dir, Session, Digest,
+            1000, 2000, maxBytes, maxPages);
+        return gate is not null;
+    }
+
+    private static bool AttemptConsumedReplay(string dir)
+    {
+        using var newJournal = Open(dir);
+        return newJournal.ClaimToken(Token, 1002);
+    }
+
     private static DurableReceiveJournalV1.Recovery Inspect(string dir) =>
         DurableReceiveJournalV1.Inspect(dir, Session, Digest, 1000, 2000, 1024, 2);
 
@@ -46,7 +59,7 @@ internal static class DurableReceiveJournalSelfTest
             "CLAIM_GOOD" => gate.ClaimToken(Token, 1001),
             "CLAIM_BAD" => gate.ClaimToken(new string('b', 64), 1001),
             "CLAIM_EXPIRED" => gate.ClaimToken(Token, 2000),
-            "RESTART_CLAIM" => Open(root).ClaimToken(Token, 1002),
+            "RESTART_CLAIM" => AttemptConsumedReplay(root),
             "COMMIT0" => gate.Commit(Wire(Page0, 0), Body, 1002),
             "COMMIT1" => gate.Commit(Wire(Page1, 1), Body, 1003),
             "COMMIT2" => gate.Commit(Wire(Page1, 2), Body, 1004),
@@ -207,7 +220,7 @@ internal static class DurableReceiveJournalSelfTest
             string root = CreatePrivateTempSubdirectory("escanner-receipt-").FullName;
             try
             {
-                var gate = Open(root);
+                using var gate = Open(root);
                 for (int i = 0; i < events.Length; i++)
                 {
                     bool pass = Action(root, gate, events[i]);
@@ -295,8 +308,7 @@ internal static class DurableReceiveJournalSelfTest
         try
         {
             var secure = PermissionGoldenCase("owner_private_0700");
-            bool secureOpen = DurableReceiveJournalV1.Open(aclRoot, Session, Digest,
-                1000, 2000, 1024, 2) is not null;
+            bool secureOpen = CanOpen(aclRoot);
             if ((secureOpen ? "ACCEPT" : "REJECT") != secure[1] ||
                 Inspect(aclRoot).Status.ToString().ToUpperInvariant() != secure[2])
             {
@@ -318,8 +330,7 @@ internal static class DurableReceiveJournalSelfTest
                 return false;
             }
             var hostile = PermissionGoldenCase("world_writer_grant");
-            bool hostileOpen = DurableReceiveJournalV1.Open(aclRoot, Session, Digest,
-                1000, 2000, 1024, 2) is not null;
+            bool hostileOpen = CanOpen(aclRoot);
             if ((hostileOpen ? "ACCEPT" : "REJECT") != hostile[1] ||
                 Inspect(aclRoot).Status.ToString().ToUpperInvariant() != hostile[2])
             {
@@ -335,11 +346,9 @@ internal static class DurableReceiveJournalSelfTest
         {
             string badFile = Path.Combine(privateRoot, "file.txt");
             File.WriteAllText(badFile, "not a directory");
-            if (DurableReceiveJournalV1.Open(badFile, Session, Digest, 1000, 2000, 1024, 2) is not null ||
-                DurableReceiveJournalV1.Open(Path.Combine(privateRoot, "missing"), Session,
-                    Digest, 1000, 2000, 1024, 2) is not null ||
-                DurableReceiveJournalV1.Open(privateRoot, Session, Digest,
-                    1000, 2000, DurableReceiveJournalV1.MaxStageBytes + 1, 2) is not null)
+            if (CanOpen(badFile) ||
+                CanOpen(Path.Combine(privateRoot, "missing")) ||
+                CanOpen(privateRoot, DurableReceiveJournalV1.MaxStageBytes + 1))
             {
                 Console.Error.WriteLine("FAIL: invalid durable receipt root or cap admitted");
                 return false;
@@ -352,7 +361,7 @@ internal static class DurableReceiveJournalSelfTest
             {
                 Directory.CreateSymbolicLink(link, privateRoot);
                 linkCreated = true;
-                if (DurableReceiveJournalV1.Open(link, Session, Digest, 1000, 2000, 1024, 2) is not null)
+                if (CanOpen(link))
                 {
                     Console.Error.WriteLine("FAIL: Windows reparse directory admitted");
                     return false;
@@ -375,7 +384,7 @@ internal static class DurableReceiveJournalSelfTest
         {
             string orphan = Path.Combine(orphanRoot, "orphan.tmp");
             File.WriteAllText(orphan, "partial", Encoding.ASCII);
-            var gate = Open(orphanRoot);
+            using var gate = Open(orphanRoot);
             if (gate.ClaimToken(Token, 1001) ||
                 Inspect(orphanRoot).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned)
             {
@@ -395,18 +404,23 @@ internal static class DurableReceiveJournalSelfTest
         try
         {
             var gates = Enumerable.Range(0, 24).Select(_ => Open(raceRoot)).ToArray();
-            int admitted = 0;
-            System.Threading.Tasks.Parallel.ForEach(gates, gate =>
+            try
             {
-                if (gate.ClaimToken(Token, 1001)) System.Threading.Interlocked.Increment(ref admitted);
-            });
-            if (admitted != 1 ||
-                Inspect(raceRoot).Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
-                Open(raceRoot).ClaimToken(Token, 1002))
-            {
-                Console.Error.WriteLine("FAIL: durable CREATE_NEW token replay race");
-                return false;
+                int admitted = 0;
+                System.Threading.Tasks.Parallel.ForEach(gates, gate =>
+                {
+                    if (gate.ClaimToken(Token, 1001))
+                        System.Threading.Interlocked.Increment(ref admitted);
+                });
+                if (admitted != 1 ||
+                    Inspect(raceRoot).Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
+                    AttemptConsumedReplay(raceRoot))
+                {
+                    Console.Error.WriteLine("FAIL: durable CREATE_NEW token replay race");
+                    return false;
+                }
             }
+            finally { foreach (var gate in gates) gate.Dispose(); }
         }
         finally { Directory.Delete(raceRoot, recursive: true); }
 
@@ -425,13 +439,11 @@ internal static class DurableReceiveJournalSelfTest
                 Directory.CreateSymbolicLink(alias, real);
                 made = true;
                 var expected = AliasGoldenCase("ancestor_symlink");
-                var candidate = DurableReceiveJournalV1.Open(Path.Combine(alias, "session"),
-                    Session, Digest, 1000, 2000, 1024, 2);
-                var actualOpen = candidate is null ? "REJECT" : "ACCEPT";
+                var actualOpen = CanOpen(Path.Combine(alias, "session"))
+                    ? "ACCEPT" : "REJECT";
                 var actualRecovery = Inspect(Path.Combine(alias, "session"))
                     .Status.ToString().ToUpperInvariant();
-                if (DurableReceiveJournalV1.Open(sessionDir, Session,
-                        Digest, 1000, 2000, 1024, 2) is null ||
+                if (!CanOpen(sessionDir) ||
                     actualOpen != expected[1] || actualRecovery != expected[2])
                 {
                     Console.Error.WriteLine("FAIL: symlinked ancestor reached private root");
@@ -459,7 +471,7 @@ internal static class DurableReceiveJournalSelfTest
             Path.GetRandomFileName() + ".hardlink");
         try
         {
-            var journal = Open(hardlinkRoot);
+            using var journal = Open(hardlinkRoot);
             if (!journal.ClaimToken(Token, 1001) ||
                 !CreateHardLinkNative(hardlinkAlias, Path.Combine(hardlinkRoot, "token.claim"),
                     IntPtr.Zero))
@@ -494,7 +506,7 @@ internal static class DurableReceiveJournalSelfTest
             string perfRoot = CreatePrivateTempSubdirectory("escanner-perf-").FullName;
             try
             {
-                var gate = DurableReceiveJournalV1.Open(perfRoot, Session, Digest,
+                using var gate = DurableReceiveJournalV1.Open(perfRoot, Session, Digest,
                     1000, 2000, 1024, pages);
                 if (gate is null || !gate.ClaimToken(Token, 1001))
                 {
