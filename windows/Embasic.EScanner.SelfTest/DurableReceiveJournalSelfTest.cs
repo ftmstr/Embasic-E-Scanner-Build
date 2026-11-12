@@ -526,6 +526,46 @@ internal static class DurableReceiveJournalSelfTest
         }
         Console.WriteLine("PASS: live prior-page blob and receipt identity swaps rejected");
 
+        // SYNCHRONIZED TEST-FIRST RED. A REAL separate same-SID PowerShell
+        // process replaces the just-flushed stage file *before* the old code
+        // obtains its first file-ID. The attacker writes byte-identical data.
+        // Pre-fix commit incorrectly trusts the new inode and confirms page 0.
+        string stageSwapRoot = CreatePrivateTempSubdirectory("escanner-stage-window-").FullName;
+        try
+        {
+            using var live = Open(stageSwapRoot);
+            if (!live.ClaimToken(Token, 1001))
+            {
+                Console.Error.WriteLine("FAIL: live stage-race positive control claim failed");
+                return false;
+            }
+            bool hostileRan = false;
+            live.AfterStageCreatedForAdversarialTest = () =>
+            {
+                string stagePath = Path.Combine(stageSwapRoot, "stage-0000.tmp");
+                if (!HostileReplaceSameBytesFromSecondProcess(stagePath) ||
+                    !File.ReadAllBytes(stagePath).AsSpan().SequenceEqual(Body) ||
+                    Directory.EnumerateFileSystemEntries(stageSwapRoot).Count() != 2)
+                    throw new InvalidOperationException(
+                        "NOT VERIFIED: external live-stage swap failed positive controls");
+                hostileRan = true;
+            };
+            if (live.Commit(Wire(Page0, 0), Body, 1002))
+            {
+                Console.Error.WriteLine(
+                    "FAIL: hostile same-bytes in-flight stage inode swap accepted a page");
+                return false;
+            }
+            if (!hostileRan)
+            {
+                Console.Error.WriteLine("NOT VERIFIED: external stage swap did not execute");
+                return false;
+            }
+            Console.WriteLine(
+                "PASS: synchronized external stage inode swap rejected BEFORE page confirmation");
+        }
+        finally { Directory.Delete(stageSwapRoot, recursive: true); }
+
         // Same common golden row as Android JVM test. The attacking writer is
         // a real independent Windows process terminated after emitting an
         // orphan staging record. Not a low-disk/power-cut simulation.
