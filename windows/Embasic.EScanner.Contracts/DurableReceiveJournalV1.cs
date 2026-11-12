@@ -534,10 +534,13 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         public ushort FirstChar; // UTF-16 flexible array starts here
     }
 
-    [DllImport("kernel32.dll", EntryPoint = "SetFileInformationByHandle",
-        SetLastError = true)]
-    private static extern bool SetFileInformationByHandle(SafeFileHandle handle,
-        uint infoClass, IntPtr info, uint infoSize);
+    // Native FileRenameInformation = 10 (NOT Win32 FileRenameInfo = 3).
+    // The native call honors OBJECT_ATTRIBUTES-style RootDirectory-relative
+    // destination names; no absolute-path or File.Move fallback is allowed.
+    [DllImport("ntdll.dll", ExactSpelling = true)]
+    private static extern int NtSetInformationFile(SafeFileHandle handle,
+        out NativeIoStatusBlock ioStatus, IntPtr info, uint infoSize,
+        int nativeInfoClass);
 
     // Atomic same-directory no-overwrite rename by SOURCE HANDLE, never
     // File.Move(sourcePath, destPath). Caller checks the pinned FILE ID first.
@@ -571,10 +574,14 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             };
             Marshal.StructureToPtr(info, infoPointer, false);
             Marshal.Copy(filename, 0, IntPtr.Add(infoPointer, offset), filename.Length);
-            // FileRenameInfo = 3. The NTFS destination must NOT be replaced.
-            if (!SetFileInformationByHandle(source, 3, infoPointer, checked((uint)total)))
+            // Native FileRenameInformation = 10, ReplaceIfExists = FALSE.
+            // NTSTATUS is retained as a nonsecret error code on failure.
+            int status = NtSetInformationFile(source, out _, infoPointer,
+                checked((uint)total), 10);
+            if (status != 0)
             {
-                LastNativeFailureStage = "win32-" + Marshal.GetLastPInvokeError();
+                LastNativeFailureStage = "ntstatus-" +
+                    unchecked((uint)status).ToString("X8", CultureInfo.InvariantCulture);
                 return false;
             }
             GC.KeepAlive(root);
