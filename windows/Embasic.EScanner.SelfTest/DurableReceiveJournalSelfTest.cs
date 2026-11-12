@@ -399,6 +399,7 @@ internal static class DurableReceiveJournalSelfTest
                 Console.Error.WriteLine("FAIL: private child positive control did not open");
                 return false;
             }
+            using var alreadyOpen = Open(protectedChild);
             var hostileAcl = new System.Diagnostics.ProcessStartInfo("icacls.exe")
             {
                 UseShellExecute = false,
@@ -414,7 +415,7 @@ internal static class DurableReceiveJournalSelfTest
                 Console.Error.WriteLine("NOT VERIFIED: ancestor DACL hostile process unavailable");
                 return false;
             }
-            if (CanOpen(protectedChild) ||
+            if (CanOpen(protectedChild) || alreadyOpen.ClaimToken(Token, 1001) ||
                 Inspect(protectedChild).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned)
             {
                 Console.Error.WriteLine(
