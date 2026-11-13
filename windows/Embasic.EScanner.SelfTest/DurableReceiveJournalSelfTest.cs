@@ -264,6 +264,69 @@ internal static class DurableReceiveJournalSelfTest
         return child.ExitCode == 0;
     }
 
+    // Separate SAME-SID OS process acquires FileAccess.Write BEFORE the
+    // journal attempts to acquire its live READ pins. It holds the handle
+    // continuously until the parent writes the release marker, then changes
+    // bytes via that SAME, already-open handle and flushes.
+    private static System.Diagnostics.Process StartPrePinWriter(
+        string asset, string ready, string release)
+    {
+        static string Quote(string s) => s.Replace("'", "''", StringComparison.Ordinal);
+        var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false, CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add(
+            "try { $p='" + Quote(asset) + "'; " +
+            "$r='" + Quote(ready) + "'; $s='" + Quote(release) + "'; " +
+            "$f=[System.IO.File]::Open($p,[System.IO.FileMode]::Open," +
+            "[System.IO.FileAccess]::Write,[System.IO.FileShare]::ReadWrite); " +
+            "try { [System.IO.File]::WriteAllText($r,'ready'); " +
+            "$got=$false; for($i=0; $i -lt 600; $i++) { " +
+            "if([System.IO.File]::Exists($s)) { $got=$true; break }; " +
+            "[System.Threading.Thread]::Sleep(50) }; " +
+            "if(-not $got) { exit 19 }; " +
+            "$b=[System.Text.Encoding]::ASCII.GetBytes('BAD'); " +
+            "$f.Position=0; $f.Write($b,0,$b.Length); $f.Flush($true) } " +
+            "finally { $f.Dispose() }; exit 0 } catch { exit 17 }");
+        var child = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("NOT VERIFIED: writer child launch failed");
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (clock.ElapsedMilliseconds < 15000)
+            {
+                if (child.HasExited)
+                    throw new InvalidOperationException(
+                        "NOT VERIFIED: pre-pin writer exited before ready " + child.ExitCode);
+                if (File.Exists(ready))
+                {
+                    try
+                    {
+                        if (File.ReadAllText(ready, Encoding.ASCII) == "ready")
+                            return child;
+                    }
+                    catch (IOException) { /* child has not closed marker yet */ }
+                }
+                System.Threading.Thread.Sleep(20);
+            }
+            throw new InvalidOperationException("NOT VERIFIED: pre-pin writer timed out");
+        }
+        catch
+        {
+            if (!child.HasExited)
+            {
+                child.Kill(entireProcessTree: true);
+                child.WaitForExit(15000);
+            }
+            child.Dispose();
+            throw;
+        }
+    }
+
     // Actual separate same-account process plants a destination AFTER stage
     // creation. A native no-overwrite rename must refuse without modifying it.
     private static bool HostilePlantDestinationFromSecondProcess(string path)
@@ -825,6 +888,83 @@ internal static class DurableReceiveJournalSelfTest
         }
         Console.WriteLine(
             "PASS: real same-SID in-place blob and receipt writes denied by LIVE journal pins");
+
+        // Test-first admission contract: an adversary has a LIVE WRITE
+        // HANDLE to a currently valid blob or receipt BEFORE any READ pin.
+        // If it is impossible to pin *both*, Commit must fail closed. The
+        // child remains alive throughout the admission, then proves its
+        // already-open handle could write and alter bytes after rejection.
+        foreach (string leaf in new[] { "page-0000.blob", "page-0000.rec" })
+        {
+            string root = CreatePrivateTempSubdirectory("escanner-prepin-write-").FullName;
+            string marker = Path.Combine(Path.GetTempPath(),
+                "escanner-prepin-ready-" + Guid.NewGuid().ToString("N") + ".tmp");
+            string release = marker + ".release";
+            System.Diagnostics.Process? hostile = null;
+            bool started = false;
+            try
+            {
+                using var journal = Open(root);
+                if (!journal.ClaimToken(Token, 1001))
+                {
+                    Console.Error.WriteLine("FAIL: pre-pin owner claim positive control");
+                    return false;
+                }
+                string asset = Path.Combine(root, leaf);
+                journal.BeforeLivePagePinsForTest = () =>
+                {
+                    hostile = StartPrePinWriter(asset, marker, release);
+                    started = true;
+                    if (hostile.HasExited || !File.Exists(asset))
+                        throw new InvalidOperationException(
+                            "NOT VERIFIED: pre-pin attacker did not remain alive");
+                };
+                bool accepted = journal.Commit(Wire(Page0, 0), Body, 1002);
+                string expectedStage = leaf.EndsWith(".blob", StringComparison.Ordinal)
+                    ? "blob-pin" : "receipt-pin";
+                if (!started || hostile is null || hostile.HasExited ||
+                    accepted || journal.LastNativeFailureStage != expectedStage ||
+                    journal.Commit(Wire(Page1, 1), Body, 1003))
+                {
+                    Console.Error.WriteLine("FAIL: earlier same-SID WRITE handle " + leaf +
+                        " breached fail-closed pin admission" +
+                        " commit=" + accepted +
+                        " nativeStage=" + journal.LastNativeFailureStage);
+                    return false;
+                }
+                // Parent now asks the STILL-LIVE adversary to use its
+                // already-open WRITE handle; it does not get to open a new
+                // handle after the failed pin admission.
+                File.WriteAllText(release, "release", Encoding.ASCII);
+                if (!hostile.WaitForExit(15000) || hostile.ExitCode != 0 ||
+                    File.ReadAllBytes(asset).AsSpan(0, 3).SequenceEqual(Body) ||
+                    Inspect(root).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned ||
+                    AttemptConsumedReplay(root))
+                {
+                    Console.Error.WriteLine("FAIL: pre-pin writer " + leaf +
+                        " did not mutate bytes or recovery failed to detect corruption");
+                    return false;
+                }
+            }
+            finally
+            {
+                if (hostile is not null)
+                {
+                    if (!hostile.HasExited)
+                    {
+                        hostile.Kill(entireProcessTree: true);
+                        hostile.WaitForExit(15000);
+                    }
+                    hostile.Dispose();
+                }
+                if (File.Exists(marker)) File.Delete(marker);
+                if (File.Exists(release)) File.Delete(release);
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+        Console.WriteLine(
+            "PASS: REAL pre-pin same-SID WRITE handle denied for blob and receipt; " +
+            "post-rejection corruption detected on read-only restart");
 
         // SYNCHRONIZED TEST-FIRST RED. A REAL separate same-SID PowerShell
         // process replaces the just-flushed stage file *before* the old code
