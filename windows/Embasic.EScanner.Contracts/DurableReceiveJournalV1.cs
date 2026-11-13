@@ -34,6 +34,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // Internal, deterministic checkpoint after native handle-relative rename
     // and before receipt creation. Never configured by production callers.
     internal Action? AfterBlobRenamedForTest { get; set; }
+    // Synchronized adversarial action at the final live admission boundary.
+    // Internal test-only, never wired by the actual journal owner.
+    internal Action? BeforeSuccessfulCommitReturnForTest { get; set; }
     internal string? LastNativeFailureStage { get; private set; }
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
@@ -191,6 +194,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                     !_livePageIds.TryAdd(envelope.Order,
                         (confirmedBlobId.Value, confirmedReceiptId.Value)) ||
                     !StableRoot()) return Poison("final-identities");
+                BeforeSuccessfulCommitReturnForTest?.Invoke();
                 return true;
             }
             catch (IOException) { return Poison(); }
