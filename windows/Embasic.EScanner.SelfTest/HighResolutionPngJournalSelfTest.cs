@@ -157,6 +157,7 @@ internal static partial class DurableReceiveJournalSelfTest
             int baseline = current.HandleCount;
             long elapsedMs;
             int live;
+            int exactPins;
             using (var journal = DurableReceiveJournalV1.Open(root, Session, Digest,
                        1000, 2000, cap, maxPages))
             {
@@ -191,7 +192,8 @@ internal static partial class DurableReceiveJournalSelfTest
                 }
                 current.Refresh();
                 live = current.HandleCount;
-                if (live - baseline < 2 * maxPages - 32 ||
+                exactPins = journal.LivePinnedAssetHandleCount;
+                if (exactPins != 2 * maxPages ||
                     live - baseline > 2 * maxPages + 128)
                 {
                     Console.Error.WriteLine("FAIL: 12MP PNG live handle budget");
@@ -234,7 +236,7 @@ internal static partial class DurableReceiveJournalSelfTest
             Console.WriteLine("PASS: REAL NTFS 12MP valid RGB PNG pages=2 " +
                 $"dimensions={w}x{h} pngBytesPerPage={png.Length} " +
                 $"elapsedMs={elapsedMs} baselineHandles={baseline} liveHandles={live} " +
-                $"afterDisposeHandles={disposed} restartPages=2 replayDenied=true " +
+                $"exactNativeReadPins={exactPins} afterDisposeHandles={disposed} restartPages=2 replayDenied=true " +
                 "offlineTamperPoisoned=true noLatencySla=true");
 
             // Another real valid PNG larger than the strict 32MiB wire policy:
