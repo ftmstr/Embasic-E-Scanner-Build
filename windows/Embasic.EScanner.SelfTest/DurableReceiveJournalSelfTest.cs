@@ -4,7 +4,7 @@ using System.Text;
 using Embasic.EScanner.Contracts;
 
 /// <summary>Real local Windows NTFS/temp-file tests; never a production TLS/QR/device claim.</summary>
-internal static class DurableReceiveJournalSelfTest
+internal static partial class DurableReceiveJournalSelfTest
 {
     private const string Session = "01234567-89ab-4cde-8f01-23456789abcd";
     private const string Page0 = "11234567-89ab-4cde-8f01-23456789abcd";
