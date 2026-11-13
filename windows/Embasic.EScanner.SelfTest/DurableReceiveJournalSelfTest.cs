@@ -1356,6 +1356,9 @@ internal static class DurableReceiveJournalSelfTest
                     }
                     milliseconds = (long)System.Diagnostics.Stopwatch
                         .GetElapsedTime(started).TotalMilliseconds;
+                    // .NET Process.HandleCount is CACHED until Refresh().
+                    // Without Refresh, baseline and live samples match falsely.
+                    current.Refresh();
                     live = current.HandleCount;
                     int expectedPins = checked(pages * 2);
                     // The private root/ancestor handle chain and CLR internals
@@ -1380,6 +1383,7 @@ internal static class DurableReceiveJournalSelfTest
                 }
                 // Dispose must release ALL page pins before the same process
                 // starts its independent read-only restart inspection.
+                current.Refresh();
                 int after = current.HandleCount;
                 if (Math.Abs(after - before) > 64)
                 {
