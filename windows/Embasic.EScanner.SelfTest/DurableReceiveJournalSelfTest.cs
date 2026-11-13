@@ -51,6 +51,16 @@ internal static class DurableReceiveJournalSelfTest
         File.WriteAllText(path, value, Encoding.ASCII);
         return true;
     }
+    // The cross-platform corruption fixture tests persistence/recovery after
+    // the live owner has released its read-only pins. Android's host golden
+    // semantics remain unchanged; this Windows test explicitly models offline
+    // attacker access, never bypasses the native LIVE pin in production.
+    private static bool TamperAfterOwnerExit(
+        DurableReceiveJournalV1 owner, string path, string value)
+    {
+        owner.Dispose();
+        return Tamper(path, value);
+    }
 
     private static bool Action(string root, DurableReceiveJournalV1 gate, string action) =>
         action switch
@@ -71,8 +81,8 @@ internal static class DurableReceiveJournalSelfTest
                 Wire(Page0, 0, sid: "31234567-89ab-4cde-8f01-23456789abcd"), Body, 1002),
             "COMMIT1_DUPID" => gate.Commit(Wire(Page0, 1), Body, 1003),
             "COMMIT1_BAD_BYTES" => gate.Commit(Wire(Page1, 1), Encoding.ASCII.GetBytes("abd"), 1003),
-            "TAMPER_BLOB" => Tamper(Path.Combine(root, "page-0000.blob"), "abd"),
-            "TAMPER_RECEIPT" => Tamper(Path.Combine(root, "page-0000.rec"), "torn"),
+            "TAMPER_BLOB" => TamperAfterOwnerExit(gate, Path.Combine(root, "page-0000.blob"), "abd"),
+            "TAMPER_RECEIPT" => TamperAfterOwnerExit(gate, Path.Combine(root, "page-0000.rec"), "torn"),
             "TAMPER_CLAIM" => Tamper(Path.Combine(root, "token.claim"), "torn"),
             "ORPHAN_TEMP" => Create(Path.Combine(root, "stage-0000.tmp")),
             "ORPHAN_BLOB" => Create(Path.Combine(root, "page-0000.blob")),
@@ -724,19 +734,30 @@ internal static class DurableReceiveJournalSelfTest
                 }
                 string asset = Path.Combine(root, assetName);
                 byte[] original = File.ReadAllBytes(asset);
-                if (!HostileReplaceSameBytesFromSecondProcess(asset) ||
+                // In a LIVE journal, the confirmed page's READ-only pin
+                // denies DELETE (rename) as well as WRITE, even when bytes
+                // would remain unchanged. The attacker is a real child PID.
+                if (HostileReplaceSameBytesFromSecondProcess(asset) ||
                     !File.ReadAllBytes(asset).AsSpan().SequenceEqual(original) ||
-                    Directory.EnumerateFileSystemEntries(root).Count() != 3)
+                    Directory.EnumerateFileSystemEntries(root).Count() != 3 ||
+                    !live.Commit(Wire(Page1, 1), Body, 1003))
                 {
                     Console.Error.WriteLine(
-                        "NOT VERIFIED: separate-process page asset swap did not complete");
+                        "FAIL: live prior-page " + assetName +
+                        " rename was allowed or later benign page was rejected");
                     return false;
                 }
-                if (live.Commit(Wire(Page1, 1), Body, 1003))
+                // Positive control: only AFTER disposing the owner is the
+                // same independent process allowed to replace an inode.
+                // Read-only recovery has no trusted pre-restart FILE ID root.
+                live.Dispose();
+                if (!HostileReplaceSameBytesFromSecondProcess(asset) ||
+                    !File.ReadAllBytes(asset).AsSpan().SequenceEqual(original) ||
+                    Inspect(root).Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
+                    Inspect(root).ConfirmedPages != 2)
                 {
                     Console.Error.WriteLine(
-                        "FAIL: same-bytes hostile prior-page " + assetName +
-                        " file-ID substitution admitted another page");
+                        "NOT VERIFIED: offline same-byte inode swap positive control failed");
                     return false;
                 }
             }
