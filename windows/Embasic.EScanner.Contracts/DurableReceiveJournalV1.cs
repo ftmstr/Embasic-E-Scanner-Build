@@ -54,6 +54,19 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // including in-place writes that do not change NTFS FILE ID. Release on
     // Dispose; cannot revoke a handle the adversary acquired BEFORE pinning.
     private readonly Dictionary<int, (SafeFileHandle Blob, SafeFileHandle Receipt)> _livePagePins = new();
+    // Internal test-only exact count of ACTUALLY OPEN native read pins.
+    // Process.HandleCount is process-global and other CLR handles can close
+    // while a test is running. Do not infer pinned handles from that delta.
+    internal int LivePinnedAssetHandleCount
+    {
+        get
+        {
+            lock (_mutex)
+                return _livePagePins.Values.Sum(pair =>
+                    (pair.Blob.IsClosed || pair.Blob.IsInvalid ? 0 : 1) +
+                    (pair.Receipt.IsClosed || pair.Receipt.IsInvalid ? 0 : 1));
+        }
+    }
     // No FILE_SHARE_DELETE: an independent process cannot rename this
     // session's root while the journal owns the directory handle.
     private readonly SafeFileHandle _rootPin;
