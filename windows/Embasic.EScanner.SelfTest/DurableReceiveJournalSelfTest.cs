@@ -1365,14 +1365,16 @@ internal static partial class DurableReceiveJournalSelfTest
                     // add bounded overhead. Refuse under-pinning or unexpected
                     // per-page native handle leaks; do not assert a global SLA.
                     int delta = live - before;
-                    // A small number of unrelated Windows/CLR handles may be
-                    // closed while a long run is being sampled. Assert the
-                    // 2-per-page trend with ±32 handles of measurement noise,
-                    // not an impossible process-global exact lower bound.
-                    if (delta < expectedPins - 32 || delta > expectedPins + 128)
+                    // Trust the live SafeFileHandle state for the EXACT pin
+                    // count. OS Process.HandleCount is process-global: unrelated
+                    // CLR handles may close during this quadratic inspection
+                    // and make a naive >=2*pages delta spuriously FAIL.
+                    int actualPins = gate.LivePinnedAssetHandleCount;
+                    if (actualPins != expectedPins || delta > expectedPins + 128)
                     {
                         Console.Error.WriteLine("FAIL: live Windows NTFS pin handle budget " +
                             pages + " baseline=" + before + " live=" + live +
+                            " openNativePins=" + actualPins +
                             " expectedPins=" + expectedPins);
                         return false;
                     }
@@ -1411,7 +1413,7 @@ internal static partial class DurableReceiveJournalSelfTest
                     $"elapsedMs={milliseconds} syntheticBytesPerPage=3 noLatencySla=true");
                 Console.WriteLine($"FOUNDATION_HANDLES_WINDOWS_NTFS pages={pages} " +
                     $"baseline={before} live={live} afterDispose={after} " +
-                    $"expectedPinHandles={2 * pages} restartPages={pages} " +
+                    $"expectedPinHandles={2 * pages} exactLivePins={2 * pages} restartPages={pages} " +
                     "replayDenied=true noHandleSla=true");
             }
             finally { Directory.Delete(perfRoot, recursive: true); }
