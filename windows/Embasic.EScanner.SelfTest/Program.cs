@@ -5,6 +5,11 @@ using Embasic.EScanner.Contracts;
 if (args.Length > 0 && args[0] == "--journal-owner-crash-child")
     return DurableReceiveJournalSelfTest.RunJournalOwnerChild(args);
 
+// Separate deterministic valid 12MP synthetic PNG/NTFS capability probe.
+// NEVER run it as part of the 3-byte golden contract suite.
+if (args.Length > 0 && args[0] == "--high-resolution-png-ntfs")
+    return DurableReceiveJournalSelfTest.RunHighResolutionPngJournalTest();
+
 if (!ScanContract.IsSupportedVersion(1) || ScanContract.IsSupportedVersion(0) || ScanContract.IsSupportedVersion(2) || !ScanContract.IsValidPageOrder(0) || ScanContract.IsValidPageOrder(-1))
 {
     Console.Error.WriteLine("FAIL: contract boundary");
