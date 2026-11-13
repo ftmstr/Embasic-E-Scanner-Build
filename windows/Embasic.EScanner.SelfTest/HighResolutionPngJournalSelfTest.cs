@@ -138,7 +138,7 @@ internal static partial class DurableReceiveJournalSelfTest
             Console.Error.WriteLine("NOT VERIFIED: 12MP PNG NTFS test requires real Windows");
             return 2;
         }
-        const int w = 3264, h = 2448; // 7,990,272 pixels, ~24MB PNG
+        int w = 3264, h = 2448; // initial 7.99MP baseline, must FAIL 12MP assertion
         // A 12MP claim requires at least twelve million actual RGB pixels.
         // The old 3264x2448 fixture was 7.99MP despite its mistaken label.
         if ((long)w * h < 12_000_000)
