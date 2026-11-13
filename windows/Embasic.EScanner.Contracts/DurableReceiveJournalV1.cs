@@ -46,6 +46,11 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // The previously committed assets must retain NTFS identity even if an
     // attacker substitutes exactly the same bytes under the same name.
     private readonly Dictionary<int, (FileId Blob, FileId Receipt)> _livePageIds = new();
+    // Hold real READ-share-only FILE handles for every live confirmed page.
+    // This denies new WRITE and DELETE opens by other same-SID processes,
+    // including in-place writes that do not change NTFS FILE ID. Release on
+    // Dispose; cannot revoke a handle the adversary acquired BEFORE pinning.
+    private readonly Dictionary<int, (SafeFileHandle Blob, SafeFileHandle Receipt)> _livePagePins = new();
     // No FILE_SHARE_DELETE: an independent process cannot rename this
     // session's root while the journal owns the directory handle.
     private readonly SafeFileHandle _rootPin;
@@ -190,10 +195,28 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 var confirmedReceiptId = GetRelativeFileId(_rootPin, rec);
                 if (confirmedBlobId is null || confirmedReceiptId is null ||
                     confirmedBlobId != stageId ||
-                    confirmedReceiptId != writtenReceiptId ||
-                    !_livePageIds.TryAdd(envelope.Order,
-                        (confirmedBlobId.Value, confirmedReceiptId.Value)) ||
-                    !StableRoot()) return Poison("final-identities");
+                    confirmedReceiptId != writtenReceiptId)
+                    return Poison("final-identities");
+                // Pin BOTH verified file identities before returning any
+                // successful admission. A conflicting prior writer handle
+                // makes pinning fail closed rather than weakening sharing.
+                var blobPin = PinImmutableRead(_rootPin, blob, confirmedBlobId.Value);
+                if (blobPin is null) return Poison("blob-pin");
+                var receiptPin = PinImmutableRead(_rootPin, rec, confirmedReceiptId.Value);
+                if (receiptPin is null)
+                {
+                    blobPin.Dispose();
+                    return Poison("receipt-pin");
+                }
+                if (!_livePageIds.TryAdd(envelope.Order,
+                        (confirmedBlobId.Value, confirmedReceiptId.Value)))
+                {
+                    blobPin.Dispose();
+                    receiptPin.Dispose();
+                    return Poison("duplicate-pin");
+                }
+                _livePagePins.Add(envelope.Order, (blobPin, receiptPin));
+                if (!StableRoot()) return Poison("pinned-identities");
                 BeforeSuccessfulCommitReturnForTest?.Invoke();
                 return true;
             }
@@ -211,6 +234,12 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             if (_disposed) return;
             _disposed = true;
             _stopped = true;
+            foreach (var pair in _livePagePins.Values)
+            {
+                pair.Blob.Dispose();
+                pair.Receipt.Dispose();
+            }
+            _livePagePins.Clear();
             _rootPin.Dispose();
             foreach (var pin in _ancestorPins) pin.Dispose();
         }
@@ -376,7 +405,8 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // Names are locally generated, single-component ASCII; no slash, reparse,
     // absolute path, alternate data stream or caller-controlled basename.
     private static SafeFileHandle? OpenRelativeFile(SafeFileHandle root, string name,
-        uint access, uint disposition, bool writeThrough = false)
+        uint access, uint disposition, bool writeThrough = false,
+        uint shareAccess = 0)
     {
         if (!OperatingSystem.IsWindows() || root.IsClosed || root.IsInvalid ||
             string.IsNullOrEmpty(name) || name.Length > 40 ||
@@ -408,7 +438,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             uint options = 0x00000040 | 0x00200000 | 0x00000020;
             if (writeThrough) options |= 0x00000002; // FILE_WRITE_THROUGH
             int status = NtCreateFile(out var child, access, ref attributes,
-                out _, IntPtr.Zero, 0x00000080, 0, disposition, options,
+                out _, IntPtr.Zero, 0x00000080, shareAccess, disposition, options,
                 IntPtr.Zero, 0);
             GC.KeepAlive(root);
             if (status != 0 || child is null || child.IsInvalid)
@@ -435,8 +465,26 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     {
         // FILE_OPEN = 1. Query identity from a pinned directory rather than
         // from a pathname. No path fallback on native API failure.
-        using var child = OpenRelativeFile(rootHandle, name, 0x80 | 0x00100000, 1);
+        using var child = OpenRelativeFile(rootHandle, name, 0x80 | 0x00100000, 1,
+            shareAccess: 0x00000001);
         return child is null ? null : HandleId(child);
+    }
+
+    // Pin a CONFIRMED file using READ access with FILE_SHARE_READ ONLY.
+    // The NTFS sharing contract excludes fresh external WRITE/DELETE handles
+    // without blocking the journal's own bounded READ and FILE ID probes.
+    // The pin remains live until Dispose() and is not an offline trust anchor.
+    private static SafeFileHandle? PinImmutableRead(
+        SafeFileHandle root, string name, FileId expected)
+    {
+        // FILE_READ_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN.
+        var pin = OpenRelativeFile(root, name,
+            0x00000001 | 0x00000080 | 0x00100000, 1,
+            shareAccess: 0x00000001);
+        if (pin is null) return null;
+        if (HandleId(pin) == expected) return pin;
+        pin.Dispose();
+        return null;
     }
 
     // FILE_CREATE = 2: no overwrite, even when a hostile process races the
@@ -487,7 +535,8 @@ public sealed class DurableReceiveJournalV1 : IDisposable
         try
         {
             using var handle = OpenRelativeFile(root, name,
-                0x00000001 | 0x00000080 | 0x00100000, 1);
+                0x00000001 | 0x00000080 | 0x00100000, 1,
+                shareAccess: 0x00000001);
             if (handle is null) return null;
             var id = HandleId(handle);
             if (id is null) return null;
