@@ -45,7 +45,8 @@ internal static partial class DurableReceiveJournalSelfTest
         target.Write(trailer);
     }
 
-    private static byte[] GenerateSyntheticRgbPng(int width, int height, int seed)
+    private static byte[] GenerateSyntheticRgbPng(int width, int height, int seed,
+        bool compressible = false)
     {
         if (width < 1 || height < 1) throw new ArgumentOutOfRangeException();
         using var png = new MemoryStream();
@@ -57,7 +58,8 @@ internal static partial class DurableReceiveJournalSelfTest
         ihdr[9] = 2; // RGB truecolor, not indexed, no alpha
         WritePngChunk(png, "IHDR", ihdr);
         using var compressed = new MemoryStream();
-        using (var zlib = new ZLibStream(compressed, CompressionLevel.NoCompression, true))
+        using (var zlib = new ZLibStream(compressed,
+                   compressible ? CompressionLevel.Optimal : CompressionLevel.NoCompression, true))
         {
             var row = new byte[checked(1 + 3 * width)];
             var random = new Random(seed); // synthetic pixels, NEVER a security nonce
@@ -65,6 +67,12 @@ internal static partial class DurableReceiveJournalSelfTest
             {
                 row[0] = 0; // PNG scanline filter: None
                 random.NextBytes(row.AsSpan(1));
+                // Keep genuine deterministic pixel diversity while making
+                // 12MP RGB fit the strict existing 32MiB receive limit.
+                // Every RGB pixel's first channel is zero in this synthetic
+                // ONLY image. No source image or camera data is substituted.
+                if (compressible)
+                    for (int x = 1; x < row.Length; x += 3) row[x] = 0;
                 zlib.Write(row);
             }
         }
@@ -138,7 +146,7 @@ internal static partial class DurableReceiveJournalSelfTest
             Console.Error.WriteLine("NOT VERIFIED: 12MP PNG NTFS test requires real Windows");
             return 2;
         }
-        int w = 3264, h = 2448; // initial 7.99MP baseline, must FAIL 12MP assertion
+        int w = 4000, h = 3000; // exactly 12,000,000 real RGB pixels
         // A 12MP claim requires at least twelve million actual RGB pixels.
         // The old 3264x2448 fixture was 7.99MP despite its mistaken label.
         if ((long)w * h < 12_000_000)
@@ -154,7 +162,7 @@ internal static partial class DurableReceiveJournalSelfTest
         string overRoot = CreatePrivateTempSubdirectory("escanner-png-overcap-").FullName;
         try
         {
-            byte[] png = GenerateSyntheticRgbPng(w, h, 20261113);
+            byte[] png = GenerateSyntheticRgbPng(w, h, 20261113, compressible: true);
             if (png.Length < 20 * 1024 * 1024 || png.Length >= cap ||
                 !CheckSyntheticPng(png, w, h))
             {
