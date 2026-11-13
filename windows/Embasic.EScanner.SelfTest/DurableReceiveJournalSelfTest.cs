@@ -1326,37 +1326,85 @@ internal static class DurableReceiveJournalSelfTest
             string perfRoot = CreatePrivateTempSubdirectory("escanner-perf-").FullName;
             try
             {
-                using var gate = DurableReceiveJournalV1.Open(perfRoot, Session, Digest,
-                    1000, 2000, 1024, pages);
-                if (gate is null || !gate.ClaimToken(Token, 1001))
+                // The same process really holds two read-only NTFS handles per
+                // committed page. These are OS HANDLE measurements, not a
+                // count inferred from code or a synthetic handle mock.
+                using var current = System.Diagnostics.Process.GetCurrentProcess();
+                int before = current.HandleCount;
+                long milliseconds;
+                int live;
+                using (var gate = DurableReceiveJournalV1.Open(perfRoot, Session, Digest,
+                    1000, 2000, 1024, pages))
                 {
-                    Console.Error.WriteLine("FAIL: synthetic perf session setup " + pages);
-                    return false;
-                }
-                long started = System.Diagnostics.Stopwatch.GetTimestamp();
-                for (int i = 0; i < pages; i++)
-                {
-                    string syntheticId = (i + 1).ToString("x8",
-                        System.Globalization.CultureInfo.InvariantCulture) +
-                        "-89ab-4cde-8f01-23456789abcd";
-                    if (!gate.Commit(Wire(syntheticId, i), Body, 1001))
+                    if (gate is null || !gate.ClaimToken(Token, 1001))
                     {
-                        Console.Error.WriteLine("FAIL: synthetic perf page " + i + "/" + pages);
+                        Console.Error.WriteLine("FAIL: synthetic perf session setup " + pages);
+                        return false;
+                    }
+                    long started = System.Diagnostics.Stopwatch.GetTimestamp();
+                    for (int i = 0; i < pages; i++)
+                    {
+                        string syntheticId = (i + 1).ToString("x8",
+                            System.Globalization.CultureInfo.InvariantCulture) +
+                            "-89ab-4cde-8f01-23456789abcd";
+                        if (!gate.Commit(Wire(syntheticId, i), Body, 1001))
+                        {
+                            Console.Error.WriteLine("FAIL: synthetic perf page " + i + "/" + pages +
+                                " nativeStage=" + gate.LastNativeFailureStage);
+                            return false;
+                        }
+                    }
+                    milliseconds = (long)System.Diagnostics.Stopwatch
+                        .GetElapsedTime(started).TotalMilliseconds;
+                    live = current.HandleCount;
+                    int expectedPins = checked(pages * 2);
+                    // The private root/ancestor handle chain and CLR internals
+                    // add bounded overhead. Refuse under-pinning or unexpected
+                    // per-page native handle leaks; do not assert a global SLA.
+                    int delta = live - before;
+                    if (delta < expectedPins || delta > expectedPins + 128)
+                    {
+                        Console.Error.WriteLine("FAIL: live Windows NTFS pin handle budget " +
+                            pages + " baseline=" + before + " live=" + live +
+                            " expectedPins=" + expectedPins);
+                        return false;
+                    }
+                    var recovery = DurableReceiveJournalV1.Inspect(perfRoot, Session,
+                        Digest, 1000, 2000, 1024, pages);
+                    if (recovery.Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
+                        recovery.ConfirmedPages != pages)
+                    {
+                        Console.Error.WriteLine("FAIL: synthetic perf receipt accounting " + pages);
                         return false;
                     }
                 }
-                long milliseconds = (long)System.Diagnostics.Stopwatch
-                    .GetElapsedTime(started).TotalMilliseconds;
-                var recovery = DurableReceiveJournalV1.Inspect(perfRoot, Session,
-                    Digest, 1000, 2000, 1024, pages);
-                if (recovery.Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
-                    recovery.ConfirmedPages != pages)
+                // Dispose must release ALL page pins before the same process
+                // starts its independent read-only restart inspection.
+                int after = current.HandleCount;
+                if (Math.Abs(after - before) > 64)
                 {
-                    Console.Error.WriteLine("FAIL: synthetic perf receipt accounting " + pages);
+                    Console.Error.WriteLine("FAIL: Windows NTFS pin handle leak after Dispose " +
+                        pages + " baseline=" + before + " after=" + after);
+                    return false;
+                }
+                var restarted = DurableReceiveJournalV1.Inspect(perfRoot, Session,
+                    Digest, 1000, 2000, 1024, pages);
+                using var newJournal = DurableReceiveJournalV1.Open(perfRoot,
+                    Session, Digest, 1000, 2000, 1024, pages);
+                if (restarted.Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
+                    restarted.ConfirmedPages != pages ||
+                    newJournal is null || newJournal.ClaimToken(Token, 1002))
+                {
+                    Console.Error.WriteLine(
+                        "FAIL: Windows NTFS multi-page restart/replay after Dispose " + pages);
                     return false;
                 }
                 Console.WriteLine($"FOUNDATION_PERF_WINDOWS_NTFS pages={pages} " +
                     $"elapsedMs={milliseconds} syntheticBytesPerPage=3 noLatencySla=true");
+                Console.WriteLine($"FOUNDATION_HANDLES_WINDOWS_NTFS pages={pages} " +
+                    $"baseline={before} live={live} afterDispose={after} " +
+                    $"expectedPinHandles={2 * pages} restartPages={pages} " +
+                    "replayDenied=true noHandleSla=true");
             }
             finally { Directory.Delete(perfRoot, recursive: true); }
         }
