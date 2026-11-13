@@ -657,7 +657,10 @@ public sealed class DurableReceiveJournalV1 : IDisposable
             var descriptor = new RawSecurityDescriptor(acl.GetSecurityDescriptorBinaryForm(), 0);
             if (descriptor.DiscretionaryAcl is null) return false;
             var owner = acl.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier;
-            var processUser = WindowsIdentity.GetCurrent().User;
+            // Every ACL check must release its Windows access-token HANDLE.
+            // StableRoot/GetRootId can call this hundreds of times per session.
+            using var currentIdentity = WindowsIdentity.GetCurrent();
+            var processUser = currentIdentity.User;
             if (owner is null || processUser is null) return false;
             var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
             var administrators = new SecurityIdentifier(
