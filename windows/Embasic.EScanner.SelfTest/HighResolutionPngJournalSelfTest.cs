@@ -139,6 +139,15 @@ internal static partial class DurableReceiveJournalSelfTest
             return 2;
         }
         const int w = 3264, h = 2448; // 7,990,272 pixels, ~24MB PNG
+        // A 12MP claim requires at least twelve million actual RGB pixels.
+        // The old 3264x2448 fixture was 7.99MP despite its mistaken label.
+        if ((long)w * h < 12_000_000)
+        {
+            Console.Error.WriteLine("FAIL: PNG fixture incorrectly labeled 12MP: " +
+                ((long)w * h).ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                " pixels");
+            return 1;
+        }
         const int maxPages = 2;
         const long cap = DurableReceiveJournalV1.MaxStageBytes;
         string root = CreatePrivateTempSubdirectory("escanner-png-12mp-").FullName;
