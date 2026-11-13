@@ -1365,7 +1365,11 @@ internal static class DurableReceiveJournalSelfTest
                     // add bounded overhead. Refuse under-pinning or unexpected
                     // per-page native handle leaks; do not assert a global SLA.
                     int delta = live - before;
-                    if (delta < expectedPins || delta > expectedPins + 128)
+                    // A small number of unrelated Windows/CLR handles may be
+                    // closed while a long run is being sampled. Assert the
+                    // 2-per-page trend with ±32 handles of measurement noise,
+                    // not an impossible process-global exact lower bound.
+                    if (delta < expectedPins - 32 || delta > expectedPins + 128)
                     {
                         Console.Error.WriteLine("FAIL: live Windows NTFS pin handle budget " +
                             pages + " baseline=" + before + " live=" + live +
