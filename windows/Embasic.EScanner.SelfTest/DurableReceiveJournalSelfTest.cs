@@ -225,6 +225,35 @@ internal static class DurableReceiveJournalSelfTest
         return attacker.ExitCode == 0;
     }
 
+    // Same-SID adversary performs IN-PLACE byte modification, not rename.
+    // The source file identity remains unchanged, so ID-only final admission
+    // would accept a corrupted confirmed page. The subprocess is real OS IO.
+    private static bool HostileInPlaceWriteFromSecondProcess(string path)
+    {
+        static string Quote(string s) => s.Replace("'", "''", StringComparison.Ordinal);
+        var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false, CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("try { $p='" + Quote(path) + "'; " +
+            "$f=[System.IO.File]::Open($p,[System.IO.FileMode]::Open," +
+            "[System.IO.FileAccess]::Write,[System.IO.FileShare]::ReadWrite); " +
+            "try { $b=[System.Text.Encoding]::ASCII.GetBytes('BAD'); " +
+            "$f.Position=0; $f.Write($b,0,$b.Length); $f.Flush($true) } " +
+            "finally { $f.Dispose() }; exit 0 } catch { exit 17 }");
+        using var child = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("Hostile in-place writer unavailable");
+        if (!child.WaitForExit(15000))
+        {
+            child.Kill(entireProcessTree: true);
+            throw new InvalidOperationException("Hostile in-place writer timed out");
+        }
+        return child.ExitCode == 0;
+    }
+
     // Actual separate same-account process plants a destination AFTER stage
     // creation. A native no-overwrite rename must refuse without modifying it.
     private static bool HostilePlantDestinationFromSecondProcess(string path)
@@ -714,6 +743,67 @@ internal static class DurableReceiveJournalSelfTest
             finally { Directory.Delete(root, recursive: true); }
         }
         Console.WriteLine("PASS: live prior-page blob and receipt identity swaps rejected");
+
+        // TEST-FIRST RED: after the last hash+receipt validation and NTFS
+        // FILE ID checks but BEFORE Commit returns, an independent same-SID
+        // PowerShell process writes different bytes to the SAME NTFS inode.
+        // The existing identity-only admission lets the corruption through.
+        // Guard must DENY writes for both freshly confirmed blob and receipt.
+        foreach (string leaf in new[] { "page-0000.blob", "page-0000.rec" })
+        {
+            string root = CreatePrivateTempSubdirectory("escanner-live-write-deny-").FullName;
+            try
+            {
+                using var journal = Open(root);
+                if (!journal.ClaimToken(Token, 1001))
+                {
+                    Console.Error.WriteLine("FAIL: live write-deny positive claim control");
+                    return false;
+                }
+                string asset = Path.Combine(root, leaf);
+                bool attempted = false, inPlaceWriteSucceeded = false;
+                journal.BeforeSuccessfulCommitReturnForTest = () =>
+                {
+                    attempted = true;
+                    inPlaceWriteSucceeded = HostileInPlaceWriteFromSecondProcess(asset);
+                };
+                bool accepted = journal.Commit(Wire(Page0, 0), Body, 1002);
+                if (!attempted)
+                {
+                    Console.Error.WriteLine(
+                        "NOT VERIFIED: final-admission separate-process writer did not run");
+                    return false;
+                }
+                if (inPlaceWriteSucceeded)
+                {
+                    Console.Error.WriteLine("FAIL: same-SID in-place " + leaf +
+                        " overwrite admitted at final live journal boundary" +
+                        " commitReturned=" + accepted);
+                    return false;
+                }
+                if (!accepted ||
+                    Inspect(root).Status != DurableReceiveJournalV1.RecoveryStatus.TokenConsumed ||
+                    Inspect(root).ConfirmedPages != 1)
+                {
+                    Console.Error.WriteLine("FAIL: benign committed page was not recoverable");
+                    return false;
+                }
+                // Outside the LIVE instance's lifetime, this SID can write.
+                // This is a positive control proving the writer is real and
+                // protection is scoped, NOT permanent Windows ACL isolation.
+                journal.Dispose();
+                if (!HostileInPlaceWriteFromSecondProcess(asset) ||
+                    Inspect(root).Status != DurableReceiveJournalV1.RecoveryStatus.Poisoned)
+                {
+                    Console.Error.WriteLine(
+                        "NOT VERIFIED: released file write/poison positive control failed");
+                    return false;
+                }
+            }
+            finally { Directory.Delete(root, recursive: true); }
+        }
+        Console.WriteLine(
+            "PASS: real same-SID in-place blob and receipt writes denied by LIVE journal pins");
 
         // SYNCHRONIZED TEST-FIRST RED. A REAL separate same-SID PowerShell
         // process replaces the just-flushed stage file *before* the old code
