@@ -37,6 +37,9 @@ public sealed class DurableReceiveJournalV1 : IDisposable
     // Synchronized adversarial action at the final live admission boundary.
     // Internal test-only, never wired by the actual journal owner.
     internal Action? BeforeSuccessfulCommitReturnForTest { get; set; }
+    // Test-only real same-SID pre-existing writer-handle admission barrier.
+    // Synchronized AFTER receipt readback but BEFORE creating live READ pins.
+    internal Action? BeforeLivePagePinsForTest { get; set; }
     internal string? LastNativeFailureStage { get; private set; }
     private readonly string _root, _session, _tokenSha;
     private readonly FileId _rootId;
@@ -200,6 +203,7 @@ public sealed class DurableReceiveJournalV1 : IDisposable
                 // Pin BOTH verified file identities before returning any
                 // successful admission. A conflicting prior writer handle
                 // makes pinning fail closed rather than weakening sharing.
+                BeforeLivePagePinsForTest?.Invoke();
                 var blobPin = PinImmutableRead(_rootPin, blob, confirmedBlobId.Value);
                 if (blobPin is null) return Poison("blob-pin");
                 var receiptPin = PinImmutableRead(_rootPin, rec, confirmedReceiptId.Value);
