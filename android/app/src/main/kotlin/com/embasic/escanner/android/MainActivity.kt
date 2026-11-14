@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
@@ -59,7 +60,7 @@ import java.util.concurrent.Executors
 class MainActivity : Activity() {
     private data class ScanPage(
         val id: String, val extension: String, val sha256: String,
-        val file: File, val thumbnail: Bitmap
+        val file: File, val thumbnail: Bitmap, val rotationDegrees: Int = 0
     )
 
     private val pages = mutableStateListOf<ScanPage>()
@@ -112,6 +113,7 @@ class MainActivity : Activity() {
                                             bitmap = page.thumbnail.asImageBitmap(),
                                             contentDescription = "Sayfa ${index + 1} önizlemesi",
                                             modifier = Modifier.size(84.dp)
+                                                .graphicsLayer { rotationZ = page.rotationDegrees.toFloat() }
                                                 .background(MaterialTheme.colorScheme.surfaceVariant,
                                                     RoundedCornerShape(8.dp)),
                                             contentScale = ContentScale.Fit
@@ -121,6 +123,8 @@ class MainActivity : Activity() {
                                             Text(page.extension.uppercase() + " · " +
                                                 (page.file.length() / 1024) + " KB",
                                                 style = MaterialTheme.typography.bodySmall)
+                                            Text("Döndürme: ${page.rotationDegrees}° · Orijinal korunur",
+                                                style = MaterialTheme.typography.labelSmall)
                                             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                                 OutlinedButton(
                                                     enabled = !busy && index > 0,
@@ -133,12 +137,18 @@ class MainActivity : Activity() {
                                                 OutlinedButton(enabled = !busy,
                                                     onClick = { removePage(index) }) { Text("Sil") }
                                             }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                OutlinedButton(enabled = !busy,
+                                                    onClick = { rotatePage(index) }) { Text("↻ 90°") }
+                                                OutlinedButton(enabled = !busy && page.rotationDegrees != 0,
+                                                    onClick = { resetRotation(index) }) { Text("Sıfırla") }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                        Text("PDF: A4 sayfaları. OCR/kırpma henüz yok. SAF hedefe " +
+                        Text("PDF: A4 sayfaları; 90° dönüş uygulanır. OCR/kırpma yok. SAF hedefe " +
                             "yazım atomik değildir.", style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -149,15 +159,17 @@ class MainActivity : Activity() {
             var invalid = 0
             for (entry in preferences.getString("order", "").orEmpty().lines()) {
                 val parts = entry.split(':')
-                if (parts.size != 2 || !parts[0].matches(Regex("[0-9a-fA-F-]{36}\\.(jpg|png)")) ||
-                    !parts[1].matches(Regex("[0-9a-f]{64}"))) continue
+                val rotation = if (parts.size == 2 || parts.size == 3)
+                    PageRotationRecipe.parsePersisted(parts.getOrNull(2)) else null
+                if (rotation == null || !parts[0].matches(Regex("[0-9a-fA-F-]{36}\\.(jpg|png)")) ||
+                    !parts[1].matches(Regex("[0-9a-f]{64}"))) { invalid++; continue }
                 val source = File(assets, parts[0])
                 try {
                     if (source.isFile && source.length() in 1..MAX_BYTES &&
                         digestFile(source) == parts[1]) {
                         restored.add(ScanPage(
                             parts[0].substringBefore('.'), parts[0].substringAfterLast('.'),
-                            parts[1], source, thumbnail(source)
+                            parts[1], source, thumbnail(source), rotation
                         ))
                     } else invalid++
                 } catch (_: Exception) { invalid++ }
@@ -316,21 +328,35 @@ class MainActivity : Activity() {
             for ((index, image) in snapshot.withIndex()) {
                 if (digestFile(image.file) != image.sha256)
                     throw IOException("Orijinal değişti")
+                if (!PageRotationRecipe.isValid(image.rotationDegrees))
+                    throw IOException("Geçersiz döndürme açısı")
                 val bitmap = decodeBounded(image.file, 2400)
                 try {
                     val page = pdf.startPage(
                         PdfDocument.PageInfo.Builder(595, 842, index + 1).create()
                     )
                     page.canvas.drawColor(Color.WHITE)
-                    val scale = minOf(555f / bitmap.width, 802f / bitmap.height)
-                    val width = (bitmap.width * scale).toInt()
-                    val height = (bitmap.height * scale).toInt()
-                    val left = (595 - width) / 2
-                    val top = (842 - height) / 2
-                    page.canvas.drawBitmap(
-                        bitmap, null, Rect(left, top, left + width, top + height),
+                    // A4 orientation is stable; only the drawing recipe rotates.
+                    // The immutable original PNG/JPEG bytes never change.
+                    val quarter = image.rotationDegrees % 180 != 0
+                    val orientedWidth = if (quarter) bitmap.height else bitmap.width
+                    val orientedHeight = if (quarter) bitmap.width else bitmap.height
+                    val scale = minOf(555f / orientedWidth, 802f / orientedHeight)
+                    val outWidth = orientedWidth * scale
+                    val outHeight = orientedHeight * scale
+                    val canvas = page.canvas
+                    canvas.save()
+                    canvas.translate((595f - outWidth) / 2f, (842f - outHeight) / 2f)
+                    when (image.rotationDegrees) {
+                        90 -> { canvas.translate(outWidth, 0f); canvas.rotate(90f) }
+                        180 -> { canvas.translate(outWidth, outHeight); canvas.rotate(180f) }
+                        270 -> { canvas.translate(0f, outHeight); canvas.rotate(270f) }
+                    }
+                    canvas.drawBitmap(
+                        bitmap, null, RectF(0f, 0f, bitmap.width * scale, bitmap.height * scale),
                         Paint(Paint.FILTER_BITMAP_FLAG)
                     )
+                    canvas.restore()
                     pdf.finishPage(page)
                 } finally { bitmap.recycle() }
             }
@@ -350,6 +376,22 @@ class MainActivity : Activity() {
         status = "Sayfa sırası güncellendi"
     }
 
+    private fun rotatePage(index: Int) {
+        if (busy || index !in pages.indices) return
+        val current = pages[index]
+        pages[index] = current.copy(
+            rotationDegrees = PageRotationRecipe.clockwise(current.rotationDegrees))
+        persistOrder()
+        status = "Sayfa ${index + 1}: ${pages[index].rotationDegrees}° saat yönünde"
+    }
+
+    private fun resetRotation(index: Int) {
+        if (busy || index !in pages.indices) return
+        pages[index] = pages[index].copy(rotationDegrees = PageRotationRecipe.reset())
+        persistOrder()
+        status = "Sayfa ${index + 1}: orijinal yön"
+    }
+
     private fun removePage(index: Int) {
         val removed = pages.removeAt(index)
         removed.file.delete()
@@ -359,7 +401,7 @@ class MainActivity : Activity() {
 
     private fun persistOrder() {
         val manifest = pages.joinToString("\n") {
-            "${it.id}.${it.extension}:${it.sha256}"
+            "${it.id}.${it.extension}:${it.sha256}:${it.rotationDegrees}"
         }
         preferences.edit().putString("order", manifest).apply()
     }
