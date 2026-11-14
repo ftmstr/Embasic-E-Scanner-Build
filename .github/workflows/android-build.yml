@@ -269,7 +269,11 @@ jobs:
           assert evidence["status"] == "SOURCE_BYTE_PARITY_PASS"
           assert {row["purl"] for row in evidence["records"]} == set(expected)
           assert inventory["counts"]["classifierJarFiles"] == 3
-          assert inventory["counts"]["hashedFiles"] == 295
+          # 14-Nov PUBLIC Compose/rotation CI run 43637079880 counted 299
+          # actual locally hashed plugin-cache files, with BOTH classified
+          # Gradle JARs byte-equal to official Maven Central. This count is
+          # NOT supplier rights, NOTICE/SBOM closure or release approval.
+          assert inventory["counts"]["hashedFiles"] == 299
           for row in evidence["records"]:
               assert row["status"] == "SOURCE_BYTES_MATCH_LOCAL"
               assert row["officialSha256"] == row["localSha256"] == expected[row["purl"]]
