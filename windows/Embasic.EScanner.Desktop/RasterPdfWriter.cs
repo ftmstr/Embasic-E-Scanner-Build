@@ -13,17 +13,30 @@ namespace Embasic.EScanner.Desktop;
 /// It is NOT a full PdfEngine (no OCR, text layer, ICC profile, annotations
 /// or signed release), and its runtime/visual QA is still NOT VERIFIED.
 /// </summary>
+internal readonly record struct RasterPdfPage(string ImagePath, int RotationDegrees);
+
 internal static class RasterPdfWriter
 {
     private const long MaxPdfBytes = 512L * 1024L * 1024L;
     private const long MaxImagePixels = 24_000_000;
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
-    internal static async Task<int> ExportVerifiedAsync(
-        IReadOnlyList<string> immutableImagePaths, string destination)
+    // Preserve the old paths-only smoke API: existing PDF results are
+    // identical at the default 0° rotation.
+    internal static Task<int> ExportVerifiedAsync(
+        IReadOnlyList<string> immutableImagePaths, string destination) =>
+        ExportVerifiedPagesAsync(
+            immutableImagePaths.Select(path => new RasterPdfPage(path, 0)).ToArray(),
+            destination);
+
+    internal static async Task<int> ExportVerifiedPagesAsync(
+        IReadOnlyList<RasterPdfPage> pages, string destination)
     {
-        if (immutableImagePaths.Count is < 1 or > 100)
+        if (pages.Count is < 1 or > 100)
             throw new InvalidDataException("PDF sayfa sayısı sınırı");
+        // Invalid transform recipes never create a staged target.
+        if (pages.Any(page => !PageRotationRecipe.IsValid(page.RotationDegrees)))
+            throw new InvalidDataException("Invalid non-destructive page rotation");
         if (string.IsNullOrWhiteSpace(destination) ||
             !string.Equals(Path.GetExtension(destination), ".pdf", StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("PDF hedefi geçersiz");
@@ -35,25 +48,25 @@ internal static class RasterPdfWriter
         string staging = Path.Combine(directory, ".embasic-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
-            await WriteRasterPdfAsync(immutableImagePaths, staging);
+            await WriteRasterPdfAsync(pages, staging);
             var tempFile = await StorageFile.GetFileFromPathAsync(staging);
             // Open and close the native validation STREAM before atomic move,
             // so this process does not hold a sharing lock on the staged PDF.
             using (var readStream = await tempFile.OpenReadAsync())
             {
                 var reopened = await PdfDocument.LoadFromStreamAsync(readStream);
-                if (reopened.PageCount != immutableImagePaths.Count)
+                if (reopened.PageCount != pages.Count)
                     throw new InvalidDataException("PDF sayfa sayısı uyuşmuyor");
             }
             // Same-directory atomic replacement; never copy an unvalidated PDF.
             File.Move(staging, destination, overwrite: true);
-            return immutableImagePaths.Count;
+            return pages.Count;
         }
         finally { if (File.Exists(staging)) File.Delete(staging); }
     }
 
     private static async Task WriteRasterPdfAsync(
-        IReadOnlyList<string> images, string stagedPath)
+        IReadOnlyList<RasterPdfPage> images, string stagedPath)
     {
         await using var output = new FileStream(stagedPath, FileMode.CreateNew,
             FileAccess.Write, FileShare.None, 65536, FileOptions.WriteThrough);
@@ -86,7 +99,7 @@ internal static class RasterPdfWriter
 
         for (int i = 0; i < images.Count; i++)
         {
-            (byte[] rgb, uint width, uint height) = await DecodeRgbAsync(images[i]);
+            (byte[] rgb, uint width, uint height) = await DecodeRgbAsync(images[i].ImagePath);
             byte[] compressed;
             using (var buffer = new MemoryStream())
             {
@@ -101,15 +114,11 @@ internal static class RasterPdfWriter
               "/Resources << /XObject << /Im0 " + imageId + " 0 R >> >> " +
               "/Contents " + contentId + " 0 R >>\n"); End();
 
-            // Fit the raster to A4 without stretching, preserve all edges.
-            double scale = Math.Min(555.0 / width, 802.0 / height);
-            string drawW = (width * scale).ToString("0.###", Invariant);
-            string drawH = (height * scale).ToString("0.###", Invariant);
-            string offsetX = ((595 - width * scale) / 2).ToString("0.###", Invariant);
-            string offsetY = ((842 - height * scale) / 2).ToString("0.###", Invariant);
+            // Scale AFTER applying orientation, preserving original RGB bytes.
+            // Single PDF image affine matrix, no destructive image rewrite.
             byte[] commands = Encoding.ASCII.GetBytes(
-                "q " + drawW + " 0 0 " + drawH + " " + offsetX + " " + offsetY +
-                " cm /Im0 Do Q\n");
+                PageRotationRecipe.PdfImageCommand(
+                    width, height, images[i].RotationDegrees));
             Begin(contentId);
             W("<< /Length " + commands.Length.ToString(Invariant) + " >>\nstream\n");
             output.Write(commands);
