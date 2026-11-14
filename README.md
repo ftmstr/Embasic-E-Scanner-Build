@@ -8,10 +8,10 @@ This **PUBLIC** repository is the sole active engineering source of truth for fu
 - The legacy Kotlin Compose Desktop prototype is migration evidence, **not** the Windows target.
 
 ## Build boundaries
-`windows/` currently contains C#/.NET 10 foundation contracts, a bootstrap probe and synthetic PDF self-tests; it is **not yet a complete WinUI 3 scanner**. `android/` contains the Android foundation and remains subject to approved dependency/toolchain verification. `docs/` holds public architecture and security notes. `tests/` holds only synthetic/golden fixtures. `.github/workflows/` contains separate, least-privilege CI jobs.
+`windows/` now contains C#/.NET 10 foundation contracts **and an actual WinUI 3 preview project** with local image import, thumbnail ordering and a first raster PDF export code path. `android/` now contains the Kotlin/Compose/Material 3 preview with multi-image import, private originals, thumbnail ordering and Android platform PDF export. Both preview projects are **not feature-complete** and remain subject to toolchain, transitive dependency rights and device verification. `docs/` holds public architecture and security notes. `tests/` holds only synthetic/golden fixtures. `.github/workflows/` contains separate, least-privilege CI jobs.
 
 ## Security
 **No automatic synchronization from private to public.** Before any source snapshot import: explicit allowlist, complete content/secret and license inspection, dependency/transitive audit, clean authorship and provenance, and independent approval. Use only generated synthetic fixtures. Never use private signing assets in CI.
 
 ## Status
-**Foundation bootstrap only.** Camera, pairing, OCR, perspective correction, searchable PDF, secure transfer and signed releases are **NOT VERIFIED** here. GitHub Actions checks must actually finish before a PASS can be reported.
+**First functional UI source, NOT release.** Android Compose and Windows WinUI3 workspace previews have been added. Builds, source-level PDF implementations and simulated fixtures are not evidence of actual device/GUI operation. Image capture from a camera, perspective correction, offline OCR, searchable PDF, secure QR/TLS transfer, full Android-Windows parity, atomic Android SAF final output, SBOM/licensing and signed releases remain **NOT VERIFIED** or unimplemented. Only completed exact-HEAD jobs may be reported PASS.
