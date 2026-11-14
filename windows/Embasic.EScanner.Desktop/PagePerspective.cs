@@ -3,7 +3,7 @@ namespace Embasic.EScanner.Desktop;
 /// <summary>
 /// CPU-only bounded inverse projective mapping for PDF raster export.
 /// Reads the already decoded/EXIF-oriented image, never alters original bytes.
-/// Maximum output 2400px/edge; physical WinRT PDF visual QA NOT VERIFIED.
+/// Source-resolution crop up to 6000px/edge and 12MP; WinRT PDF QA NOT VERIFIED.
 /// </summary>
 internal static class PagePerspective
 {
@@ -15,19 +15,9 @@ internal static class PagePerspective
             throw new InvalidDataException("Invalid quad or source image pixels");
         if (quad.IsFullFrame) return (source, width, height);
         double w = width, h = height;
-        double Distance(int i, int j)
-        {
-            double dx = (quad.X(j) - quad.X(i)) * w;
-            double dy = (quad.Y(j) - quad.Y(i)) * h;
-            return Math.Sqrt(dx * dx + dy * dy);
-        }
-        double targetW = Math.Max(Distance(0, 1), Distance(3, 2));
-        double targetH = Math.Max(Distance(0, 3), Distance(1, 2));
-        double factor = Math.Min(1.0, 2400.0 / Math.Max(targetW, targetH));
-        int outW = Math.Max(32, (int)Math.Round(targetW * factor));
-        int outH = Math.Max(32, (int)Math.Round(targetH * factor));
-        if ((long)outW * outH > 6_000_000L)
-            throw new InvalidDataException("Crop output pixel limit");
+        var plan = CropOutputPlan.Measure(checked((int)width), checked((int)height), quad);
+        int outW = plan.Width;
+        int outH = plan.Height;
         // Homography from unit destination rectangle (u,v) -> original quad.
         double x0 = quad.X(0) * (w - 1), y0 = quad.Y(0) * (h - 1);
         double x1 = quad.X(1) * (w - 1), y1 = quad.Y(1) * (h - 1);

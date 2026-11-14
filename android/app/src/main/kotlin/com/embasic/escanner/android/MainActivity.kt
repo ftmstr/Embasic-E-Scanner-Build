@@ -337,6 +337,49 @@ class MainActivity : Activity() {
 
     private fun thumbnail(file: File): Bitmap = decodeBounded(file, 480)
 
+    /**
+     * Export-only decode; unlike the preview's 2400px limit this preserves
+     * 12MP and eligible <=24MP sources without resampling. Above 24MP, one
+     * power-of-two safety sample may be used (not full-resolution parity).
+     * Reject before bitmap allocation if the process heap cannot hold both
+     * decode + projective output + scratch; never fall back silently to 2400px.
+     */
+    private fun decodeForExport(file: File, quad: PageQuadRecipe): Bitmap {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, opts)
+        if (opts.outWidth <= 0 || opts.outHeight <= 0 ||
+            opts.outWidth.toLong() * opts.outHeight > 100_000_000L)
+            throw IOException("PDF görsel geometrisi sınırı")
+        var sample = 1
+        while (opts.outWidth.toLong() / sample * (opts.outHeight / sample) > 24_000_000L ||
+            maxOf(opts.outWidth, opts.outHeight) / sample > 8000) {
+            sample *= 2
+        }
+        val plannedWidth = maxOf(1, opts.outWidth / sample)
+        val plannedHeight = maxOf(1, opts.outHeight / sample)
+        val projected = if (quad.isFullFrame) 0L
+                        else CropOutputPlan.measure(plannedWidth, plannedHeight, quad)
+                            .let { it.width.toLong() * it.height }
+        val decodeBytes = plannedWidth.toLong() * plannedHeight * 4
+        val estimatedPeak = decodeBytes + projected * 4 + 24L * 1024 * 1024
+        val runtime = Runtime.getRuntime()
+        val headroom = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory())
+        if (estimatedPeak > headroom)
+            throw IOException("PDF kırpma için kullanılabilir bellek yetersiz")
+        opts.inJustDecodeBounds = false
+        opts.inPreferredConfig = Bitmap.Config.ARGB_8888
+        opts.inScaled = false
+        opts.inSampleSize = sample
+        val bitmap = BitmapFactory.decodeFile(file.absolutePath, opts)
+            ?: throw IOException("PDF görseli çözümlenemedi")
+        if (bitmap.width.toLong() * bitmap.height > 24_000_000L ||
+            maxOf(bitmap.width, bitmap.height) > 8000) {
+            bitmap.recycle()
+            throw IOException("Çözümlenen görüntü kaynak sınırı")
+        }
+        return bitmap
+    }
+
     private fun decodeBounded(file: File, largestEdge: Int): Bitmap {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, opts)
@@ -361,7 +404,7 @@ class MainActivity : Activity() {
                     throw IOException("Orijinal değişti")
                 if (!PageRotationRecipe.isValid(image.rotationDegrees))
                     throw IOException("Geçersiz döndürme açısı")
-                val original = decodeBounded(image.file, 2400)
+                val original = decodeForExport(image.file, image.quad)
                 val bitmap = try {
                     if (image.quad.isFullFrame) original
                     else PagePerspective.warp(original, image.quad)
