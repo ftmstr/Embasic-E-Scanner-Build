@@ -7,15 +7,17 @@ version-pinned BOM compatible with the retained AGP 8.13.2/SDK 36 build,
 and Android platform-only PDF APIs. The preview's actual source implements:
 a document picker with multiple JPEG/PNG images, bounded and header-sniffed
 copies into private immutable originals, SHA-256 integrity on persisted
-workspace recovery, thumbnail display, page reordering, removal and
-on-device A4 image PDF generation. Export writes a **locally staged and
+workspace recovery, thumbnail display, page reordering, removal,
+**non-destructive clockwise 90° rotation/reset stored per page** and
+on-device A4 image PDF generation. Rotations are applied to both the
+thumbnail and A4 PDF canvas, never to private source JPEG/PNG bytes. Export writes a **locally staged and
 page-count-validated** PDF to a newly user-selected SAF destination.
 The final SAF destination copy is **not an atomic replace**; the UI states
 this openly and a failed provider write may leave a partial destination.
 No storage permission, network or advertisement SDK is required.
 
 **Strict non-claims:** Device installation and touch/camera acceptance are
-NOT VERIFIED; crop, perspective, offline OCR, searchable PDF, undo/redo,
+NOT VERIFIED; four-corner crop, perspective, offline OCR, searchable PDF, undo/redo,
 select-all, QR pairing and Windows feature parity are NOT implemented.
 Import and PDF work is queued on a single background executor; import data
 never reaches any ad layer. A 64MiB image source cap, 100-page workspace
@@ -52,11 +54,12 @@ source Git blob identity and copied upstream license; see
   `c27417f274bd1cf2f36e1f93d54e3de840d54e43`. A SHA text file alone
   would NOT have been enough.
 - `compileSdk=36`, `targetSdk=36`, `minSdk=26` and Java target 17.
-- `:app` has one `Activity` that displays an explicit non-release message.
+- `:app` has one functional Compose workspace Activity for SAF import,
+  local thumbnails, reorder, 90° rotation and raster PDF staging.
   There are **no camera, storage or network permissions**.
-- Third-party *production runtime* libraries for Compose/Material 3, CameraX,
-  OCR, networking, monetization and export are **not included** pending
-  direct/transitive licensing review. JUnit 4.13.2 (EPL-1.0) and its
+- Compose/Material 3 **are included** as preview runtime dependencies and
+  remain under unresolved direct/transitive licensing review. CameraX,
+  OCR, networking, monetization SDKs are **not included**. JUnit 4.13.2 (EPL-1.0) and its
   Hamcrest Core 1.3 (BSD) dependency are **testImplementation only**;
   CI must prove neither appears in the production runtime graph.
   This is not a scanner and not platform feature parity.
