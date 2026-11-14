@@ -32,6 +32,7 @@ kotlin {
     }
 }
 
+// Compose BOM 2025.08.00 retained for SDK36/AGP8.13 AAR metadata compatibility.
 // First functional Compose slice. Native platform PdfDocument is used for local PDF;
 // Compose direct+transitive licensing and SDK distribution remain RELEASE NO-GO.
 
@@ -39,7 +40,7 @@ kotlin {
 // Direct POM compile transitive: hamcrest-core 1.3, BSD-style license.
 // See docs/ANDROID-TOOLCHAIN-LICENSE-RESEARCH-20261029.md; not runtime license clearance.
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation(platform("androidx.compose:compose-bom:2025.08.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
