@@ -40,6 +40,29 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          dotnet run --project windows/Embasic.EScanner.PdfSmoke/Embasic.EScanner.PdfSmoke.csproj -c Release -p:RuntimeIdentifier=win-x64
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The headless WinRT PDF decoder may be unavailable to CI's
+          # noninteractive user session. Bound the probe so a blocked API
+          # never consumes a whole runner. Failure remains FAIL/BLOCKED.
+          $psi = [System.Diagnostics.ProcessStartInfo]::new('dotnet')
+          foreach ($arg in @('run', '--project',
+            'windows/Embasic.EScanner.PdfSmoke/Embasic.EScanner.PdfSmoke.csproj',
+            '-c', 'Release', '-p:RuntimeIdentifier=win-x64')) {
+            [void]$psi.ArgumentList.Add($arg)
+          }
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $child = [System.Diagnostics.Process]::Start($psi)
+          if ($null -eq $child) { throw 'NOT VERIFIED: PDF smoke process unavailable' }
+          try {
+            $stdout = $child.StandardOutput.ReadToEndAsync()
+            $stderr = $child.StandardError.ReadToEndAsync()
+            if (!$child.WaitForExit(180000)) {
+              $child.Kill($true)
+              throw 'BLOCKED: Windows headless PDF smoke exceeded bounded 180s; NOT VERIFIED'
+            }
+            Write-Output $stdout.GetAwaiter().GetResult()
+            Write-Output $stderr.GetAwaiter().GetResult()
+            if ($child.ExitCode -ne 0) { exit $child.ExitCode }
+          } finally { $child.Dispose() }
           Write-Output 'NOT VERIFIED: interactive WinUI3 user flow, Android device PDF, rendered PDF visual QA or signed release'
