@@ -52,6 +52,7 @@ static byte[] TinyPng()
 string folder = Path.Combine(Path.GetTempPath(), "embasic-pdf-real-smoke-" +
     Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(folder);
+Console.WriteLine("PDF_SMOKE_STAGE=fixture-directory-ready"); Console.Out.Flush();
 try
 {
     string a = Path.Combine(folder, "first.png");
@@ -59,7 +60,10 @@ try
     string pdf = Path.Combine(folder, "result.pdf");
     File.WriteAllBytes(a, TinyPng());
     File.WriteAllBytes(b, TinyPng());
+    Console.WriteLine("PDF_SMOKE_STAGE=png-written"); Console.Out.Flush();
+    Console.WriteLine("PDF_SMOKE_STAGE=before-real-export"); Console.Out.Flush();
     int pages = await RasterPdfWriter.ExportVerifiedAsync([a, b], pdf);
+    Console.WriteLine("PDF_SMOKE_STAGE=after-real-export"); Console.Out.Flush();
     if (pages != 2 || !File.Exists(pdf) || new FileInfo(pdf).Length < 350)
         throw new Exception("real PDF was not created");
     var bytes = File.ReadAllBytes(pdf);
@@ -74,6 +78,7 @@ try
     bool rejected = false;
     try
     {
+        Console.WriteLine("PDF_SMOKE_STAGE=before-invalid-export"); Console.Out.Flush();
         await RasterPdfWriter.ExportVerifiedAsync([a, invalid], pdf);
     }
     catch { rejected = true; }
