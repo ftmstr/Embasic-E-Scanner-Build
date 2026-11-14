@@ -37,10 +37,15 @@ internal static class RasterPdfWriter
         {
             await WriteRasterPdfAsync(immutableImagePaths, staging);
             var tempFile = await StorageFile.GetFileFromPathAsync(staging);
-            var reopened = await PdfDocument.LoadFromFileAsync(tempFile);
-            if (reopened.PageCount != immutableImagePaths.Count)
-                throw new InvalidDataException("PDF sayfa sayısı uyuşmuyor");
-            // No-overwrite intermediate stage; atomic replace after validation.
+            // Open and close the native validation STREAM before atomic move,
+            // so this process does not hold a sharing lock on the staged PDF.
+            using (var readStream = await tempFile.OpenReadAsync())
+            {
+                var reopened = await PdfDocument.LoadFromStreamAsync(readStream);
+                if (reopened.PageCount != immutableImagePaths.Count)
+                    throw new InvalidDataException("PDF sayfa sayısı uyuşmuyor");
+            }
+            // Same-directory atomic replacement; never copy an unvalidated PDF.
             File.Move(staging, destination, overwrite: true);
             return immutableImagePaths.Count;
         }
