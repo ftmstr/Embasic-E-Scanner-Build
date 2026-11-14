@@ -1,5 +1,36 @@
 # Embasic E-Scanner Android — independent PUBLIC foundation
 
+## First usable Android UI preview (14 November 2026, RELEASE NO-GO)
+
+The Kotlin `MainActivity` now uses **Jetpack Compose/Material 3**, a
+version-pinned BOM compatible with the retained AGP 8.13.2/SDK 36 build,
+and Android platform-only PDF APIs. The preview's actual source implements:
+a document picker with multiple JPEG/PNG images, bounded and header-sniffed
+copies into private immutable originals, SHA-256 integrity on persisted
+workspace recovery, thumbnail display, page reordering, removal and
+on-device A4 image PDF generation. Export writes a **locally staged and
+page-count-validated** PDF to a newly user-selected SAF destination.
+The final SAF destination copy is **not an atomic replace**; the UI states
+this openly and a failed provider write may leave a partial destination.
+No storage permission, network or advertisement SDK is required.
+
+**Strict non-claims:** Device installation and touch/camera acceptance are
+NOT VERIFIED; crop, perspective, offline OCR, searchable PDF, undo/redo,
+select-all, QR pairing and Windows feature parity are NOT implemented.
+Import and PDF work is queued on a single background executor; import data
+never reaches any ad layer. A 64MiB image source cap, 100-page workspace
+cap, 100-million-pixel decode safety guard and SHA-256 private-asset
+checks are initial safeguards; production performance is NOT VERIFIED.
+
+**New dependency release gate:** Compose BOM `2025.08.00`,
+`androidx.compose.ui:ui`, `androidx.compose.foundation:foundation`,
+`androidx.compose.material3:material3`, and
+`org.jetbrains.kotlin.plugin.compose:2.3.21` are NEW dependencies.
+Vendor documentation establishes tooling guidance, but individual
+versions, all transitive license rights, third-party notices and SBOM
+have **NOT been fully cleared for commercial release**. Build/debug CI is
+not licensing approval, signing or device smoke.
+
 Status: **CLEAN-ROOM FOUNDATION ONLY / NO-GO RELEASE**. This source was
 authored afresh for the PUBLIC ftmstr/Embasic-E-Scanner-Build repository.
 No PRIVATE Git history, APK, proprietary scan, signing key, customer
