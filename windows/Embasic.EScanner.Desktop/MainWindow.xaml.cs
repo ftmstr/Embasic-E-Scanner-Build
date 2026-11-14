@@ -11,11 +11,12 @@ namespace Embasic.EScanner.Desktop;
 
 /// <summary>
 /// Unpackaged WinUI3 first vertical slice: local PNG/JPEG originals, thumbnails,
-/// ordering and deletion. No OCR, crop, PDF engine, or release packaging yet.
+/// ordering, non-destructive rotation and deletion. No OCR, perspective crop,
+/// searchable PDF, or release packaging yet.
 /// </summary>
 public sealed partial class MainWindow : Window
 {
-    private sealed record ScanPage(string FileName, string Sha256);
+    private sealed record ScanPage(string FileName, string Sha256, int RotationDegrees = 0);
     private readonly List<ScanPage> _pages = [];
     private readonly string _privateRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -45,15 +46,17 @@ public sealed partial class MainWindow : Window
                 foreach (var entry in lines.Take(MaxPages))
                 {
                     var chunks = entry.Split(':');
-                    if (chunks.Length != 2 ||
+                    if (chunks.Length is not (2 or 3) ||
                         !System.Text.RegularExpressions.Regex.IsMatch(
                             chunks[0], @"^[0-9a-fA-F-]{36}\.(jpg|png)$") ||
                         !System.Text.RegularExpressions.Regex.IsMatch(
-                            chunks[1], @"^[0-9a-f]{64}$")) continue;
+                            chunks[1], @"^[0-9a-f]{64}$") ||
+                        !PageRotationRecipe.TryParse(chunks.Length == 3 ? chunks[2] : null,
+                            out int rotation)) continue;
                     var path = Path.Combine(_privateRoot, chunks[0]);
                     if (File.Exists(path) && new FileInfo(path).Length <= MaxBytes &&
                         await DigestAsync(path) == chunks[1])
-                        _pages.Add(new ScanPage(chunks[0], chunks[1]));
+                        _pages.Add(new ScanPage(chunks[0], chunks[1], rotation));
                 }
             }
             await RenderPagesAsync();
@@ -109,17 +112,19 @@ public sealed partial class MainWindow : Window
         try
         {
             // Validate immutable private images before writing anything.
-            var paths = new List<string>();
+            var pagesToExport = new List<RasterPdfPage>();
             foreach (var page in _pages)
             {
                 string image = Path.Combine(_privateRoot, page.FileName);
                 if (await DigestAsync(image) != page.Sha256)
                     throw new InvalidDataException("Orijinal dosya SHA-256 uyuşmuyor");
-                paths.Add(image);
+                if (!PageRotationRecipe.IsValid(page.RotationDegrees))
+                    throw new InvalidDataException("Invalid rotation recipe");
+                pagesToExport.Add(new RasterPdfPage(image, page.RotationDegrees));
             }
             if (string.IsNullOrWhiteSpace(file.Path))
                 throw new InvalidDataException("Bu konumdaki dosya doğrudan yazılamıyor");
-            int count = await RasterPdfWriter.ExportVerifiedAsync(paths, file.Path);
+            int count = await RasterPdfWriter.ExportVerifiedPagesAsync(pagesToExport, file.Path);
             StatusText.Text = $"A4 PDF kaydedildi: {count} sayfa. (OCR yok.)";
         }
         catch (Exception error)
@@ -200,7 +205,9 @@ public sealed partial class MainWindow : Window
             };
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
             var thumbnail = new Image {
-                Width = 92, Height = 120, Stretch = Stretch.Uniform
+                Width = 92, Height = 120, Stretch = Stretch.Uniform,
+                RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5),
+                RenderTransform = new RotateTransform { Angle = page.RotationDegrees }
             };
             var bitmap = new BitmapImage { DecodePixelWidth = 240 };
             var file = await StorageFile.GetFileFromPathAsync(
@@ -214,6 +221,10 @@ public sealed partial class MainWindow : Window
                 Text = $"Sayfa {index + 1} · {page.FileName[(page.FileName.LastIndexOf('.') + 1)..].ToUpperInvariant()}",
                 FontSize = 17, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             });
+            controls.Children.Add(new TextBlock {
+                Text = $"Döndürme: {page.RotationDegrees}° · Orijinal korunur",
+                Opacity = 0.7
+            });
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             int selected = index;
             var up = new Button { Content = "↑", IsEnabled = index > 0 };
@@ -226,6 +237,14 @@ public sealed partial class MainWindow : Window
             buttons.Children.Add(down);
             buttons.Children.Add(delete);
             controls.Children.Add(buttons);
+            var editButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var rotate = new Button { Content = "↻ 90°" };
+            rotate.Click += async (_, _) => await RotatePageAsync(selected);
+            var reset = new Button { Content = "Sıfırla", IsEnabled = page.RotationDegrees != 0 };
+            reset.Click += async (_, _) => await ResetPageRotationAsync(selected);
+            editButtons.Children.Add(rotate);
+            editButtons.Children.Add(reset);
+            controls.Children.Add(editButtons);
             row.Children.Add(controls);
             card.Child = row;
             PageStack.Children.Add(card);
@@ -239,6 +258,26 @@ public sealed partial class MainWindow : Window
         SaveOrder();
         await RenderPagesAsync();
         StatusText.Text = "Sayfa sırası güncellendi.";
+    }
+
+    private async Task RotatePageAsync(int index)
+    {
+        if (_busy || index < 0 || index >= _pages.Count) return;
+        _pages[index] = _pages[index] with {
+            RotationDegrees = PageRotationRecipe.Clockwise(_pages[index].RotationDegrees)
+        };
+        SaveOrder();
+        await RenderPagesAsync();
+        StatusText.Text = $"Sayfa {index + 1}: {_pages[index].RotationDegrees}° döndürüldü.";
+    }
+
+    private async Task ResetPageRotationAsync(int index)
+    {
+        if (_busy || index < 0 || index >= _pages.Count) return;
+        _pages[index] = _pages[index] with { RotationDegrees = 0 };
+        SaveOrder();
+        await RenderPagesAsync();
+        StatusText.Text = $"Sayfa {index + 1}: orijinal yönde.";
     }
 
     private async Task RemovePageAsync(int index)
@@ -257,7 +296,8 @@ public sealed partial class MainWindow : Window
         var stage = Path.Combine(_privateRoot, "workspace-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
-            File.WriteAllLines(stage, _pages.Select(p => p.FileName + ":" + p.Sha256),
+            File.WriteAllLines(stage, _pages.Select(p =>
+                p.FileName + ":" + p.Sha256 + ":" + p.RotationDegrees),
                 Encoding.UTF8);
             File.Move(stage, ManifestPath, true);
         }
