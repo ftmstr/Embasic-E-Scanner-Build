@@ -36,19 +36,26 @@ jobs:
           dotnet build windows/Embasic.EScanner.Desktop/Embasic.EScanner.Desktop.csproj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --no-restore
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Output 'NOT VERIFIED: WinUI3 window launch, native visual QA, signed package, SDK REDIST, OCR or feature parity'
-      - name: Run actual headless Windows raster PDF save/reopen/error-preservation smoke
+      - name: Compile dedicated headless raster PDF smoke BEFORE launching runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          # The headless WinRT PDF decoder may be unavailable to CI's
-          # noninteractive user session. Bound the probe so a blocked API
-          # never consumes a whole runner. Failure remains FAIL/BLOCKED.
+          $project = 'windows/Embasic.EScanner.PdfSmoke/Embasic.EScanner.PdfSmoke.csproj'
+          dotnet restore $project -p:RuntimeIdentifier=win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build $project -c Release -p:RuntimeIdentifier=win-x64 --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'PDF smoke separate .NET compile PASS; real WinRT API runtime still NOT VERIFIED'
+      - name: Run PREBUILT headless Windows raster PDF save/reopen/error-preservation smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Avoid hidden NuGet restoration/build inside the time-limited child.
+          # Distinguish compile/restore from actual WinRT runtime stall.
+          $dll = 'windows/Embasic.EScanner.PdfSmoke/bin/Release/net10.0-windows10.0.26100.0/win-x64/Embasic.EScanner.PdfSmoke.dll'
+          if (!(Test-Path $dll)) { throw 'NOT VERIFIED: compiled PDF smoke DLL missing' }
           $psi = [System.Diagnostics.ProcessStartInfo]::new('dotnet')
-          foreach ($arg in @('run', '--project',
-            'windows/Embasic.EScanner.PdfSmoke/Embasic.EScanner.PdfSmoke.csproj',
-            '-c', 'Release', '-p:RuntimeIdentifier=win-x64')) {
-            [void]$psi.ArgumentList.Add($arg)
-          }
+          [void]$psi.ArgumentList.Add((Resolve-Path $dll).Path)
           $psi.UseShellExecute = $false
           $psi.RedirectStandardOutput = $true
           $psi.RedirectStandardError = $true
