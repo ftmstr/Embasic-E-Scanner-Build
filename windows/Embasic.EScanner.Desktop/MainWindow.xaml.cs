@@ -95,6 +95,41 @@ public sealed partial class MainWindow : Window
         finally { SetBusy(false); }
     }
 
+    private async void SavePdf_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || _pages.Count == 0) return;
+        var picker = new FileSavePicker();
+        picker.FileTypeChoices.Add("PDF dosyası", new List<string> { ".pdf" });
+        picker.SuggestedFileName = "Embasic-Scan";
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSaveFileAsync();
+        if (file is null) return;
+        SetBusy(true, "PDF geçici dosyada oluşturuluyor ve yeniden açılarak doğrulanıyor…");
+        try
+        {
+            // Validate immutable private images before writing anything.
+            var paths = new List<string>();
+            foreach (var page in _pages)
+            {
+                string image = Path.Combine(_privateRoot, page.FileName);
+                if (await DigestAsync(image) != page.Sha256)
+                    throw new InvalidDataException("Orijinal dosya SHA-256 uyuşmuyor");
+                paths.Add(image);
+            }
+            if (string.IsNullOrWhiteSpace(file.Path))
+                throw new InvalidDataException("Bu konumdaki dosya doğrudan yazılamıyor");
+            int count = await RasterPdfWriter.ExportVerifiedAsync(paths, file.Path);
+            StatusText.Text = $"A4 PDF kaydedildi: {count} sayfa. (OCR yok.)";
+        }
+        catch (Exception error)
+        {
+            StatusText.Text = "PDF kaydedilemedi: " + error.GetType().Name +
+                ". Doğrulama başarısızsa mevcut hedef korunur.";
+        }
+        finally { SetBusy(false); }
+    }
+
     private async Task<ScanPage> CopyPrivateAsync(StorageFile source)
     {
         var path = source.Path;
@@ -153,6 +188,7 @@ public sealed partial class MainWindow : Window
     {
         PageStack.Children.Clear();
         PageCount.Text = $"{_pages.Count} sayfa";
+        SavePdfButton.IsEnabled = !_busy && _pages.Count > 0;
         for (int index = 0; index < _pages.Count; index++)
         {
             var page = _pages[index];
@@ -231,6 +267,7 @@ public sealed partial class MainWindow : Window
     private void SetBusy(bool value, string? message = null)
     {
         _busy = value;
+        SavePdfButton.IsEnabled = !value && _pages.Count > 0;
         if (message is not null) StatusText.Text = message;
     }
 }
