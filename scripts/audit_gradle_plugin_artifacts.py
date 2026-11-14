@@ -350,6 +350,11 @@ def check_partial_notice(result: dict, notice: str) -> None:
             counts["modules"] - counts["pomWithLicenseNames"],
         "pluginCachedFileHashes": counts["hashedFiles"],
     }
+    # Print every observed count BEFORE fail-closed comparison, so one real
+    # dependency-graph run gives all four required NOTICE corrections.
+    # Never auto-approve licensing or silently overwrite published NOTICE.
+    for name, count in expected.items():
+        print(f"PARTIAL_NOTICE_EXPECTED: - {name}: {count}", flush=True)
     for name, count in expected.items():
         marker = f"- {name}: {count}"
         if notice.splitlines().count(marker) != 1:
