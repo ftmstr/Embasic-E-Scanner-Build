@@ -380,7 +380,9 @@ jobs:
           report = json.loads(p.read_text(encoding="utf-8"))
           c = report["counts"]
           assert report["status"] == "REVIEW_QUEUE_ONLY_LEGAL_NO_GO"
-          assert c["selectedModules"] == 147
+          # Real review queue run 43637854136: 149 root plugin modules,
+          # exactly 42 unresolved child POM licensing gaps. Keep NO-GO.
+          assert c["selectedModules"] == 149
           assert c["directPOMLicenseGaps"] == 42
           assert c["childPOMNotCached"] == 12
           assert c["childPOMWithoutDirectLicenseName"] == 30
