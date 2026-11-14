@@ -13,7 +13,8 @@ namespace Embasic.EScanner.Desktop;
 /// It is NOT a full PdfEngine (no OCR, text layer, ICC profile, annotations
 /// or signed release), and its runtime/visual QA is still NOT VERIFIED.
 /// </summary>
-internal readonly record struct RasterPdfPage(string ImagePath, int RotationDegrees);
+internal readonly record struct RasterPdfPage(string ImagePath, int RotationDegrees,
+    PageQuadRecipe? Quad = null);
 
 internal static class RasterPdfWriter
 {
@@ -35,7 +36,8 @@ internal static class RasterPdfWriter
         if (pages.Count is < 1 or > 100)
             throw new InvalidDataException("PDF sayfa sayısı sınırı");
         // Invalid transform recipes never create a staged target.
-        if (pages.Any(page => !PageRotationRecipe.IsValid(page.RotationDegrees)))
+        if (pages.Any(page => !PageRotationRecipe.IsValid(page.RotationDegrees) ||
+            !(page.Quad ?? PageQuadRecipe.Full).IsValid()))
             throw new InvalidDataException("Invalid non-destructive page rotation");
         if (string.IsNullOrWhiteSpace(destination) ||
             !string.Equals(Path.GetExtension(destination), ".pdf", StringComparison.OrdinalIgnoreCase))
@@ -100,6 +102,9 @@ internal static class RasterPdfWriter
         for (int i = 0; i < images.Count; i++)
         {
             (byte[] rgb, uint width, uint height) = await DecodeRgbAsync(images[i].ImagePath);
+            var quad = images[i].Quad ?? PageQuadRecipe.Full;
+            if (!quad.IsFullFrame)
+                (rgb, width, height) = PagePerspective.WarpRgb(rgb, width, height, quad);
             byte[] compressed;
             using (var buffer = new MemoryStream())
             {

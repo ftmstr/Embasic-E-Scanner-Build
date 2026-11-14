@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 
@@ -16,7 +17,8 @@ namespace Embasic.EScanner.Desktop;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
-    private sealed record ScanPage(string FileName, string Sha256, int RotationDegrees = 0);
+    private sealed record ScanPage(string FileName, string Sha256,
+        int RotationDegrees = 0, PageQuadRecipe? Quad = null);
     private readonly List<ScanPage> _pages = [];
     private readonly string _privateRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -46,17 +48,19 @@ public sealed partial class MainWindow : Window
                 foreach (var entry in lines.Take(MaxPages))
                 {
                     var chunks = entry.Split(':');
-                    if (chunks.Length is not (2 or 3) ||
+                    if (chunks.Length is not (2 or 3 or 4) ||
                         !System.Text.RegularExpressions.Regex.IsMatch(
                             chunks[0], @"^[0-9a-fA-F-]{36}\.(jpg|png)$") ||
                         !System.Text.RegularExpressions.Regex.IsMatch(
                             chunks[1], @"^[0-9a-f]{64}$") ||
-                        !PageRotationRecipe.TryParse(chunks.Length == 3 ? chunks[2] : null,
-                            out int rotation)) continue;
+                        !PageRotationRecipe.TryParse(chunks.Length >= 3 ? chunks[2] : null,
+                            out int rotation) ||
+                        !PageQuadRecipe.TryParse(chunks.Length == 4 ? chunks[3] : null,
+                            out var quad)) continue;
                     var path = Path.Combine(_privateRoot, chunks[0]);
                     if (File.Exists(path) && new FileInfo(path).Length <= MaxBytes &&
                         await DigestAsync(path) == chunks[1])
-                        _pages.Add(new ScanPage(chunks[0], chunks[1], rotation));
+                        _pages.Add(new ScanPage(chunks[0], chunks[1], rotation, quad));
                 }
             }
             await RenderPagesAsync();
@@ -118,9 +122,11 @@ public sealed partial class MainWindow : Window
                 string image = Path.Combine(_privateRoot, page.FileName);
                 if (await DigestAsync(image) != page.Sha256)
                     throw new InvalidDataException("Orijinal dosya SHA-256 uyuşmuyor");
-                if (!PageRotationRecipe.IsValid(page.RotationDegrees))
-                    throw new InvalidDataException("Invalid rotation recipe");
-                pagesToExport.Add(new RasterPdfPage(image, page.RotationDegrees));
+                if (!PageRotationRecipe.IsValid(page.RotationDegrees) ||
+                    !(page.Quad ?? PageQuadRecipe.Full).IsValid())
+                    throw new InvalidDataException("Invalid non-destructive transform recipe");
+                pagesToExport.Add(new RasterPdfPage(image, page.RotationDegrees,
+                    page.Quad ?? PageQuadRecipe.Full));
             }
             if (string.IsNullOrWhiteSpace(file.Path))
                 throw new InvalidDataException("Bu konumdaki dosya doğrudan yazılamıyor");
@@ -224,7 +230,9 @@ public sealed partial class MainWindow : Window
                 FontSize = 17, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             });
             controls.Children.Add(new TextBlock {
-                Text = $"Döndürme: {page.RotationDegrees}° · Orijinal korunur",
+                Text = $"Döndürme: {page.RotationDegrees}° · " +
+                    ((page.Quad ?? PageQuadRecipe.Full).IsFullFrame ?
+                    "Kırpma yok" : "4-köşe kırpma") + " · Orijinal korunur",
                 Opacity = 0.7
             });
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -246,11 +254,134 @@ public sealed partial class MainWindow : Window
             reset.Click += async (_, _) => await ResetPageRotationAsync(selected);
             editButtons.Children.Add(rotate);
             editButtons.Children.Add(reset);
+            var crop = new Button { Content = "4 köşe" };
+            crop.Click += async (_, _) => await EditQuadAsync(selected);
+            editButtons.Children.Add(crop);
             controls.Children.Add(editButtons);
             row.Children.Add(controls);
             card.Child = row;
             PageStack.Children.Add(card);
         }
+    }
+
+    private async Task EditQuadAsync(int index)
+    {
+        if (_busy || index < 0 || index >= _pages.Count) return;
+        var page = _pages[index];
+        var file = await StorageFile.GetFileFromPathAsync(
+            Path.Combine(_privateRoot, page.FileName));
+        var bitmap = new BitmapImage { DecodePixelWidth = 500 };
+        using (var stream = await file.OpenReadAsync())
+            await bitmap.SetSourceAsync(stream);
+        if (bitmap.PixelWidth < 1 || bitmap.PixelHeight < 1)
+        {
+            StatusText.Text = "Görüntü geometrisi okunamadı; kırpma uygulanmadı.";
+            return;
+        }
+        double scale = Math.Min(360.0 / bitmap.PixelWidth, 440.0 / bitmap.PixelHeight);
+        double viewW = bitmap.PixelWidth * scale, viewH = bitmap.PixelHeight * scale;
+        var image = new Image {
+            Width = viewW, Height = viewH, Source = bitmap, Stretch = Stretch.Fill
+        };
+        var canvas = new Canvas {
+            Width = viewW, Height = viewH,
+            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent)
+        };
+        var frame = new Grid { Width = viewW, Height = viewH };
+        frame.Children.Add(image);
+        frame.Children.Add(canvas);
+        PageQuadRecipe draft = page.Quad ?? PageQuadRecipe.Full;
+        int active = -1;
+        void RenderHandles()
+        {
+            canvas.Children.Clear();
+            for (int i = 0; i < 4; i++)
+            {
+                int j = (i + 1) % 4;
+                canvas.Children.Add(new Line {
+                    X1 = draft.X(i) * viewW, Y1 = draft.Y(i) * viewH,
+                    X2 = draft.X(j) * viewW, Y2 = draft.Y(j) * viewH,
+                    Stroke = new SolidColorBrush(Microsoft.UI.Colors.DeepSkyBlue),
+                    StrokeThickness = 3
+                });
+                var knob = new Ellipse {
+                    Width = 22, Height = 22,
+                    Fill = new SolidColorBrush(Microsoft.UI.Colors.DodgerBlue),
+                    Stroke = new SolidColorBrush(Microsoft.UI.Colors.White),
+                    StrokeThickness = 2
+                };
+                Canvas.SetLeft(knob, draft.X(i) * viewW - 11);
+                Canvas.SetTop(knob, draft.Y(i) * viewH - 11);
+                canvas.Children.Add(knob);
+            }
+        }
+        RenderHandles();
+        canvas.PointerPressed += (_, args) =>
+        {
+            var p = args.GetCurrentPoint(canvas).Position;
+            double best = 45.0 * 45.0;
+            active = -1;
+            for (int i = 0; i < 4; i++)
+            {
+                double dx = p.X - draft.X(i) * viewW;
+                double dy = p.Y - draft.Y(i) * viewH;
+                double d2 = dx * dx + dy * dy;
+                if (d2 < best) { best = d2; active = i; }
+            }
+            if (active >= 0) canvas.CapturePointer(args.Pointer);
+        };
+        canvas.PointerMoved += (_, args) =>
+        {
+            if (active < 0) return;
+            var pos = args.GetCurrentPoint(canvas).Position;
+            int nx = (int)Math.Round(Math.Clamp(pos.X / viewW * 1000.0, 0, 1000));
+            int ny = (int)Math.Round(Math.Clamp(pos.Y / viewH * 1000.0, 0, 1000));
+            var candidate = draft.Moved(active, nx, ny);
+            if (candidate is not null)
+            {
+                draft = candidate;
+                RenderHandles();
+            }
+        };
+        canvas.PointerReleased += (_, args) =>
+        {
+            active = -1;
+            canvas.ReleasePointerCapture(args.Pointer);
+        };
+        canvas.PointerCanceled += (_, _) => { active = -1; };
+        var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(new TextBlock {
+            Text = "Mavi köşeleri sürükleyin. Katlanan veya çok küçük alanlar reddedilir.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        panel.Children.Add(frame);
+        var dialog = new ContentDialog {
+            XamlRoot = Content.XamlRoot,
+            Title = "Manuel 4-köşe kırpma",
+            Content = panel,
+            PrimaryButtonText = "Uygula",
+            SecondaryButtonText = "Sıfırla",
+            CloseButtonText = "İptal",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        var result = await dialog.ShowAsync();
+        if (result is not (ContentDialogResult.Primary or ContentDialogResult.Secondary))
+            return;
+        if (result == ContentDialogResult.Secondary)
+            draft = PageQuadRecipe.Full;
+        if (!draft.IsValid())
+        {
+            StatusText.Text = "Geçersiz kırpma reddedildi.";
+            return;
+        }
+        int current = _pages.FindIndex(p => p.FileName == page.FileName);
+        if (current < 0 || _busy) return;
+        _pages[current] = _pages[current] with { Quad = draft };
+        SaveOrder();
+        await RenderPagesAsync();
+        StatusText.Text = draft.IsFullFrame
+            ? "Dört-köşe kırpma sıfırlandı."
+            : "Dört köşe kaydedildi; orijinal değişmedi, PDF'de uygulanır.";
     }
 
     private async Task MovePageAsync(int from, int to)
@@ -299,7 +430,8 @@ public sealed partial class MainWindow : Window
         try
         {
             File.WriteAllLines(stage, _pages.Select(p =>
-                p.FileName + ":" + p.Sha256 + ":" + p.RotationDegrees),
+                p.FileName + ":" + p.Sha256 + ":" + p.RotationDegrees + ":" +
+                (p.Quad ?? PageQuadRecipe.Full).Encode()),
                 Encoding.UTF8);
             File.Move(stage, ManifestPath, true);
         }

@@ -65,7 +65,28 @@ foreach (var invalidQuad in new[] {
     Require(!PageQuadRecipe.TryParse(invalidQuad, out _), "reject unsafe quad");
 Require(PageQuadRecipe.Full.Moved(0, 1000, 1000) is null,
     "folded quad must reject before apply");
-Console.WriteLine("PASS: Windows normalized manual crop quad geometry/manifest safety");
+byte[] synthetic = new byte[8 * 8 * 3];
+for (int y = 0; y < 8; y++)
+    for (int x = 0; x < 8; x++)
+    {
+        int offset = (y * 8 + x) * 3;
+        synthetic[offset] = (byte)(x * 20);
+        synthetic[offset + 1] = (byte)(y * 20);
+        synthetic[offset + 2] = 17;
+    }
+var warped = PagePerspective.WarpRgb(synthetic, 8, 8, PageQuadRecipe.Inset);
+Require(warped.Width >= 32 && warped.Height >= 32 &&
+    warped.Rgb.Length == warped.Width * warped.Height * 3,
+    "real CPU projective warp output dimensions");
+Require(warped.Rgb[2] == 17, "perspective corner sampling retains synthetic blue");
+Require(PagePerspective.WarpRgb(synthetic, 8, 8,
+    PageQuadRecipe.Full).Rgb == synthetic, "identity preserves RGB bytes");
+try {
+    PagePerspective.WarpRgb(new byte[7], 8, 8, PageQuadRecipe.Inset);
+    throw new Exception("corrupt pixel buffer accepted");
+}
+catch (InvalidDataException) { /* expected */ }
+Console.WriteLine("PASS: Windows normalized manual crop quad and bounded CPU perspective warp");
 Console.WriteLine("PASS: Windows right-angle rotation manifest migration, " +
     "four A4 PDF matrices, corrupt angles and zero dimensions rejected; " +
     "actual WinUI3 visual/PDF-runtime test NOT VERIFIED");
