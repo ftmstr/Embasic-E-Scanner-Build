@@ -11,5 +11,7 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
     <Compile Include="../Embasic.EScanner.Desktop/RasterPdfWriter.cs"
              Link="RasterPdfWriter.cs" />
+    <Compile Include="../Embasic.EScanner.Desktop/PageRotationRecipe.cs"
+             Link="PageRotationRecipe.cs" />
   </ItemGroup>
 </Project>
