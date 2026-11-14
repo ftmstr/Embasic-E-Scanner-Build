@@ -205,7 +205,9 @@ public sealed partial class MainWindow : Window
             };
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
             var thumbnail = new Image {
-                Width = 92, Height = 120, Stretch = Stretch.Uniform,
+                // Square preview allocation prevents 90° render transforms
+                // spilling into adjacent workspace controls.
+                Width = 120, Height = 120, Stretch = Stretch.Uniform,
                 RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5),
                 RenderTransform = new RotateTransform { Angle = page.RotationDegrees }
             };
