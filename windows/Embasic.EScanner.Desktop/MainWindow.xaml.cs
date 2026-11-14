@@ -4,7 +4,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
-using Microsoft.UI.Xaml.Shapes;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 
@@ -298,13 +297,13 @@ public sealed partial class MainWindow : Window
             for (int i = 0; i < 4; i++)
             {
                 int j = (i + 1) % 4;
-                canvas.Children.Add(new Line {
+                canvas.Children.Add(new Microsoft.UI.Xaml.Shapes.Line {
                     X1 = draft.X(i) * viewW, Y1 = draft.Y(i) * viewH,
                     X2 = draft.X(j) * viewW, Y2 = draft.Y(j) * viewH,
                     Stroke = new SolidColorBrush(Microsoft.UI.Colors.DeepSkyBlue),
                     StrokeThickness = 3
                 });
-                var knob = new Ellipse {
+                var knob = new Microsoft.UI.Xaml.Shapes.Ellipse {
                     Width = 22, Height = 22,
                     Fill = new SolidColorBrush(Microsoft.UI.Colors.DodgerBlue),
                     Stroke = new SolidColorBrush(Microsoft.UI.Colors.White),
