@@ -16,6 +16,13 @@ android {
         versionName = "0.1.0-workspace-preview"
     }
 
+    // Bind the SAME synthetic golden fixture to Android JUnit and Windows .NET tests.
+    sourceSets {
+        getByName("test") {
+            resources.srcDir("../../tests/golden")
+        }
+    }
+
     buildFeatures {
         compose = true
     }

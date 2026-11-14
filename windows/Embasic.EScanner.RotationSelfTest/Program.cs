@@ -65,6 +65,32 @@ foreach (var invalidQuad in new[] {
     Require(!PageQuadRecipe.TryParse(invalidQuad, out _), "reject unsafe quad");
 Require(PageQuadRecipe.Full.Moved(0, 1000, 1000) is null,
     "folded quad must reject before apply");
+// One canonical TSV drives Android JUnit and Windows .NET exact geometry parity.
+string fixture = Path.Combine(AppContext.BaseDirectory, "perspective-output-v1.tsv");
+Require(File.Exists(fixture), "shared perspective geometry fixture copied");
+int sharedCases = 0;
+foreach (string row in File.ReadLines(fixture))
+{
+    if (string.IsNullOrWhiteSpace(row) || row.StartsWith('#')) continue;
+    string[] fields = row.Split('\t');
+    Require(fields.Length == 6, "shared golden TSV field count");
+    Require(PageQuadRecipe.TryParse(fields[3], out var quad), "shared golden quad");
+    var plan = CropOutputPlan.Measure(int.Parse(fields[1]), int.Parse(fields[2]), quad);
+    Require(plan.Width == int.Parse(fields[4]) &&
+        plan.Height == int.Parse(fields[5]), "shared golden geometry " + fields[0]);
+    Require(plan.Width <= CropOutputPlan.MaxEdge &&
+        (long)plan.Width * plan.Height <= CropOutputPlan.MaxPixels,
+        "bounded plan " + fields[0]);
+    sharedCases++;
+}
+Require(sharedCases == 5, "shared golden case count");
+foreach (var (w0, h0) in new[] { (0, 100), (-1, 200), (100, 0), (20000, 20000) })
+{
+    try { CropOutputPlan.Measure(w0, h0, PageQuadRecipe.Inset);
+        throw new Exception("accepted invalid input geometry"); }
+    catch (InvalidDataException) { /* expected */ }
+}
+Console.WriteLine("PASS: 5 shared Android/Windows 12MP perspective geometry goldens");
 byte[] synthetic = new byte[8 * 8 * 3];
 for (int y = 0; y < 8; y++)
     for (int x = 0; x < 8; x++)
