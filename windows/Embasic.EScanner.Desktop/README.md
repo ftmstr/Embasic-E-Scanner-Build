@@ -8,7 +8,10 @@ using an unpackaged, framework-dependent build
 The source implements a launchable XAML window, an OS image file picker,
 JPEG/PNG file signature checks, per-file 64MiB admission, full private copies
 in `%LOCALAPPDATA%/Embasic/E-Scanner/originals`, SHA-256 manifest recovery,
-image thumbnails, page movement up/down and deletion. It uses app-generated
+image thumbnails, page movement up/down, non-destructive clockwise 90°
+rotation/reset stored in the manifest (legacy entries migrate to 0°),
+and deletion. The A4 raster PDF writer applies the rotation as a PDF image
+matrix without altering the imported source or its SHA-256. It uses app-generated
 UUIDs and no camera, network, advertising or device identifiers.
 
 **Scope:** this preview now has a **first real raster A4 PDF export
@@ -17,7 +20,7 @@ same-target-directory staging, reopening via Windows.Data.Pdf for page-count
 validation and same-volume atomic replacement. The XAML project's actual
 native compile and the exported PDF's physical Windows GUI/runtime smoke
 must be recorded separately; source code alone is NOT a passing feature.
-This preview still does NOT crop, rotate, correct perspective, invoke OCR,
+This preview still does NOT support four-corner crop, perspective, invoke OCR,
 pair with Android, or provide a validated shipping installer. File picker's local `StorageFile.Path` must
 be available; cloud-backed/virtual providers are not yet supported. The
 initial manifest has simple private atomic `File.Move` replacement but
@@ -32,6 +35,6 @@ app requires matching Windows App SDK runtime on the device.
 dependencies have unresolved EULA/REDIST and source licensing gates.**
 Distribution is **NO-GO**, even if compile succeeds.
 
-Next: on-device GUI smoke, Windows real PDF export with staging/validation
+Next: on-device GUI/rotation visual smoke, Windows real PDF export with staging/validation
 and atomic replacement, local workspace parity tests with Android, then
 perspective, image engine, offline OCR, secure QR/TLS and signing.
