@@ -88,11 +88,17 @@ graph or a product-license approval. No downstream APK/AAB contains
 these entire compiler/build-time dependencies merely because they appear
 in the root Gradle plugin classpath.
 
+The current Android preview adds Compose runtime dependencies. The November 14 CI
+observed 149 Gradle plugin modules instead of the earlier 147-module snapshot.
+This is a PARTIAL local audit observation, not permission to distribute.
+The remaining license metadata and cached byte counters must be independently
+reconciled before this CI gate can pass.
+
 The publicly linked Android buildEnvironment audit and local-cache verifier
 recorded the following exact snapshot, with hashed binary/metadata evidence
 retained as a GitHub Actions artifact:
 
-- pluginModules: 147
+- pluginModules: 149
 - pluginLicenseNameMetadata: 105
 - pluginMissingLicenseMetadata: 42
 - pluginCachedFileHashes: 295
