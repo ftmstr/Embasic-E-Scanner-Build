@@ -11,9 +11,14 @@ in `%LOCALAPPDATA%/Embasic/E-Scanner/originals`, SHA-256 manifest recovery,
 image thumbnails, page movement up/down and deletion. It uses app-generated
 UUIDs and no camera, network, advertising or device identifiers.
 
-**Scope:** this first preview does NOT yet export real PDF on Windows, crop,
-rotate, correct perspective, invoke OCR, pair with Android, or provide a
-validated shipping installer. File picker's local `StorageFile.Path` must
+**Scope:** this preview now has a **first real raster A4 PDF export
+source path**, using the Windows image decoder + in-house .NET PDF stream,
+same-target-directory staging, reopening via Windows.Data.Pdf for page-count
+validation and same-volume atomic replacement. The XAML project's actual
+native compile and the exported PDF's physical Windows GUI/runtime smoke
+must be recorded separately; source code alone is NOT a passing feature.
+This preview still does NOT crop, rotate, correct perspective, invoke OCR,
+pair with Android, or provide a validated shipping installer. File picker's local `StorageFile.Path` must
 be available; cloud-backed/virtual providers are not yet supported. The
 initial manifest has simple private atomic `File.Move` replacement but
 has not passed adversarial powercut tests. Large-image decode, visual QA
