@@ -35,4 +35,11 @@ jobs:
           $ErrorActionPreference = 'Stop'
           dotnet build windows/Embasic.EScanner.Desktop/Embasic.EScanner.Desktop.csproj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --no-restore
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Output 'NOT VERIFIED: WinUI3 runtime launch, native visual QA, signed package, SDK legal REDIST, OCR, PDF or feature parity'
+          Write-Output 'NOT VERIFIED: WinUI3 window launch, native visual QA, signed package, SDK REDIST, OCR or feature parity'
+      - name: Run actual headless Windows raster PDF save/reopen/error-preservation smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet run --project windows/Embasic.EScanner.PdfSmoke/Embasic.EScanner.PdfSmoke.csproj -c Release -p:RuntimeIdentifier=win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: interactive WinUI3 user flow, Android device PDF, rendered PDF visual QA or signed release'
