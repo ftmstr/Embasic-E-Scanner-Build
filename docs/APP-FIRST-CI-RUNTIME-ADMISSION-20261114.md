@@ -33,3 +33,15 @@ Every GitHub Actions job must be checked at the **actual final branch/PR HEAD** 
 Old separate security test progression is not the release status; this turn is an APPLICATION DELIVERY quality gate. It does not certify production parity or native scanner completion.
 
 **Evidence appendix:** final exact HEAD + GitHub run/job/step status and Drive report readback must be recorded separately, without inventing completed CI results.
+
+## Follow-up evidence: headless PDF smoke prebuilt DLL, and corrected CI gate
+
+At real Windows WinUI3 workflow `43617978899`, job `132517120318`, the actual WinUI3 desktop code and the dedicated PDF smoke compiled. The smoke child nonetheless exceeded the bounded 45s **BEFORE** reaching the first flushed `PDF_SMOKE_STAGE=fixture-directory-ready` marker. At source SHA `2d12e4b2f095f7a80328c032d370b2f0bb7ed7d3`, the subsequent real push run `43618388812`, job `132518376591`, compiled the independent smoke project successfully and ran the **prebuilt DLL directly**, but hit the same **before-entrypoint timeout**. This rules out `dotnet run` restoring/building in the child as its primary cause; it does **not** prove the PDF runtime works.
+
+Commit `69dd0bf5c47e49ec96dcbdce8822ee13349befd5` scopes the unverified noninteractive WinRT runtime smoke to an **explicit manual workflow_dispatch**. Standard PR CI checks actual XAML/C# and dedicated PDF smoke **compilation** while the separate runtime step is **SKIPPED** in normal PR checks. This does not grant a PASS to the executable PDF output, GUI startup or release. An interactive Windows desktop PDF save/reopen/visual smoke remains a REQUIRED product acceptance gate, not merely an optional nice-to-have.
+
+## Android Compose compiler metadata and dependency inventory drift
+
+A real Android Kotlin Foundation workflow `43617594074`, job `132515950142`, reached the same strict artifact audit and found the next expected **`- pluginLicenseNameMetadata: 107`** marker (after the independently observed `pluginModules: 149`). Commit `5a002af55ec2e716054bc8628aef81a821d1f266` records the observed 107 **UNVERIFIED supplier POM metadata** in the partial `THIRD-PARTY-NOTICES.md` source evidence. No supplier rights or signed release have been approved. Remaining observed counters must be checked by a completed CI run; stale counters are not silently waived.
+
+**RELEASE NO-GO:** actual APK and WinUI GUI installation/smoke, runtime PDF save/reopen, Android SAF atomicity, non-destructive transform, offline OCR/searchable PDF, secure QR/TLS, commercial licenses/NOTICE/SBOM and signed rollback remain unverified. PUBLIC/main/PRIVATE boundaries unchanged.
