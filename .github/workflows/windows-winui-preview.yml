@@ -57,9 +57,12 @@ jobs:
           try {
             $stdout = $child.StandardOutput.ReadToEndAsync()
             $stderr = $child.StandardError.ReadToEndAsync()
-            if (!$child.WaitForExit(180000)) {
+            if (!$child.WaitForExit(45000)) {
               $child.Kill($true)
-              throw 'BLOCKED: Windows headless PDF smoke exceeded bounded 180s; NOT VERIFIED'
+              [void]$child.WaitForExit(10000)
+              Write-Output $stdout.GetAwaiter().GetResult()
+              Write-Output $stderr.GetAwaiter().GetResult()
+              throw 'BLOCKED: Windows headless PDF smoke exceeded bounded 45s; stage trace above; NOT VERIFIED'
             }
             Write-Output $stdout.GetAwaiter().GetResult()
             Write-Output $stderr.GetAwaiter().GetResult()
