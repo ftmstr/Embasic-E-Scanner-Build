@@ -18,6 +18,7 @@
         </StackPanel>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,16,0,16">
             <Button Content="Görseller ekle" Click="AddImages_Click"/>
+            <Button x:Name="SavePdfButton" Content="PDF kaydet" Click="SavePdf_Click" IsEnabled="False"/>
             <TextBlock x:Name="PageCount" VerticalAlignment="Center" Text="0 sayfa"/>
         </StackPanel>
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
@@ -25,6 +26,6 @@
         </ScrollViewer>
         <TextBlock Grid.Row="3" x:Name="StatusText" Margin="0,14,0,0"
                    TextWrapping="Wrap"
-                   Text="PNG/JPEG içe aktarma ve sayfa sıralama. PDF/OCR/kırpma henüz yok."/>
+                   Text="Yerel A4 raster PDF önizlemesi. OCR/kırpma henüz yok; kurulum ve görsel QA tamamlanmadı."/>
     </Grid>
 </Window>
