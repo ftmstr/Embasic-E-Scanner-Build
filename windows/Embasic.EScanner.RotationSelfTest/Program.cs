@@ -49,6 +49,23 @@ foreach (var (w, h) in new[] { (0u, 100u), (100u, 0u) })
           throw new Exception("zero image dimension accepted"); }
     catch (InvalidDataException) { /* expected */ }
 }
+Require(PageQuadRecipe.TryParse(null, out var legacyQuad) &&
+    legacyQuad.IsFullFrame, "legacy quad identity");
+Require(PageQuadRecipe.Inset.IsValid() &&
+    PageQuadRecipe.TryParse(PageQuadRecipe.Inset.Encode(), out var reloaded) &&
+    reloaded == PageQuadRecipe.Inset, "quad persisted roundtrip");
+Require(PageQuadRecipe.Full.Moved(0, 120, 150) is { } moved &&
+    PageQuadRecipe.TryParse(moved.Encode(), out var saved) &&
+    moved == saved, "move/canonical persistence");
+foreach (var invalidQuad in new[] {
+    "", "0,0;1000,0;1000,1000", "0,0;1000,1000;1000,0;0,1000",
+    "0,0;20,0;20,20;0,20", "000,0;1000,0;1000,1000;0,1000",
+    "-1,0;1000,0;1000,1000;0,1000", "0,0;1001,0;1000,1000;0,1000"
+})
+    Require(!PageQuadRecipe.TryParse(invalidQuad, out _), "reject unsafe quad");
+Require(PageQuadRecipe.Full.Moved(0, 1000, 1000) is null,
+    "folded quad must reject before apply");
+Console.WriteLine("PASS: Windows normalized manual crop quad geometry/manifest safety");
 Console.WriteLine("PASS: Windows right-angle rotation manifest migration, " +
     "four A4 PDF matrices, corrupt angles and zero dimensions rejected; " +
     "actual WinUI3 visual/PDF-runtime test NOT VERIFIED");
