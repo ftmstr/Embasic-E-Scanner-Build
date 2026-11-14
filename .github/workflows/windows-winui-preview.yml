@@ -4,10 +4,14 @@ name: Windows WinUI3 workspace preview compile (NOT release)
     branches: [fix/pdf-fixture-selftest-20261018]
     paths:
       - 'windows/Embasic.EScanner.Desktop/**'
+      - 'windows/Embasic.EScanner.PdfSmoke/**'
+      - 'windows/Embasic.EScanner.RotationSelfTest/**'
       - '.github/workflows/windows-winui-preview.yml'
   pull_request:
     paths:
       - 'windows/Embasic.EScanner.Desktop/**'
+      - 'windows/Embasic.EScanner.PdfSmoke/**'
+      - 'windows/Embasic.EScanner.RotationSelfTest/**'
       - '.github/workflows/windows-winui-preview.yml'
   workflow_dispatch:
 permissions:
@@ -23,6 +27,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Execute headless right-angle rotation recipe and A4 PDF geometry tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet run --project windows/Embasic.EScanner.RotationSelfTest/Embasic.EScanner.RotationSelfTest.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: interactive WinUI3 rotation preview, physical PDF rendering or Android-device parity'
       - name: Restore exact WinAppSDK 2.6.4 for PUBLIC WinUI3 preview
         shell: pwsh
         run: |
