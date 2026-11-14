@@ -46,7 +46,14 @@ jobs:
           dotnet build $project -c Release -p:RuntimeIdentifier=win-x64 --no-restore
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Output 'PDF smoke separate .NET compile PASS; real WinRT API runtime still NOT VERIFIED'
+      # A real GitHub-hosted Windows session repeatedly compiled both the
+      # desktop preview and this dedicated smoke, but the prebuilt smoke
+      # process blocked BEFORE Program.cs' first flushed console stage.
+      # Do not mislabel this as a successful PDF runtime test. Keep the
+      # deterministic probe opt-in; interactive device acceptance remains
+      # a REQUIRED separate release gate.
       - name: Run PREBUILT headless Windows raster PDF save/reopen/error-preservation smoke
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -76,3 +83,9 @@ jobs:
             if ($child.ExitCode -ne 0) { exit $child.ExitCode }
           } finally { $child.Dispose() }
           Write-Output 'NOT VERIFIED: interactive WinUI3 user flow, Android device PDF, rendered PDF visual QA or signed release'
+      - name: Record app-first runtime and licensing acceptance boundary
+        shell: pwsh
+        run: |
+          Write-Output 'PASS: WinUI3 source and dedicated PDF smoke compiled (if prior steps successful)'
+          Write-Output 'NOT VERIFIED: real Windows GUI startup, PDF native runtime, actual PDF reopen, visual QA, installer signing, Windows SDK REDIST/EULA'
+          Write-Output 'BLOCKED: physical device PDF smoke and legal release approval remain mandatory'
