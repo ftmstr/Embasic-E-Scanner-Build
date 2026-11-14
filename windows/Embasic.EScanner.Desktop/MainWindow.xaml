@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Embasic.EScanner.Desktop.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Embasic E-Scanner — Workspace Preview">
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel Spacing="5">
+            <TextBlock Text="EMBASIC / E-SCANNER" FontSize="12" Foreground="#3B82F6"/>
+            <TextBlock Text="Tarama çalışma alanı" FontSize="30" FontWeight="SemiBold"/>
+            <TextBlock Text="Windows WinUI 3 · Çevrimdışı ilk önizleme" Opacity="0.7"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,16,0,16">
+            <Button Content="Görseller ekle" Click="AddImages_Click"/>
+            <Button x:Name="SavePdfButton" Content="PDF kaydet" Click="SavePdf_Click" IsEnabled="False"/>
+            <TextBlock x:Name="PageCount" VerticalAlignment="Center" Text="0 sayfa"/>
+        </StackPanel>
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="PageStack" Spacing="10"/>
+        </ScrollViewer>
+        <TextBlock Grid.Row="3" x:Name="StatusText" Margin="0,14,0,0"
+                   TextWrapping="Wrap"
+                   Text="Yerel A4 raster PDF önizlemesi. OCR/kırpma henüz yok; kurulum ve görsel QA tamamlanmadı."/>
+    </Grid>
+</Window>

@@ -1,0 +1,3 @@
+# case_id<TAB>open_result<TAB>read_only_recovery<TAB>later_commit_result
+ancestor_symlink	REJECT	POISONED	N/A
+external_token_hardlink	N/A	POISONED	REJECT

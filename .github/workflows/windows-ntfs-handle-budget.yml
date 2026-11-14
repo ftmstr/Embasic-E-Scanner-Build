@@ -1,0 +1,32 @@
+name: Windows NTFS extended handle budget (synthetic, NOT release)
+on:
+  push:
+    branches: ['fix/pdf-fixture-selftest-20261018']
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-ntfs-handle-budget.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ntfs-extended:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build public synthetic Windows contracts
+        run: dotnet build windows/Embasic.EScanner.SelfTest/Embasic.EScanner.SelfTest.csproj -c Release
+      - name: Test 20 100 500 1000 synthetic page pin handles and read-only restart
+        shell: pwsh
+        env:
+          EMBASIC_ESCANNER_PERF_EXTENDED: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet run --project windows/Embasic.EScanner.SelfTest/Embasic.EScanner.SelfTest.csproj -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: production image/OCR/PDF performance, native Windows package, physical ENOSPC and sudden power-loss durability'

@@ -1,0 +1,91 @@
+name: Windows WinUI3 workspace preview compile (NOT release)
+'on':
+  push:
+    branches: [fix/pdf-fixture-selftest-20261018]
+    paths:
+      - 'windows/Embasic.EScanner.Desktop/**'
+      - '.github/workflows/windows-winui-preview.yml'
+  pull_request:
+    paths:
+      - 'windows/Embasic.EScanner.Desktop/**'
+      - '.github/workflows/windows-winui-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  winui-preview:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore exact WinAppSDK 2.6.4 for PUBLIC WinUI3 preview
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet restore windows/Embasic.EScanner.Desktop/Embasic.EScanner.Desktop.csproj -p:Platform=x64 -p:RuntimeIdentifier=win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile unpackaged real WinUI3 XAML and C# workspace preview
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build windows/Embasic.EScanner.Desktop/Embasic.EScanner.Desktop.csproj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: WinUI3 window launch, native visual QA, signed package, SDK REDIST, OCR or feature parity'
+      - name: Compile dedicated headless raster PDF smoke BEFORE launching runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = 'windows/Embasic.EScanner.PdfSmoke/Embasic.EScanner.PdfSmoke.csproj'
+          dotnet restore $project -p:RuntimeIdentifier=win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build $project -c Release -p:RuntimeIdentifier=win-x64 --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'PDF smoke separate .NET compile PASS; real WinRT API runtime still NOT VERIFIED'
+      # A real GitHub-hosted Windows session repeatedly compiled both the
+      # desktop preview and this dedicated smoke, but the prebuilt smoke
+      # process blocked BEFORE Program.cs' first flushed console stage.
+      # Do not mislabel this as a successful PDF runtime test. Keep the
+      # deterministic probe opt-in; interactive device acceptance remains
+      # a REQUIRED separate release gate.
+      - name: Run PREBUILT headless Windows raster PDF save/reopen/error-preservation smoke
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Avoid hidden NuGet restoration/build inside the time-limited child.
+          # Distinguish compile/restore from actual WinRT runtime stall.
+          $dll = 'windows/Embasic.EScanner.PdfSmoke/bin/Release/net10.0-windows10.0.26100.0/win-x64/Embasic.EScanner.PdfSmoke.dll'
+          if (!(Test-Path $dll)) { throw 'NOT VERIFIED: compiled PDF smoke DLL missing' }
+          $psi = [System.Diagnostics.ProcessStartInfo]::new('dotnet')
+          [void]$psi.ArgumentList.Add((Resolve-Path $dll).Path)
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $child = [System.Diagnostics.Process]::Start($psi)
+          if ($null -eq $child) { throw 'NOT VERIFIED: PDF smoke process unavailable' }
+          try {
+            $stdout = $child.StandardOutput.ReadToEndAsync()
+            $stderr = $child.StandardError.ReadToEndAsync()
+            if (!$child.WaitForExit(45000)) {
+              $child.Kill($true)
+              [void]$child.WaitForExit(10000)
+              Write-Output $stdout.GetAwaiter().GetResult()
+              Write-Output $stderr.GetAwaiter().GetResult()
+              throw 'BLOCKED: Windows headless PDF smoke exceeded bounded 45s; stage trace above; NOT VERIFIED'
+            }
+            Write-Output $stdout.GetAwaiter().GetResult()
+            Write-Output $stderr.GetAwaiter().GetResult()
+            if ($child.ExitCode -ne 0) { exit $child.ExitCode }
+          } finally { $child.Dispose() }
+          Write-Output 'NOT VERIFIED: interactive WinUI3 user flow, Android device PDF, rendered PDF visual QA or signed release'
+      - name: Record app-first runtime and licensing acceptance boundary
+        shell: pwsh
+        run: |
+          Write-Output 'PASS: WinUI3 source and dedicated PDF smoke compiled (if prior steps successful)'
+          Write-Output 'NOT VERIFIED: real Windows GUI startup, PDF native runtime, actual PDF reopen, visual QA, installer signing, Windows SDK REDIST/EULA'
+          Write-Output 'BLOCKED: physical device PDF smoke and legal release approval remain mandatory'

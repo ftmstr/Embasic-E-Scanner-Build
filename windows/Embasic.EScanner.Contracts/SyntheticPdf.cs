@@ -37,9 +37,14 @@ public static class SyntheticPdf
         return output.ToArray();
     }
 
+    // Closed-world golden fixture admission; this is not a general-purpose PDF parser.
+    // Bound input before decoding and reject any noncanonical byte, even when its
+    // structural fields still look valid (xref flags, object terminators, etc.).
     public static bool VerifyFixture(byte[]? bytes)
     {
         if (bytes is null || bytes.Length < 100) return false;
+        var canonical = Create();
+        if (bytes.Length != canonical.Length) return false;
         var s = Encoding.ASCII.GetString(bytes);
         if (!s.StartsWith("%PDF-1.4\n", StringComparison.Ordinal) ||
             !s.EndsWith("%%EOF\n", StringComparison.Ordinal)) return false;
@@ -65,6 +70,7 @@ public static class SyntheticPdf
                 StringComparison.Ordinal)) return false;
         return s.Contains("/Count 1", StringComparison.Ordinal) &&
                s.Contains("/MediaBox [0 0 300 200]", StringComparison.Ordinal) &&
-               s.Contains("EMBASIC SYNTHETIC TEST", StringComparison.Ordinal);
+               s.Contains("EMBASIC SYNTHETIC TEST", StringComparison.Ordinal) &&
+               bytes.AsSpan().SequenceEqual(canonical);
     }
 }
