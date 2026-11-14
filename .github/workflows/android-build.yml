@@ -268,7 +268,11 @@ jobs:
           assert evidence["sourceByteMatches"] == 2 and evidence["notSourceVerified"] == 0
           assert evidence["status"] == "SOURCE_BYTE_PARITY_PASS"
           assert {row["purl"] for row in evidence["records"]} == set(expected)
-          assert inventory["counts"]["classifierJarFiles"] == 3
+          # Real 14-Nov runner 43637471662: classifierJarFiles=4 and
+          # classifierJarModules=4 after Compose toolchain resolution.
+          # Only the TWO allowlisted gradle813 classifiers are compared
+          # with Maven Central here; other files remain NOT VERIFIED.
+          assert inventory["counts"]["classifierJarFiles"] == 4
           # 14-Nov PUBLIC Compose/rotation CI run 43637079880 counted 299
           # actual locally hashed plugin-cache files, with BOTH classified
           # Gradle JARs byte-equal to official Maven Central. This count is
