@@ -1,0 +1,38 @@
+name: Windows WinUI3 workspace preview compile (NOT release)
+'on':
+  push:
+    branches: [fix/pdf-fixture-selftest-20261018]
+    paths:
+      - 'windows/Embasic.EScanner.Desktop/**'
+      - '.github/workflows/windows-winui-preview.yml'
+  pull_request:
+    paths:
+      - 'windows/Embasic.EScanner.Desktop/**'
+      - '.github/workflows/windows-winui-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  winui-preview:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore exact WinAppSDK 2.6.4 for PUBLIC WinUI3 preview
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet restore windows/Embasic.EScanner.Desktop/Embasic.EScanner.Desktop.csproj -p:Platform=x64 -p:RuntimeIdentifier=win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile unpackaged real WinUI3 XAML and C# workspace preview
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build windows/Embasic.EScanner.Desktop/Embasic.EScanner.Desktop.csproj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: WinUI3 runtime launch, native visual QA, signed package, SDK legal REDIST, OCR, PDF or feature parity'
