@@ -103,10 +103,19 @@ retained as a GitHub Actions artifact:
 - pluginModules: 149
 - pluginLicenseNameMetadata: 107
 - pluginMissingLicenseMetadata: 42
-- pluginCachedFileHashes: 295
+- pluginCachedFileHashes: 299
 
 In the 2 November historical snapshot, all 147 selected Maven modules had
 at least one local cached file hashed and 292 cached files were fingerprinted.
+**14 November app-first rotation CI evidence**: Windows/Android source builds
+are separate from licensing. Android Foundation run 43636439911, job
+132574161739, independently observed pluginModules=149,
+pluginLicenseNameMetadata=107, pluginMissingLicenseMetadata=42 and
+pluginCachedFileHashes=299. These are local cache fingerprints only:
+origin verification, licensing and releaseApproved remain NOT VERIFIED.
+The 299 counter is now the current strict PARTIAL audit marker; historical
+295-byte snapshot descriptions below are deliberately unchanged.
+
 The later 8 November classifier-aware CI snapshot hashes 295 cached files
 for those 147 modules; see the separate dated section below. Supplier POM license-name
 metadata was available for only 105 modules. The other 42 modules have
