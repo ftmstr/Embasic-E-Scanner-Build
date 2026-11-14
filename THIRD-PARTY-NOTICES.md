@@ -88,6 +88,8 @@ graph or a product-license approval. No downstream APK/AAB contains
 these entire compiler/build-time dependencies merely because they appear
 in the root Gradle plugin classpath.
 
+The November 14 live CI also observed 107 supplier POM license-name labels;
+these are UNVERIFIED_SUPPLIER_POM hints, never distribution approval.
 The current Android preview adds Compose runtime dependencies. The November 14 CI
 observed 149 Gradle plugin modules instead of the earlier 147-module snapshot.
 This is a PARTIAL local audit observation, not permission to distribute.
@@ -99,7 +101,7 @@ recorded the following exact snapshot, with hashed binary/metadata evidence
 retained as a GitHub Actions artifact:
 
 - pluginModules: 149
-- pluginLicenseNameMetadata: 105
+- pluginLicenseNameMetadata: 107
 - pluginMissingLicenseMetadata: 42
 - pluginCachedFileHashes: 295
 
