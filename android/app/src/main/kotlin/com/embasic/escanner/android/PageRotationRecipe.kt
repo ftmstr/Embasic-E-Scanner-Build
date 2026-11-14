@@ -23,7 +23,9 @@ internal object PageRotationRecipe {
      */
     fun parsePersisted(field: String?): Int? {
         if (field == null) return 0
-        val degrees = field.toIntOrNull() ?: return null
-        return degrees.takeIf(::isValid)
+        // Canonical decimal spellings only: reject +90, 090, whitespace,
+        // negatives and accidental migration of malformed edits.
+        if (field !in setOf("0", "90", "180", "270")) return null
+        return field.toInt()
     }
 }
