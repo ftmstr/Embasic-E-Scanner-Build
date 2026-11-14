@@ -158,6 +158,8 @@ class MainActivity : Activity() {
             val restored = mutableListOf<ScanPage>()
             var invalid = 0
             for (entry in preferences.getString("order", "").orEmpty().lines()) {
+                // Empty new workspaces are not corrupt manifest entries.
+                if (entry.isBlank()) continue
                 val parts = entry.split(':')
                 val rotation = if (parts.size == 2 || parts.size == 3)
                     PageRotationRecipe.parsePersisted(parts.getOrNull(2)) else null
