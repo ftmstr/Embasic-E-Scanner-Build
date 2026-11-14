@@ -13,6 +13,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,11 +37,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color as UiColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -51,6 +62,8 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.Executors
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Initial usable local-first scanning WORKSPACE: import immutable private copies,
@@ -60,11 +73,13 @@ import java.util.concurrent.Executors
 class MainActivity : Activity() {
     private data class ScanPage(
         val id: String, val extension: String, val sha256: String,
-        val file: File, val thumbnail: Bitmap, val rotationDegrees: Int = 0
+        val file: File, val thumbnail: Bitmap, val rotationDegrees: Int = 0,
+        val quad: PageQuadRecipe = PageQuadRecipe.FULL
     )
 
     private val pages = mutableStateListOf<ScanPage>()
     private val io = Executors.newSingleThreadExecutor()
+    private var editingPageId by mutableStateOf<String?>(null)
     private var busy by mutableStateOf(true)
     private var status by mutableStateOf("Yerel çalışma alanı yükleniyor…")
     private val assets by lazy { File(filesDir, "originals").also { it.mkdirs() } }
@@ -123,7 +138,9 @@ class MainActivity : Activity() {
                                             Text(page.extension.uppercase() + " · " +
                                                 (page.file.length() / 1024) + " KB",
                                                 style = MaterialTheme.typography.bodySmall)
-                                            Text("Döndürme: ${page.rotationDegrees}° · Orijinal korunur",
+                                            Text("Döndürme: ${page.rotationDegrees}° · " +
+                                                (if (page.quad.isFullFrame) "Kırpma yok" else "4-köşe kırpma") +
+                                                " · Orijinal korunur",
                                                 style = MaterialTheme.typography.labelSmall)
                                             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                                 OutlinedButton(
@@ -142,14 +159,25 @@ class MainActivity : Activity() {
                                                     onClick = { rotatePage(index) }) { Text("↻ 90°") }
                                                 OutlinedButton(enabled = !busy && page.rotationDegrees != 0,
                                                     onClick = { resetRotation(index) }) { Text("Sıfırla") }
+                                                OutlinedButton(enabled = !busy,
+                                                    onClick = { editingPageId = page.id }) { Text("4 köşe") }
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                        Text("PDF: A4 sayfaları; 90° dönüş uygulanır. OCR/kırpma yok. SAF hedefe " +
-                            "yazım atomik değildir.", style = MaterialTheme.typography.labelSmall)
+                        Text("PDF: A4 · 90° dönüş ve 4-köşe perspektif uygulanır (sınırlı raster). " +
+                            "OCR yok; SAF hedef yazımı atomik değildir.",
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                    val editing = pages.firstOrNull { it.id == editingPageId }
+                    if (editing != null) {
+                        QuadDialog(editing, onCancel = { editingPageId = null },
+                            onApply = { candidate ->
+                                setQuad(editing.id, candidate)
+                                editingPageId = null
+                            })
                     }
                 }
             } }
@@ -161,9 +189,11 @@ class MainActivity : Activity() {
                 // Empty new workspaces are not corrupt manifest entries.
                 if (entry.isBlank()) continue
                 val parts = entry.split(':')
-                val rotation = if (parts.size == 2 || parts.size == 3)
+                val rotation = if (parts.size in 2..4)
                     PageRotationRecipe.parsePersisted(parts.getOrNull(2)) else null
-                if (rotation == null || !parts[0].matches(Regex("[0-9a-fA-F-]{36}\\.(jpg|png)")) ||
+                val quad = if (parts.size in 2..4)
+                    PageQuadRecipe.parse(parts.getOrNull(3)) else null
+                if (rotation == null || quad == null || !parts[0].matches(Regex("[0-9a-fA-F-]{36}\\.(jpg|png)")) ||
                     !parts[1].matches(Regex("[0-9a-f]{64}"))) { invalid++; continue }
                 val source = File(assets, parts[0])
                 try {
@@ -171,7 +201,7 @@ class MainActivity : Activity() {
                         digestFile(source) == parts[1]) {
                         restored.add(ScanPage(
                             parts[0].substringBefore('.'), parts[0].substringAfterLast('.'),
-                            parts[1], source, thumbnail(source), rotation
+                            parts[1], source, thumbnail(source), rotation, quad
                         ))
                     } else invalid++
                 } catch (_: Exception) { invalid++ }
@@ -332,7 +362,14 @@ class MainActivity : Activity() {
                     throw IOException("Orijinal değişti")
                 if (!PageRotationRecipe.isValid(image.rotationDegrees))
                     throw IOException("Geçersiz döndürme açısı")
-                val bitmap = decodeBounded(image.file, 2400)
+                val original = decodeBounded(image.file, 2400)
+                val bitmap = try {
+                    if (image.quad.isFullFrame) original
+                    else PagePerspective.warp(original, image.quad)
+                } catch (error: Exception) {
+                    original.recycle()
+                    throw error
+                }
                 try {
                     val page = pdf.startPage(
                         PdfDocument.PageInfo.Builder(595, 842, index + 1).create()
@@ -360,7 +397,10 @@ class MainActivity : Activity() {
                     )
                     canvas.restore()
                     pdf.finishPage(page)
-                } finally { bitmap.recycle() }
+                } finally {
+                    if (bitmap !== original) bitmap.recycle()
+                    original.recycle()
+                }
             }
             FileOutputStream(stage).use { pdf.writeTo(it); it.fd.sync() }
         } finally { pdf.close() }
@@ -368,6 +408,96 @@ class MainActivity : Activity() {
             PdfRenderer(fd).use { renderer ->
                 if (renderer.pageCount != snapshot.size)
                     throw IOException("PDF sayfa sayısı uyuşmuyor")
+            }
+        }
+    }
+
+    private fun setQuad(id: String, quad: PageQuadRecipe) {
+        if (busy) return
+        val index = pages.indexOfFirst { it.id == id }
+        if (index < 0) return
+        pages[index] = pages[index].copy(quad = quad)
+        persistOrder()
+        status = if (quad.isFullFrame) "Sayfa ${index + 1}: kırpma sıfırlandı"
+                 else "Sayfa ${index + 1}: 4 köşe kaydedildi; orijinal korunuyor"
+    }
+
+    @Composable
+    private fun QuadDialog(page: ScanPage, onCancel: () -> Unit,
+                           onApply: (PageQuadRecipe) -> Unit) {
+        var draft by remember(page.id) { mutableStateOf(page.quad) }
+        Dialog(onDismissRequest = onCancel) {
+            Surface(shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Manuel 4-köşe kırpma", style = MaterialTheme.typography.titleLarge)
+                    Text("Mavi köşeleri sürükleyin. Geçersiz/katlanmış alanlar reddedilir.",
+                        style = MaterialTheme.typography.bodySmall)
+                    Box(Modifier.fillMaxWidth().height(340.dp)) {
+                        Image(page.thumbnail.asImageBitmap(),
+                            contentDescription = "Orijinal görsel üzerinde 4-köşe alanı",
+                            modifier = Modifier.matchParentSize(), contentScale = ContentScale.Fit)
+                        Canvas(Modifier.matchParentSize().pointerInput(page.id) {
+                            var active = -1
+                            fun imageMetrics(): FloatArray {
+                                val scale = min(size.width.toFloat() / page.thumbnail.width,
+                                    size.height.toFloat() / page.thumbnail.height)
+                                val w = page.thumbnail.width * scale
+                                val h = page.thumbnail.height * scale
+                                return floatArrayOf((size.width - w) / 2f,
+                                    (size.height - h) / 2f, w, h)
+                            }
+                            detectDragGestures(
+                                onDragStart = { position ->
+                                    val m = imageMetrics()
+                                    active = (0..3).minByOrNull { i ->
+                                        val dx = position.x - m[0] - draft.x(i) * m[2]
+                                        val dy = position.y - m[1] - draft.y(i) * m[3]
+                                        dx * dx + dy * dy
+                                    } ?: -1
+                                    if (active >= 0) {
+                                        val dx = position.x - m[0] - draft.x(active) * m[2]
+                                        val dy = position.y - m[1] - draft.y(active) * m[3]
+                                        if (dx * dx + dy * dy > 48f * 48f) active = -1
+                                    }
+                                },
+                                onDragEnd = { active = -1 },
+                                onDragCancel = { active = -1 }
+                            ) { change, _ ->
+                                if (active >= 0) {
+                                    val m = imageMetrics()
+                                    val x = (((change.position.x - m[0]) / m[2]) * 1000f)
+                                        .roundToInt()
+                                    val y = (((change.position.y - m[1]) / m[3]) * 1000f)
+                                        .roundToInt()
+                                    draft.moved(active, x, y)?.let { draft = it }
+                                    change.consume()
+                                }
+                            }
+                        }) {
+                            val scale = min(size.width / page.thumbnail.width,
+                                size.height / page.thumbnail.height)
+                            val width = page.thumbnail.width * scale
+                            val height = page.thumbnail.height * scale
+                            val left = (size.width - width) / 2f
+                            val top = (size.height - height) / 2f
+                            fun p(i: Int) = Offset(left + draft.x(i) * width,
+                                                    top + draft.y(i) * height)
+                            for (i in 0..3) {
+                                drawLine(UiColor.Cyan, p(i), p((i + 1) % 4), strokeWidth = 4f)
+                                drawCircle(UiColor(0xFF0284C7), radius = 12f, center = p(i))
+                                drawCircle(UiColor.White, radius = 5f, center = p(i))
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { draft = PageQuadRecipe.FULL }) {
+                            Text("Sıfırla")
+                        }
+                        OutlinedButton(onClick = onCancel) { Text("İptal") }
+                        Button(onClick = { onApply(draft) }) { Text("Uygula") }
+                    }
+                }
             }
         }
     }
@@ -403,7 +533,7 @@ class MainActivity : Activity() {
 
     private fun persistOrder() {
         val manifest = pages.joinToString("\n") {
-            "${it.id}.${it.extension}:${it.sha256}:${it.rotationDegrees}"
+            "${it.id}.${it.extension}:${it.sha256}:${it.rotationDegrees}:${it.quad.encode()}"
         }
         preferences.edit().putString("order", manifest).apply()
     }
