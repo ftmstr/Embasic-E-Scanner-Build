@@ -1333,6 +1333,7 @@ internal static partial class DurableReceiveJournalSelfTest
                 int before = current.HandleCount;
                 long milliseconds;
                 int live;
+                DurableReceiveJournalV1? disposedGate = null;
                 using (var gate = DurableReceiveJournalV1.Open(perfRoot, Session, Digest,
                     1000, 2000, 1024, pages))
                 {
@@ -1341,6 +1342,7 @@ internal static partial class DurableReceiveJournalSelfTest
                         Console.Error.WriteLine("FAIL: synthetic perf session setup " + pages);
                         return false;
                     }
+                    disposedGate = gate;
                     long started = System.Diagnostics.Stopwatch.GetTimestamp();
                     for (int i = 0; i < pages; i++)
                     {
@@ -1391,10 +1393,16 @@ internal static partial class DurableReceiveJournalSelfTest
                 // starts its independent read-only restart inspection.
                 current.Refresh();
                 int after = current.HandleCount;
-                if (Math.Abs(after - before) > 64)
+                // The exact disposed SafeFileHandle pin count, not process-
+                // global baseline churn, proves that every pin was released.
+                // Hundreds of unrelated CLR handles may close during a long
+                // performance run and invalidate abs(after-before)<=64.
+                int leakedPins = disposedGate?.LivePinnedAssetHandleCount ?? -1;
+                if (leakedPins != 0 || after - before > 128)
                 {
                     Console.Error.WriteLine("FAIL: Windows NTFS pin handle leak after Dispose " +
-                        pages + " baseline=" + before + " after=" + after);
+                        pages + " baseline=" + before + " after=" + after +
+                        " stillOpenPagePins=" + leakedPins);
                     return false;
                 }
                 var restarted = DurableReceiveJournalV1.Inspect(perfRoot, Session,
