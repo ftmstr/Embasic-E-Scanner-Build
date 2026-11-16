@@ -10,6 +10,9 @@
     <Compile Include="../Embasic.EScanner.Desktop/CropOutputPlan.cs" Link="CropOutputPlan.cs" />
     <None Include="../../tests/golden/perspective-output-v1.tsv"
           Link="perspective-output-v1.tsv" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../Embasic.EScanner.Desktop/ExifOrientationRecipe.cs" Link="ExifOrientationRecipe.cs" />
+    <None Include="../../tests/golden/exif-orientation-v1.tsv"
+          Link="exif-orientation-v1.tsv" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../Embasic.EScanner.Desktop/PagePerspective.cs" Link="PagePerspective.cs" />
     <Compile Include="../Embasic.EScanner.Desktop/PageRotationRecipe.cs"
              Link="PageRotationRecipe.cs" />

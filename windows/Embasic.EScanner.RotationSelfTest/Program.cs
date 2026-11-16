@@ -91,6 +91,38 @@ foreach (var (w0, h0) in new[] { (0, 100), (-1, 200), (100, 0), (20000, 20000) }
     catch (InvalidDataException) { /* expected */ }
 }
 Console.WriteLine("PASS: 5 shared Android/Windows 12MP perspective geometry goldens");
+// Shared Android JUnit / .NET EXIF tag 0x0112 parity geometry (NOT a WinRT decode).
+string exifFixture = Path.Combine(AppContext.BaseDirectory, "exif-orientation-v1.tsv");
+Require(File.Exists(exifFixture), "EXIF synthetic fixture copied into .NET test output");
+int exifCases = 0;
+var exifTags = new HashSet<int>();
+foreach (string line in File.ReadLines(exifFixture))
+{
+    if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+    var fields = line.Split('\t').Select(int.Parse).ToArray();
+    Require(fields.Length == 9, "EXIF fixture column count");
+    Require(ExifOrientationRecipe.TryParse(fields[0], out var recipe),
+        "EXIF supported tag");
+    var dims = recipe.OutputSize(fields[1], fields[2]);
+    var pixel = recipe.MapPixel(fields[1], fields[2], fields[3], fields[4]);
+    Require(dims == (fields[5], fields[6]) &&
+            pixel == (fields[7], fields[8]), "EXIF golden tag " + fields[0]);
+    exifCases++;
+    exifTags.Add(fields[0]);
+}
+Require(exifCases == 16 && exifTags.SetEquals(Enumerable.Range(1, 8)),
+    "all eight EXIF tag geometries and 16 corner goldens executed");
+foreach (int invalidExif in new[] { -1, 0, 9, 255 })
+    Require(!ExifOrientationRecipe.TryParse(invalidExif, out _),
+        "EXIF malformed orientation tag rejected");
+foreach (var (badW, badH) in new[] { (0, 3), (3, 0), (-1, 3), (20000, 20000) })
+{
+    try { new ExifOrientationRecipe(1).OutputSize(badW, badH);
+        throw new Exception("invalid EXIF geometry admitted"); }
+    catch (InvalidDataException) { /* expected */ }
+}
+Console.WriteLine("PASS: 16 shared Android/Windows EXIF golden coordinate cases for eight tags; Windows decoder runtime NOT VERIFIED");
+
 byte[] synthetic = new byte[8 * 8 * 3];
 for (int y = 0; y < 8; y++)
     for (int x = 0; x < 8; x++)
