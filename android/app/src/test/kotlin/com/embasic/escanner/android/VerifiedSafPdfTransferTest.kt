@@ -121,7 +121,9 @@ class VerifiedSafPdfTransferTest {
     @Test fun appendOnlyProviderRetainingOldBytesFailsClosed() {
         val file = staged()
         val data = ByteArrayOutputStream().apply { write("PREVIOUS_USER_CONTENT".toByteArray()) }
-        VerifiedSafPdfTransferTest.assertIOException("SAF hedefi") {
+        // Readback exceeds the staged length, so the bounded digest rejects
+        // the extra bytes BEFORE the final hash-compare branch can run.
+        VerifiedSafPdfTransferTest.assertIOException("PDF bayt sınırı") {
             VerifiedSafPdfTransfer.copyAndVerify(file, { data },
                 { ByteArrayInputStream(data.toByteArray()) })
         }
