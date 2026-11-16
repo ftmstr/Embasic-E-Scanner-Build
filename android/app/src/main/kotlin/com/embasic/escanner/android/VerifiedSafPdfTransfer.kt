@@ -18,6 +18,10 @@ import java.security.MessageDigest
 internal object VerifiedSafPdfTransfer {
     private const val MAX_BYTES = 512L * 1024L * 1024L
     private const val BUFFER = 64 * 1024
+    // InputStream.read(byte[],...) is required to make progress or return EOF.
+    // Nonconforming cloud/document providers can return zero forever. Bound
+    // consecutive zero reads so a worker cannot spin indefinitely without IO.
+    private const val MAX_ZERO_READS = 16
     data class Receipt(val bytes: Long, val sha256: String)
 
     fun copyAndVerify(
@@ -39,10 +43,16 @@ internal object VerifiedSafPdfTransfer {
         output.use { stream ->
             staged.inputStream().use { input ->
                 val bytes = ByteArray(BUFFER)
+                var zeroReads = 0
                 while (true) {
                     val n = input.read(bytes)
                     if (n == -1) break
-                    if (n == 0) continue
+                    if (n == 0) {
+                        if (++zeroReads >= MAX_ZERO_READS)
+                            throw IOException("PDF staging akışı ilerlemiyor")
+                        continue
+                    }
+                    zeroReads = 0
                     copied += n
                     if (copied > expected.bytes) throw IOException("PDF staging büyüdü")
                     copiedDigest.update(bytes, 0, n)
@@ -68,10 +78,16 @@ internal object VerifiedSafPdfTransfer {
         val md = MessageDigest.getInstance("SHA-256")
         val bytes = ByteArray(BUFFER)
         var total = 0L
+        var zeroReads = 0
         while (true) {
             val n = input.read(bytes)
             if (n == -1) break
-            if (n == 0) continue
+            if (n == 0) {
+                if (++zeroReads >= MAX_ZERO_READS)
+                    throw IOException("SAF/PDF okuma akışı ilerlemiyor")
+                continue
+            }
+            zeroReads = 0
             total += n
             if (total > limit) throw IOException("PDF bayt sınırı aşıldı")
             md.update(bytes, 0, n)
