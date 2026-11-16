@@ -237,7 +237,7 @@ class VerifiedSafPdfTransferTest {
                 append("%PDF-1.4\\n")
                 repeat(pageCount) { i ->
                     append("synthetic-page-").append(i).append(':')
-                    append("XYZ1234".repeat(512)).append('\\n')
+                    append("XYZ1234".repeat(512)).append(10.toChar())
                 }
                 append("%%EOF")
             }.toByteArray()
