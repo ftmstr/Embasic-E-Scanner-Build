@@ -339,12 +339,14 @@ class MainActivity : Activity() {
 
     /**
      * Export-only decode; unlike the preview's 2400px limit this preserves
-     * 12MP and eligible <=24MP sources without resampling. Above 24MP, one
-     * power-of-two safety sample may be used (not full-resolution parity).
+     * 12MP and eligible <=24MP sources without resampling. JPEG EXIF geometry
+     * is normalized before crop/rotation on the working pixels; original asset
+     * stays untouched. Above 24MP a power-of-two sample may be required.
      * Reject before bitmap allocation if the process heap cannot hold both
      * decode + projective output + scratch; never fall back silently to 2400px.
      */
     private fun decodeForExport(file: File, quad: PageQuadRecipe): Bitmap {
+        val orientation = ExifBitmapNormalizer.read(file)
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, opts)
         if (opts.outWidth <= 0 || opts.outHeight <= 0 ||
@@ -357,11 +359,17 @@ class MainActivity : Activity() {
         }
         val plannedWidth = maxOf(1, opts.outWidth / sample)
         val plannedHeight = maxOf(1, opts.outHeight / sample)
+        val (orientedWidth, orientedHeight) =
+            orientation.outputSize(plannedWidth, plannedHeight)
         val projected = if (quad.isFullFrame) 0L
-                        else CropOutputPlan.measure(plannedWidth, plannedHeight, quad)
+                        else CropOutputPlan.measure(orientedWidth, orientedHeight, quad)
                             .let { it.width.toLong() * it.height }
         val decodeBytes = plannedWidth.toLong() * plannedHeight * 4
-        val estimatedPeak = decodeBytes + projected * 4 + 24L * 1024 * 1024
+        // JPEG EXIF tag 2..8 creates a second ARGB bitmap; reserve both
+        // buffers BEFORE decoding. In-memory PDF page allocation is additional.
+        val orientedBytes = if (orientation.tag == 1) 0L else decodeBytes
+        val estimatedPeak = decodeBytes + orientedBytes + projected * 4 +
+                            24L * 1024 * 1024
         val runtime = Runtime.getRuntime()
         val headroom = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory())
         if (estimatedPeak > headroom)
@@ -377,10 +385,18 @@ class MainActivity : Activity() {
             bitmap.recycle()
             throw IOException("Çözümlenen görüntü kaynak sınırı")
         }
-        return bitmap
+        return try {
+            val oriented = ExifBitmapNormalizer.apply(bitmap, orientation)
+            if (oriented !== bitmap) bitmap.recycle()
+            oriented
+        } catch (error: Exception) {
+            bitmap.recycle()
+            throw error
+        }
     }
 
     private fun decodeBounded(file: File, largestEdge: Int): Bitmap {
+        val orientation = ExifBitmapNormalizer.read(file)
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, opts)
         if (opts.outWidth <= 0 || opts.outHeight <= 0 ||
@@ -391,8 +407,17 @@ class MainActivity : Activity() {
             opts.outHeight / sample > largestEdge * 2) sample *= 2
         opts.inJustDecodeBounds = false
         opts.inSampleSize = sample
-        return BitmapFactory.decodeFile(file.absolutePath, opts)
+        opts.inScaled = false
+        val raw = BitmapFactory.decodeFile(file.absolutePath, opts)
             ?: throw IOException("Görsel çözümlenemedi")
+        return try {
+            val oriented = ExifBitmapNormalizer.apply(raw, orientation)
+            if (oriented !== raw) raw.recycle()
+            oriented
+        } catch (error: Exception) {
+            raw.recycle()
+            throw error
+        }
     }
 
     private fun createAndValidatePdf(snapshot: List<ScanPage>, stage: File) {
