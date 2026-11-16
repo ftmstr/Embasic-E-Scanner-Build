@@ -266,20 +266,41 @@ class MainActivity : Activity() {
             }
             REQUEST_PDF -> data.data?.let { destination ->
                 busy = true
-                status = "PDF geçici dosyada oluşturuluyor ve doğrulanıyor…"
+                status = "PDF hazırlanıyor; SAF sağlayıcısına yazım atomik değildir…"
                 val snapshot = pages.toList()
                 io.execute {
                     var staged: File? = null
                     val result = try {
                         staged = File.createTempFile("escanner-pdf-", ".tmp", cacheDir)
                         createAndValidatePdf(snapshot, staged)
-                        contentResolver.openOutputStream(destination, "w")?.use { output ->
-                            staged.inputStream().use { it.copyTo(output) }
-                            output.flush()
-                        } ?: throw IOException("Hedef belge açılamıyor")
-                        "PDF kaydedildi (${snapshot.size} sayfa)."
+                        // ACTION_CREATE_DOCUMENT only. Use explicit truncate mode
+                        // ("wt"), then CLOSE before reopening the provider bytes.
+                        // "w" is provider-dependent and may leave trailing bytes.
+                        val receipt = VerifiedSafPdfTransfer.copyAndVerify(
+                            staged = staged,
+                            openTarget = { contentResolver.openOutputStream(destination, "wt") },
+                            reopenTarget = { contentResolver.openInputStream(destination) }
+                        )
+                        // A matching hash is necessary but not the final
+                        // validation: reopen the TARGET through PdfRenderer.
+                        // Some SAF providers return nonseekable file descriptors;
+                        // fail closed rather than claim a valid document.
+                        val descriptor = contentResolver.openFileDescriptor(destination, "r")
+                            ?: throw IOException("SAF PDF yeniden açılamıyor")
+                        descriptor.use { fd ->
+                            PdfRenderer(fd).use { pdf ->
+                                if (pdf.pageCount != snapshot.size)
+                                    throw IOException("SAF PDF sayfa sayısı değişti")
+                            }
+                        }
+                        "PDF doğrulandı (${snapshot.size} sayfa; ${receipt.bytes} bayt; SHA-256 eşleşti). " +
+                            "SAF atomik kayıt garantisi yok."
                     } catch (e: Exception) {
-                        "PDF kaydedilemedi: ${e.javaClass.simpleName}. Hedefte eksik dosya kalabilir."
+                        // SAF may expose partially written bytes on crash/denial.
+                        // Never delete/overwrite a possibly preexisting provider
+                        // URI automatically: it could contain user content.
+                        "PDF hedef doğrulaması başarısız: ${e.javaClass.simpleName}. " +
+                            "SAF hedefinde eksik dosya bulunabilir; dosyayı kontrol edin."
                     } finally { staged?.delete() }
                     runOnUiThread { status = result; busy = false }
                 }
