@@ -18,7 +18,7 @@ internal object PrivateImageStageCache {
     private val name = Regex(
         """escanner-image-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp"""
     )
-    data class Recovery(val removed: Int, val protected: Int, val failed: Int)
+    data class Recovery(val removed: Int, val protectedSkipped: Int, val failed: Int)
 
     private fun directory(cache: File, create: Boolean): File {
         val root = cache.toPath()
@@ -60,16 +60,16 @@ internal object PrivateImageStageCache {
         if (!dir.exists()) return@synchronized Recovery(0, 0, 0)
         val files = dir.listFiles() ?: throw IOException("Görsel stage listelenemiyor")
         var removed = 0
-        var protected = 0
+        var protectedSkipped = 0
         var failed = 0
         var attempts = 0
         for (file in files) {
             if (!name.matches(file.name)) continue
             val path = file.toPath().toAbsolutePath().normalize()
-            if (active.contains(path)) { protected++; continue }
+            if (active.contains(path)) { protectedSkipped++; continue }
             if (++attempts > 128) { failed++; continue }
             if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
-                protected++
+                protectedSkipped++
                 continue
             }
             try {
@@ -77,6 +77,6 @@ internal object PrivateImageStageCache {
             } catch (_: IOException) { failed++ }
               catch (_: SecurityException) { failed++ }
         }
-        Recovery(removed, protected, failed)
+        Recovery(removed, protectedSkipped, failed)
     }
 }

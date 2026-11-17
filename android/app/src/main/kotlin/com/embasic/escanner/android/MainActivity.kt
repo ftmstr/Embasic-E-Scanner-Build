@@ -239,8 +239,8 @@ class MainActivity : Activity() {
                     else -> ""
                 }
                 val imageCleanupStatus = when {
-                    imageRecovery.failed > 0 || imageRecovery.protected > 0 ->
-                        "Görsel cache: ${imageRecovery.failed + imageRecovery.protected} öğe temizlenmedi"
+                    imageRecovery.failed > 0 || imageRecovery.protectedSkipped > 0 ->
+                        "Görsel cache: ${imageRecovery.failed + imageRecovery.protectedSkipped} öğe temizlenmedi"
                     imageRecovery.removed > 0 ->
                         "${imageRecovery.removed} eski görsel geçici dosyası temizlendi"
                     else -> ""

@@ -36,7 +36,7 @@ class PrivateImageStageCacheTest {
         val live = PrivateImageStageCache.create(cache)
         val result = PrivateImageStageCache.recover(cache)
         assertEquals(1, result.removed)
-        assertEquals(1, result.protected)
+        assertEquals(1, result.protectedSkipped)
         assertFalse(orphan.exists())
         assertTrue(live.exists())
         assertTrue(PrivateImageStageCache.finish(cache, live))
@@ -65,7 +65,7 @@ class PrivateImageStageCacheTest {
             Files.createSymbolicLink(path, external)
             val recovery = PrivateImageStageCache.recover(cache)
             assertEquals(0, recovery.removed)
-            assertEquals(1, recovery.protected)
+            assertEquals(1, recovery.protectedSkipped)
             assertTrue(Files.isSymbolicLink(path))
             assertEquals("keep", String(Files.readAllBytes(external)))
         } finally {
