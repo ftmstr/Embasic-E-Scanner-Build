@@ -23,10 +23,10 @@ class PageImageExportPlanTest {
 
     @Test fun clockwiseRotationSwapsDimensionsOnlyForQuarterTurns() {
         val p = PageImageExportPlan
-        assertEquals(p.Size(1600, 1200), p.outputSize(1600, 1200, 0))
-        assertEquals(p.Size(1200, 1600), p.outputSize(1600, 1200, 90))
-        assertEquals(p.Size(1600, 1200), p.outputSize(1600, 1200, 180))
-        assertEquals(p.Size(1200, 1600), p.outputSize(1600, 1200, 270))
+        assertEquals(PageImageExportPlan.Size(1600, 1200), p.outputSize(1600, 1200, 0))
+        assertEquals(PageImageExportPlan.Size(1200, 1600), p.outputSize(1600, 1200, 90))
+        assertEquals(PageImageExportPlan.Size(1600, 1200), p.outputSize(1600, 1200, 180))
+        assertEquals(PageImageExportPlan.Size(1200, 1600), p.outputSize(1600, 1200, 270))
     }
 
     @Test fun outOfBoundsOrUnsupportedRotationRejectedBeforeEncode() {
@@ -45,11 +45,11 @@ class PageImageExportPlanTest {
 
     @Test fun actualEncodedMimeAndDimensionsMustMatchRequestedFormat() {
         val p = PageImageExportPlan
-        val size = p.Size(842, 595)
-        p.requireEncoded(p.Format.JPEG, size, "image/jpeg", 842, 595)
-        p.requireEncoded(p.Format.PNG, size, "image/png", 842, 595)
-        rejects("MIME") { p.requireEncoded(p.Format.JPEG, size, "image/png", 842, 595) }
-        rejects("MIME") { p.requireEncoded(p.Format.PNG, size, "image/png", 595, 842) }
-        rejects("MIME") { p.requireEncoded(p.Format.PNG, size, null, 842, 595) }
+        val size = PageImageExportPlan.Size(842, 595)
+        p.requireEncoded(PageImageExportPlan.Format.JPEG, size, "image/jpeg", 842, 595)
+        p.requireEncoded(PageImageExportPlan.Format.PNG, size, "image/png", 842, 595)
+        rejects("MIME") { p.requireEncoded(PageImageExportPlan.Format.JPEG, size, "image/png", 842, 595) }
+        rejects("MIME") { p.requireEncoded(PageImageExportPlan.Format.PNG, size, "image/png", 595, 842) }
+        rejects("MIME") { p.requireEncoded(PageImageExportPlan.Format.PNG, size, null, 842, 595) }
     }
 }
