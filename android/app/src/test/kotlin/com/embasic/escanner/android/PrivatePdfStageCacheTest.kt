@@ -77,12 +77,12 @@ class PrivatePdfStageCacheTest {
         val outside = Files.createTempFile("escanner-outside-", ".pdf")
         val link = File(cache, "escanner-pdf-34567890.tmp").toPath()
         try {
-            Files.writeString(outside, "protected content")
+            Files.write(outside, "protected content".toByteArray(Charsets.UTF_8))
             Files.createSymbolicLink(link, outside)
             val result = PrivatePdfStageCache.recover(cache)
             assertEquals(0, result.removed)
             assertEquals(1, result.unsafeSkipped)
-            assertEquals("protected content", Files.readString(outside))
+            assertEquals("protected content", String(Files.readAllBytes(outside), Charsets.UTF_8))
             assertTrue(Files.isSymbolicLink(link))
         } finally {
             Files.deleteIfExists(link)
