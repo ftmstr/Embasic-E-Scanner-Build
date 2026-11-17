@@ -288,7 +288,9 @@ class MainActivity : Activity() {
                     var cleanupFailed = false
                     val result = try {
                         staged = PrivatePdfStageCache.create(cacheDir)
-                        createAndValidatePdf(snapshot, staged)
+                        // Real native PdfRenderer rasterizes each staged A4
+                        // page before any SAF provider target is touched.
+                        val stagedRaster = createAndValidatePdf(snapshot, staged)
                         // ACTION_CREATE_DOCUMENT only. Use explicit truncate mode
                         // ("wt"), then CLOSE before reopening the provider bytes.
                         // "w" is provider-dependent and may leave trailing bytes.
@@ -303,14 +305,15 @@ class MainActivity : Activity() {
                         // fail closed rather than claim a valid document.
                         val descriptor = contentResolver.openFileDescriptor(destination, "r")
                             ?: throw IOException("SAF PDF yeniden açılamıyor")
-                        descriptor.use { fd ->
-                            PdfRenderer(fd).use { pdf ->
-                                if (pdf.pageCount != snapshot.size)
-                                    throw IOException("SAF PDF sayfa sayısı değişti")
-                            }
-                        }
-                        "PDF doğrulandı (${snapshot.size} sayfa; ${receipt.bytes} bayt; SHA-256 eşleşti). " +
-                            "SAF atomik kayıt garantisi yok."
+                        // The target must open and rasterize EVERY A4 page
+                        // with the same native renderer, not merely parse
+                        // its page count. Compare page-indexed low-res ARGB
+                        // digests of staged and provider-backed renderings.
+                        val targetRaster = PdfRasterGate.verify(descriptor, snapshot.size)
+                        if (targetRaster != stagedRaster)
+                            throw IOException("SAF PDF raster pikselleri uyuşmuyor")
+                        "PDF doğrulandı (${snapshot.size} A4 sayfa; ${receipt.bytes} bayt; " +
+                            "SHA-256 ve raster eşleşti). SAF atomik kayıt garantisi yok."
                     } catch (e: Exception) {
                         // SAF may expose partially written bytes on crash/denial.
                         // Never delete/overwrite a possibly preexisting provider
@@ -467,7 +470,9 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun createAndValidatePdf(snapshot: List<ScanPage>, stage: File) {
+    private fun createAndValidatePdf(
+        snapshot: List<ScanPage>, stage: File
+    ): PdfRasterGate.Receipt {
         if (snapshot.isEmpty()) throw IOException("Boş belge")
         val pdf = PdfDocument()
         try {
@@ -518,12 +523,12 @@ class MainActivity : Activity() {
             }
             FileOutputStream(stage).use { pdf.writeTo(it); it.fd.sync() }
         } finally { pdf.close() }
-        ParcelFileDescriptor.open(stage, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-            PdfRenderer(fd).use { renderer ->
-                if (renderer.pageCount != snapshot.size)
-                    throw IOException("PDF sayfa sayısı uyuşmuyor")
-            }
-        }
+        // Independent native render/readback of each staged page:
+        // geometry + bounded actual raster pixels, in ordered SHA-256.
+        return PdfRasterGate.verify(
+            ParcelFileDescriptor.open(stage, ParcelFileDescriptor.MODE_READ_ONLY),
+            snapshot.size
+        )
     }
 
     private fun setQuad(id: String, quad: PageQuadRecipe) {
