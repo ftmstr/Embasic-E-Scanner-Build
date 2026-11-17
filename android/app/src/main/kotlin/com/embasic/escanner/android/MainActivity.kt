@@ -182,6 +182,10 @@ class MainActivity : Activity() {
             } }
         })
         io.execute {
+            // Recover only recognized private PDF cache stages left by a crash.
+            // Live exports from any recreated Activity remain registered.
+            val recovery = try { PrivatePdfStageCache.recover(cacheDir) }
+                catch (_: Exception) { PrivatePdfStageCache.Recovery(0, 0, 0, 1) }
             val restored = mutableListOf<ScanPage>()
             var invalid = 0
             for (entry in preferences.getString("order", "").orEmpty().lines()) {
@@ -208,8 +212,19 @@ class MainActivity : Activity() {
             runOnUiThread {
                 pages.addAll(restored.take(MAX_PAGES))
                 busy = false
-                status = if (invalid > 0) "$invalid bozuk/eksik kaynak reddedildi"
-                         else "${pages.size} sayfa hazır"
+                val workspaceStatus = if (invalid > 0)
+                    "$invalid bozuk/eksik kaynak reddedildi"
+                    else "${pages.size} sayfa hazır"
+                val cleanupStatus = when {
+                    recovery.failed > 0 || recovery.unsafeSkipped > 0 ->
+                        "PDF geçici önbelleğinde ${recovery.failed + recovery.unsafeSkipped} " +
+                            "öğe güvenle temizlenemedi"
+                    recovery.removed > 0 ->
+                        "${recovery.removed} eski PDF geçici dosyası temizlendi"
+                    else -> ""
+                }
+                status = if (cleanupStatus.isEmpty()) workspaceStatus
+                         else "$workspaceStatus · $cleanupStatus"
             }
         }
     }
@@ -270,8 +285,9 @@ class MainActivity : Activity() {
                 val snapshot = pages.toList()
                 io.execute {
                     var staged: File? = null
+                    var cleanupFailed = false
                     val result = try {
-                        staged = File.createTempFile("escanner-pdf-", ".tmp", cacheDir)
+                        staged = PrivatePdfStageCache.create(cacheDir)
                         createAndValidatePdf(snapshot, staged)
                         // ACTION_CREATE_DOCUMENT only. Use explicit truncate mode
                         // ("wt"), then CLOSE before reopening the provider bytes.
@@ -301,8 +317,18 @@ class MainActivity : Activity() {
                         // URI automatically: it could contain user content.
                         "PDF hedef doğrulaması başarısız: ${e.javaClass.simpleName}. " +
                             "SAF hedefinde eksik dosya bulunabilir; dosyayı kontrol edin."
-                    } finally { staged?.delete() }
-                    runOnUiThread { status = result; busy = false }
+                    } finally {
+                        staged?.let { file ->
+                            try { PrivatePdfStageCache.finish(cacheDir, file) }
+                            catch (_: Exception) { cleanupFailed = true }
+                        }
+                    }
+                    runOnUiThread {
+                        status = if (cleanupFailed)
+                            "$result Özel PDF geçici dosyası temizlenemedi."
+                            else result
+                        busy = false
+                    }
                 }
             }
         }
