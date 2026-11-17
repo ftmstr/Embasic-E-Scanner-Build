@@ -79,6 +79,8 @@ class MainActivity : Activity() {
     private val pages = mutableStateListOf<ScanPage>()
     private val io = Executors.newSingleThreadExecutor()
     private var editingPageId by mutableStateOf<String?>(null)
+    // Picker response is accepted only for the originally selected page ID.
+    private var pendingImagePageId: String? = null
     private var busy by mutableStateOf(true)
     private var status by mutableStateOf("Yerel çalışma alanı yükleniyor…")
     private val assets by lazy { File(filesDir, "originals").also { it.mkdirs() } }
@@ -161,12 +163,23 @@ class MainActivity : Activity() {
                                                 OutlinedButton(enabled = !busy,
                                                     onClick = { editingPageId = page.id }) { Text("4 köşe") }
                                             }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                OutlinedButton(enabled = !busy,
+                                                    onClick = { chooseImage(page, PageImageExportPlan.Format.JPEG) }) {
+                                                    Text("JPG dışa aktar")
+                                                }
+                                                OutlinedButton(enabled = !busy,
+                                                    onClick = { chooseImage(page, PageImageExportPlan.Format.PNG) }) {
+                                                    Text("PNG dışa aktar")
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                        Text("PDF: A4 · 90° dönüş ve 4-köşe perspektif uygulanır (sınırlı raster). " +
+                        Text("PDF: A4 · JPG/PNG: tek sayfa, kaynak çözünürlüğü. " +
+                            "Döndürme ve 4-köşe perspektif uygulanır. " +
                             "OCR yok; SAF hedef yazımı atomik değildir.",
                             style = MaterialTheme.typography.labelSmall)
                     }
@@ -186,6 +199,8 @@ class MainActivity : Activity() {
             // Live exports from any recreated Activity remain registered.
             val recovery = try { PrivatePdfStageCache.recover(cacheDir) }
                 catch (_: Exception) { PrivatePdfStageCache.Recovery(0, 0, 0, 1) }
+            val imageRecovery = try { PrivateImageStageCache.recover(cacheDir) }
+                catch (_: Exception) { PrivateImageStageCache.Recovery(0, 0, 1) }
             val restored = mutableListOf<ScanPage>()
             var invalid = 0
             for (entry in preferences.getString("order", "").orEmpty().lines()) {
@@ -223,8 +238,15 @@ class MainActivity : Activity() {
                         "${recovery.removed} eski PDF geçici dosyası temizlendi"
                     else -> ""
                 }
-                status = if (cleanupStatus.isEmpty()) workspaceStatus
-                         else "$workspaceStatus · $cleanupStatus"
+                val imageCleanupStatus = when {
+                    imageRecovery.failed > 0 || imageRecovery.protected > 0 ->
+                        "Görsel cache: ${imageRecovery.failed + imageRecovery.protected} öğe temizlenmedi"
+                    imageRecovery.removed > 0 ->
+                        "${imageRecovery.removed} eski görsel geçici dosyası temizlendi"
+                    else -> ""
+                }
+                status = listOf(workspaceStatus, cleanupStatus, imageCleanupStatus)
+                    .filter { it.isNotEmpty() }.joinToString(" · ")
             }
         }
     }
@@ -247,9 +269,40 @@ class MainActivity : Activity() {
         startActivityForResult(create, REQUEST_PDF)
     }
 
+    private fun chooseImage(page: ScanPage, format: PageImageExportPlan.Format) {
+        if (busy || pendingImagePageId != null) return
+        pendingImagePageId = page.id
+        val create = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = format.mime
+            putExtra(Intent.EXTRA_TITLE,
+                "Embasic-Sayfa-${pages.indexOfFirst { it.id == page.id } + 1}.${format.extension}")
+        }
+        try {
+            startActivityForResult(create,
+                if (format == PageImageExportPlan.Format.JPEG) REQUEST_JPEG else REQUEST_PNG)
+        } catch (error: Exception) {
+            pendingImagePageId = null
+            status = "Görsel hedef seçicisi açılamadı: ${error.javaClass.simpleName}"
+        }
+    }
+
     @Deprecated("Platform document picker result; Android SDK Activity contract.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_JPEG || requestCode == REQUEST_PNG) {
+            val chosenId = pendingImagePageId
+            pendingImagePageId = null // cancellation or process death fails closed
+            if (resultCode != RESULT_OK || data?.data == null || busy) return
+            val page = pages.firstOrNull { it.id == chosenId }
+            if (page == null) {
+                status = "Görsel dışa aktarma: seçilen sayfa artık bulunamadı"
+                return
+            }
+            exportImage(page, data.data!!, if (requestCode == REQUEST_JPEG)
+                PageImageExportPlan.Format.JPEG else PageImageExportPlan.Format.PNG)
+            return
+        }
         if (resultCode != RESULT_OK || data == null || busy) return
         when (requestCode) {
             REQUEST_IMPORT -> {
@@ -333,6 +386,69 @@ class MainActivity : Activity() {
                         busy = false
                     }
                 }
+            }
+        }
+    }
+
+    /** Exports one immutable page, not a PDF A4 layout or whole workspace. */
+    private fun exportImage(
+        page: ScanPage, destination: Uri, format: PageImageExportPlan.Format
+    ) {
+        busy = true
+        status = "${format.extension.uppercase()} görseli hazırlanıyor…"
+        io.execute {
+            var staged: File? = null
+            var cleanupFailed = false
+            val result = try {
+                if (digestFile(page.file) != page.sha256)
+                    throw IOException("Orijinal görsel değişti")
+                if (!PageRotationRecipe.isValid(page.rotationDegrees))
+                    throw IOException("Görsel döndürme açısı geçersiz")
+                staged = PrivateImageStageCache.create(cacheDir)
+                val original = decodeForExport(page.file, page.quad)
+                val cropped = try {
+                    if (page.quad.isFullFrame) original
+                    else PagePerspective.warp(original, page.quad)
+                } catch (error: Exception) {
+                    original.recycle()
+                    throw error
+                }
+                val size = try {
+                    PageImageExporter.encode(staged, cropped, page.rotationDegrees, format)
+                } finally {
+                    if (cropped !== original) cropped.recycle()
+                    original.recycle()
+                }
+                // Reuse the already bounded, content-agnostic SAF byte
+                // SHA-256/size contract; no second copy implementation.
+                val receipt = VerifiedSafPdfTransfer.copyAndVerify(
+                    staged = staged,
+                    openTarget = { contentResolver.openOutputStream(destination, "wt") },
+                    reopenTarget = { contentResolver.openInputStream(destination) }
+                )
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                val stream = contentResolver.openInputStream(destination)
+                    ?: throw IOException("SAF görsel hedefi tekrar okunamıyor")
+                stream.use { BitmapFactory.decodeStream(it, null, bounds) }
+                PageImageExportPlan.requireEncoded(
+                    format, size, bounds.outMimeType, bounds.outWidth, bounds.outHeight
+                )
+                "${format.extension.uppercase()} doğrulandı (${size.width}×${size.height}; " +
+                    "${receipt.bytes} bayt; SHA-256 eşleşti). SAF atomik kayıt garantisi yok."
+            } catch (error: Exception) {
+                "${format.extension.uppercase()} dışa aktarılamadı: " +
+                    "${error.javaClass.simpleName}. SAF hedefi eksik olabilir; kontrol edin."
+            } finally {
+                staged?.let { file ->
+                    try { if (!PrivateImageStageCache.finish(cacheDir, file))
+                        cleanupFailed = true }
+                    catch (_: Exception) { cleanupFailed = true }
+                }
+            }
+            runOnUiThread {
+                status = if (cleanupFailed) "$result Görsel geçici dosyası temizlenemedi."
+                         else result
+                busy = false
             }
         }
     }
@@ -681,6 +797,8 @@ class MainActivity : Activity() {
     private companion object {
         const val REQUEST_IMPORT = 101
         const val REQUEST_PDF = 102
+        const val REQUEST_JPEG = 103
+        const val REQUEST_PNG = 104
         const val MAX_PAGES = 100
         const val MAX_BYTES = 64L * 1024L * 1024L
     }
