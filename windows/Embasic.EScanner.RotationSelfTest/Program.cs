@@ -162,7 +162,7 @@ var zeroImage = PageImageOutputPlan.Measure(PageImageFormat.Png,
     "synthetic.png", 320, 200, 0, PageQuadRecipe.Inset);
 Require(zeroImage.Width > 0 && zeroImage.Height > 0,
     "Windows crop output plan");
-foreach (var (f, name, w, h, angle) in new[] {
+foreach (var (f, name, w, h, imageAngle) in new[] {
     (PageImageFormat.Jpeg, "bad.png", 320u, 200u, 0),
     (PageImageFormat.Png, "bad.jpg", 320u, 200u, 0),
     (PageImageFormat.Png, "bad.png", 0u, 200u, 0),
@@ -170,7 +170,7 @@ foreach (var (f, name, w, h, angle) in new[] {
     (PageImageFormat.Jpeg, "bad.jpg", 320u, 200u, 45)
 }) {
     try {
-        PageImageOutputPlan.Measure(f, name, w, h, angle, PageQuadRecipe.Full);
+        PageImageOutputPlan.Measure(f, name, w, h, imageAngle, PageQuadRecipe.Full);
         throw new Exception("unsafe Windows image export plan accepted");
     }
     catch (InvalidDataException) { /* expected */ }

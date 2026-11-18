@@ -63,10 +63,15 @@ internal static class PageImageExporter
                 var stage = await StorageFile.GetFileFromPathAsync(stagePath);
                 using (var stream = await stage.OpenAsync(FileAccessMode.ReadWrite))
                 {
-                    var encoder = await BitmapEncoder.CreateAsync(
-                        format == PageImageFormat.Jpeg
-                            ? BitmapEncoder.JpegEncoderId : BitmapEncoder.PngEncoderId,
-                        stream);
+                    // Align the requested JPEG quality with Android's quality 92 policy.
+                    var encoder = format == PageImageFormat.Jpeg
+                        ? await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId,
+                            stream, new BitmapPropertySet {
+                                { "ImageQuality", new BitmapTypedValue(
+                                    0.92f, Windows.Foundation.PropertyType.Single) }
+                            })
+                        : await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId,
+                            stream);
                     encoder.SetPixelData(BitmapPixelFormat.Bgra8,
                         format == PageImageFormat.Jpeg
                             ? BitmapAlphaMode.Ignore : BitmapAlphaMode.Straight,

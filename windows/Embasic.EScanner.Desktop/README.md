@@ -1,5 +1,18 @@
 # Embasic E-Scanner — Windows WinUI 3 workspace preview (PUBLIC)
 
+## Windows per-page JPEG and PNG source slice (2026-11-18)
+
+Each WinUI3 workspace page now offers JPG and PNG export. The source uses the
+immutable private original, EXIF orientation, manual four-corner perspective,
+0/90/180/270 rotation and a same-target-directory staged WinRT encoder.
+Codec MIME/dimensions and SHA-256 are read back before a single File.Move
+overwrite publication. JPG flattens transparency to white; PNG keeps alpha.
+The target must be a local filesystem path; cloud-backed pickers are not
+supported. Physical native encode/readback, Windows GUI, actual WinRT PDF,
+JPEG color fidelity and provider power-loss safety are NOT VERIFIED.
+See `docs/APP-FIRST-WINDOWS-PAGE-JPEG-PNG-EXPORT-20261118.md`.
+RELEASE NO-GO; Android Maven NOTICE and SDK redistribution gates remain open.
+
 This is the **first real Windows graphical application project** in the
 PUBLIC repo. It targets **C#/.NET 10, WinUI 3 and Windows App SDK 2.6.4**,
 using an unpackaged, framework-dependent build
