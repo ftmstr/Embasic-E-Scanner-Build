@@ -16,5 +16,7 @@
     <Compile Include="../Embasic.EScanner.Desktop/PagePerspective.cs" Link="PagePerspective.cs" />
     <Compile Include="../Embasic.EScanner.Desktop/PageRotationRecipe.cs"
              Link="PageRotationRecipe.cs" />
+    <Compile Include="../Embasic.EScanner.Desktop/PageImageOutputPlan.cs"
+             Link="PageImageOutputPlan.cs" />
   </ItemGroup>
 </Project>

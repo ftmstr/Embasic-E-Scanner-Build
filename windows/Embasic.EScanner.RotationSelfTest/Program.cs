@@ -148,4 +148,47 @@ Console.WriteLine("PASS: Windows normalized manual crop quad and bounded CPU per
 Console.WriteLine("PASS: Windows right-angle rotation manifest migration, " +
     "four A4 PDF matrices, corrupt angles and zero dimensions rejected; " +
     "actual WinUI3 visual/PDF-runtime test NOT VERIFIED");
+// Windows app-first JPEG/PNG parity: pure output admission and rotation/alpha pixels.
+// These are NOT WinRT codec, FileSavePicker, device, or visual acceptance.
+var jpg = PageImageOutputPlan.Measure(PageImageFormat.Jpeg,
+    "synthetic.jpg", 320, 200, 90, PageQuadRecipe.Full);
+Require(jpg.Width == 200 && jpg.Height == 320 && jpg.MimeType == "image/jpeg",
+    "Windows JPEG 90-degree output plan");
+var png = PageImageOutputPlan.Measure(PageImageFormat.Png,
+    "synthetic.png", 320, 200, 270, PageQuadRecipe.Full);
+Require(png.Width == 200 && png.Height == 320 && png.MimeType == "image/png",
+    "Windows PNG 270-degree output plan");
+var zeroImage = PageImageOutputPlan.Measure(PageImageFormat.Png,
+    "synthetic.png", 320, 200, 0, PageQuadRecipe.Inset);
+Require(zeroImage.Width > 0 && zeroImage.Height > 0,
+    "Windows crop output plan");
+foreach (var (f, name, w, h, angle) in new[] {
+    (PageImageFormat.Jpeg, "bad.png", 320u, 200u, 0),
+    (PageImageFormat.Png, "bad.jpg", 320u, 200u, 0),
+    (PageImageFormat.Png, "bad.png", 0u, 200u, 0),
+    (PageImageFormat.Png, "bad.png", 9000u, 200u, 0),
+    (PageImageFormat.Jpeg, "bad.jpg", 320u, 200u, 45)
+}) {
+    try {
+        PageImageOutputPlan.Measure(f, name, w, h, angle, PageQuadRecipe.Full);
+        throw new Exception("unsafe Windows image export plan accepted");
+    }
+    catch (InvalidDataException) { /* expected */ }
+}
+byte[] alphaPixels = { 255, 0, 0, 0, 0, 0, 255, 255 };
+var rotatedPng = PageImageOutputPlan.RotateRgbaToBgra(
+    alphaPixels, 2, 1, 90, PageImageFormat.Png);
+Require(rotatedPng.SequenceEqual(new byte[] { 0, 0, 255, 0, 255, 0, 0, 255 }),
+    "PNG 90-degree clockwise pixel order and original alpha");
+var rotatedJpeg = PageImageOutputPlan.RotateRgbaToBgra(
+    alphaPixels, 2, 1, 90, PageImageFormat.Jpeg);
+Require(rotatedJpeg.SequenceEqual(new byte[] { 255, 255, 255, 255, 255, 0, 0, 255 }),
+    "JPEG alpha becomes white, opaque blue retained");
+byte[] fourChannel = Enumerable.Repeat((byte)77, 8 * 8 * 4).ToArray();
+var alphaWarp = PagePerspective.WarpRgba(fourChannel, 8, 8, PageQuadRecipe.Inset);
+Require(alphaWarp.Rgba.Length == alphaWarp.Width * alphaWarp.Height * 4 &&
+    alphaWarp.Rgba.All(b => b == 77), "PNG manual crop keeps alpha");
+Require(PagePerspective.WarpRgba(fourChannel, 8, 8, PageQuadRecipe.Full).Rgba ==
+    fourChannel, "PNG identity preserves original RGBA");
+Console.WriteLine("PASS: Windows JPEG/PNG pure output policy, rotate, white JPEG matte and PNG alpha/perspective; WinRT codec/runtime NOT VERIFIED");
 return 0;

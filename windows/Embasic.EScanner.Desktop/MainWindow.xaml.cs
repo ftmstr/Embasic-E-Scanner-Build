@@ -11,8 +11,8 @@ namespace Embasic.EScanner.Desktop;
 
 /// <summary>
 /// Unpackaged WinUI3 first vertical slice: local PNG/JPEG originals, thumbnails,
-/// ordering, non-destructive rotation and deletion. No OCR, perspective crop,
-/// searchable PDF, or release packaging yet.
+/// ordering, per-page PNG/JPEG, non-destructive rotation and manual crop.
+/// No OCR, searchable PDF, or release packaging yet.
 /// </summary>
 public sealed partial class MainWindow : Window
 {
@@ -140,6 +140,41 @@ public sealed partial class MainWindow : Window
         finally { SetBusy(false); }
     }
 
+    private async Task ExportPageImageAsync(int index, PageImageFormat format)
+    {
+        if (_busy || index < 0 || index >= _pages.Count) return;
+        var page = _pages[index];
+        var picker = new FileSavePicker();
+        string extension = format == PageImageFormat.Jpeg ? ".jpg" : ".png";
+        picker.FileTypeChoices.Add(format == PageImageFormat.Jpeg
+            ? "JPEG görüntüsü" : "PNG görüntüsü", new List<string> { extension });
+        picker.SuggestedFileName = $"Embasic-Scan-{index + 1:D3}";
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSaveFileAsync();
+        if (file is null) return;
+        SetBusy(true, "Görüntü geçici dosyaya kodlanıyor ve doğrulanıyor…");
+        try
+        {
+            if (string.IsNullOrWhiteSpace(file.Path))
+                throw new InvalidDataException("Yalnız yerel dosya hedefi destekleniyor");
+            string original = Path.Combine(_privateRoot, page.FileName);
+            if (!File.Exists(original) || await DigestAsync(original) != page.Sha256)
+                throw new InvalidDataException("Orijinal SHA-256 uyuşmuyor");
+            await PageImageExporter.ExportVerifiedAsync(
+                new RasterPdfPage(original, page.RotationDegrees, page.Quad),
+                file.Path, format);
+            StatusText.Text = $"{(format == PageImageFormat.Jpeg ? "JPG" : "PNG")} " +
+                $"kaydedildi: sayfa {index + 1}. Yerel dosya staging doğrulandı.";
+        }
+        catch (Exception error)
+        {
+            StatusText.Text = "Görsel kaydedilemedi: " + error.GetType().Name +
+                ". Yayımlama öncesi hata varsa mevcut hedef korunur.";
+        }
+        finally { SetBusy(false); }
+    }
+
     private async Task<ScanPage> CopyPrivateAsync(StorageFile source)
     {
         var path = source.Path;
@@ -257,6 +292,18 @@ public sealed partial class MainWindow : Window
             crop.Click += async (_, _) => await EditQuadAsync(selected);
             editButtons.Children.Add(crop);
             controls.Children.Add(editButtons);
+            var exportButtons = new StackPanel {
+                Orientation = Orientation.Horizontal, Spacing = 8
+            };
+            var saveJpg = new Button { Content = "JPG dışa aktar" };
+            saveJpg.Click += async (_, _) =>
+                await ExportPageImageAsync(selected, PageImageFormat.Jpeg);
+            var savePng = new Button { Content = "PNG dışa aktar" };
+            savePng.Click += async (_, _) =>
+                await ExportPageImageAsync(selected, PageImageFormat.Png);
+            exportButtons.Children.Add(saveJpg);
+            exportButtons.Children.Add(savePng);
+            controls.Children.Add(exportButtons);
             row.Children.Add(controls);
             card.Child = row;
             PageStack.Children.Add(card);

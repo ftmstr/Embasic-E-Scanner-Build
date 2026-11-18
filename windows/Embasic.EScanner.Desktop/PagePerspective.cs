@@ -10,8 +10,19 @@ internal static class PagePerspective
     internal static (byte[] Rgb, uint Width, uint Height) WarpRgb(
         byte[] source, uint width, uint height, PageQuadRecipe quad)
     {
+        return WarpPixels(source, width, height, quad, 3);
+    }
+
+    // PNG retains straight alpha with exactly the RGB/PDF geometry.
+    internal static (byte[] Rgba, uint Width, uint Height) WarpRgba(
+        byte[] source, uint width, uint height, PageQuadRecipe quad)
+        => WarpPixels(source, width, height, quad, 4);
+
+    private static (byte[] Pixels, uint Width, uint Height) WarpPixels(
+        byte[] source, uint width, uint height, PageQuadRecipe quad, int channels)
+    {
         if (!quad.IsValid() || width == 0 || height == 0 ||
-            source.LongLength != checked((long)width * height * 3))
+            source.LongLength != checked((long)width * height * channels))
             throw new InvalidDataException("Invalid quad or source image pixels");
         if (quad.IsFullFrame) return (source, width, height);
         double w = width, h = height;
@@ -37,7 +48,7 @@ internal static class PagePerspective
         }
         double a = x1 - x0 + g * x1, b = x3 - x0 + k * x3;
         double d = y1 - y0 + g * y1, e = y3 - y0 + k * y3;
-        byte[] output = new byte[checked(outW * outH * 3)];
+        byte[] output = new byte[checked(outW * outH * channels)];
         for (int y = 0; y < outH; y++)
         {
             double v = (y + 0.5) / outH;
@@ -57,12 +68,12 @@ internal static class PagePerspective
                 int xx = Math.Min(ix + 1, (int)width - 1);
                 int yy = Math.Min(iy + 1, (int)height - 1);
                 double fx = px - ix, fy = py - iy;
-                int base00 = checked((iy * (int)width + ix) * 3);
-                int base10 = checked((iy * (int)width + xx) * 3);
-                int base01 = checked((yy * (int)width + ix) * 3);
-                int base11 = checked((yy * (int)width + xx) * 3);
-                int target = (y * outW + x) * 3;
-                for (int color = 0; color < 3; color++)
+                int base00 = checked((iy * (int)width + ix) * channels);
+                int base10 = checked((iy * (int)width + xx) * channels);
+                int base01 = checked((yy * (int)width + ix) * channels);
+                int base11 = checked((yy * (int)width + xx) * channels);
+                int target = (y * outW + x) * channels;
+                for (int color = 0; color < channels; color++)
                 {
                     double top = source[base00 + color] * (1 - fx) +
                                  source[base10 + color] * fx;
