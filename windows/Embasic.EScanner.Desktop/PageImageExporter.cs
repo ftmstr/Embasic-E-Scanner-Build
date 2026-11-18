@@ -28,7 +28,7 @@ internal static class PageImageExporter
             string.Equals(Path.GetFullPath(page.ImagePath), target,
                 StringComparison.OrdinalIgnoreCase) ||
             (File.Exists(target) &&
-             (File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0))
+             (File.GetAttributes(target) & System.IO.FileAttributes.ReparsePoint) != 0))
             throw new InvalidDataException("Güvensiz hedef yolu");
 
         // Reject invalid names/formats BEFORE creating any output.
