@@ -1,0 +1,3 @@
+# id	recovery_status	next_commit	stage_presence
+# Real separate-process synthetic stage write followed by writer SIGKILL/TerminateProcess
+killed_external_stage_writer	POISONED	REJECT	PRESENT

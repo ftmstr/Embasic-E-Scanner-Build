@@ -1,0 +1,55 @@
+name: Android clean-room compile (NOT release evidence)
+'on':
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-cleanroom-compile.yml'
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-cleanroom-compile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify official Gradle distribution digest before execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24'
+          grep -Fx 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.6-bin.zip' android/gradle/wrapper/gradle-wrapper.properties
+          grep -Fx "distributionSha256Sum=${expected}" android/gradle/wrapper/gradle-wrapper.properties
+          grep -Fx 'ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0' android/gradle/wrapper/gradle-wrapper.jar.sha256
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --retry 2 \
+            --output "${RUNNER_TEMP}/gradle-8.14.6-bin.zip" \
+            'https://services.gradle.org/distributions/gradle-8.14.6-bin.zip'
+          printf '%s  %s\n' "$expected" "${RUNNER_TEMP}/gradle-8.14.6-bin.zip" | sha256sum --check
+          unzip -q "${RUNNER_TEMP}/gradle-8.14.6-bin.zip" -d "${RUNNER_TEMP}"
+      - name: Check preinstalled SDK 36 without automatic license acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_HOME:-}" || ! -f "${ANDROID_HOME}/platforms/android-36/android.jar" ]]; then
+            echo '::error::BLOCKED: SDK platform 36 unavailable. Do not silently accept Android SDK Terms.'
+            exit 3
+          fi
+          echo 'SDK platform 36: PRESENT (SDK license/release gate still NOT VERIFIED)'
+      - name: Compile unsigned Kotlin Android foundation and lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/gradle-8.14.6/bin/gradle" -p android --no-daemon --stacktrace :app:assembleDebug :app:lintDebug
+          echo '::notice::Foundation compile only; no device smoke, release signing, camera, OCR, Compose or parity accepted.'

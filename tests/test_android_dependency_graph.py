@@ -1,0 +1,330 @@
+"""Synthetic Gradle outputs: independent dependency graph / partial BOM audit tests."""
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+SOURCE = Path(__file__).resolve().parents[1] / "scripts" / "audit_android_dependency_graph.py"
+spec = importlib.util.spec_from_file_location("android_dependency_graph_audit", SOURCE)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+RUNTIME = """\
+> Task :app:dependencies
+debugRuntimeClasspath - Runtime classpath of debug.
++--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21
+|    \\--- org.jetbrains:annotations:13.0
+BUILD SUCCESSFUL in 3s
+"""
+TEST = """\
+> Task :app:dependencies
+debugUnitTestRuntimeClasspath - Resolved configuration for debug unit test.
++--- junit:junit:4.13.2
+|    \\--- org.hamcrest:hamcrest-core:1.3
++--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21
+|    \\--- org.jetbrains:annotations:13.0
+BUILD SUCCESSFUL in 3s
+"""
+
+
+NOTICE = """# Third-party notices — REVIEW INCOMPLETE
+
+NOT a full SBOM.
+
+| Package | Scope | License metadata |
+| --- | --- | --- |
+| \x60pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\x60 | debug runtime | Apache-2.0 (NOT VERIFIED) |
+| \x60pkg:maven/org.jetbrains/annotations@13.0\x60 | debug runtime | Apache-2.0 (NOT VERIFIED) |
+| \x60pkg:maven/junit/junit@4.13.2\x60 | JVM tests ONLY | EPL-1.0 (review OPEN) |
+| \x60pkg:maven/org.hamcrest/hamcrest-core@1.3\x60 | JVM tests ONLY | New BSD (review OPEN) |
+"""
+
+# Real exact-HEAD Android 18-Nov workflow 44384810611 resolved one additional
+# module in debugRuntimeClasspath; the four previously noticed rows remained
+# unique. This synthetic fixture tests that exact *observed* coordinate only.
+BASE_LIBRARY_PURL = "pkg:maven/com.android.databinding/baseLibrary@8.13.2"
+RUNTIME_WITH_BASE = RUNTIME.replace(
+    "+--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21",
+    "+--- com.android.databinding:baseLibrary:8.13.2\n"
+    "+--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21",
+)
+BASE_LIBRARY_NOTICE_ROW = (
+    "| \x60pkg:maven/com.android.databinding/baseLibrary@8.13.2\x60 "
+    "| Android resolved debug runtime; APK packaging NOT VERIFIED "
+    "| Apache-2.0 (supplier POM label, distribution NOT VERIFIED) |"
+)
+NOTICE_WITH_BASE = NOTICE.replace(
+    "| \x60pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\x60",
+    BASE_LIBRARY_NOTICE_ROW + "\n"
+    "| \x60pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\x60",
+)
+
+
+class DependencyGraphAuditTests(unittest.TestCase):
+    def test_complete_scoped_graph_reports_partial_non_release(self):
+        data = mod.audit(RUNTIME, TEST)
+        self.assertEqual(data["graphAudit"], "PASS")
+        self.assertEqual(data["inventoryCompleteness"], "PARTIAL")
+        self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+        self.assertFalse(data["releaseApproved"])
+        self.assertFalse(data["pluginClasspathCovered"])
+        self.assertEqual(data["componentCounts"], {"runtime": 2, "test": 4})
+        self.assertEqual(data["testComponents"][0]["licenseEvidence"],
+                         "EPL-1.0 (supplier POM; test-only boundary)")
+
+    def test_missing_required_test_module_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME, TEST.replace("junit:junit:4.13.2", "other:module:1.0"))
+
+    def test_junit_in_android_runtime_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace("BUILD SUCCESSFUL", "+--- junit:junit:4.13.2\nBUILD SUCCESSFUL"), TEST)
+
+    def test_unpinned_junit_version_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME, TEST.replace("junit:junit:4.13.2", "junit:junit:4.13.1"))
+
+    def test_dynamic_version_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace("kotlin-stdlib:2.3.21", "kotlin-stdlib:2.+"), TEST)
+
+    def test_failed_resolution_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace("BUILD SUCCESSFUL", "BUILD FAILED"), TEST)
+
+    def test_unresolved_module_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace("BUILD SUCCESSFUL", "+--- example:module:1.2 FAILED\nBUILD SUCCESSFUL"), TEST)
+
+    def test_gradle_could_not_resolve_edge_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace(
+                "BUILD SUCCESSFUL", "Could not resolve artifact\\nBUILD SUCCESSFUL"), TEST)
+
+    def test_missing_configuration_fails(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace("debugRuntimeClasspath", "compileClasspath"), TEST)
+
+    def test_conflicting_versions_fail(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME.replace("BUILD SUCCESSFUL", "+--- org.jetbrains.kotlin:kotlin-stdlib:2.3.20\nBUILD SUCCESSFUL"), TEST)
+
+    def test_gradle_requested_version_resolution_is_recorded(self):
+        data = mod.audit(RUNTIME, TEST.replace("junit:junit:4.13.2", "junit:junit:4.13.1 -> 4.13.2"))
+        self.assertIn("pkg:maven/junit/junit@4.13.2", [c["purl"] for c in data["testComponents"]])
+
+    def test_unreviewed_module_is_included_not_auto_licensed(self):
+        data = mod.audit(RUNTIME.replace("BUILD SUCCESSFUL", "+--- vendor:unknown:5.0\nBUILD SUCCESSFUL"), TEST)
+        record = next(c for c in data["runtimeComponents"] if c["purl"] == "pkg:maven/vendor/unknown@5.0")
+        self.assertEqual(record["licenseEvidence"], "NOT_VERIFIED")
+        self.assertFalse(record["licenseApproved"])
+
+    def test_input_bounds_and_symlink_fail_closed(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = root / "runtime.txt"
+            test = root / "test.txt"
+            runtime.write_text(RUNTIME)
+            test.write_text(TEST)
+            notice = root / "THIRD-PARTY-NOTICES.md"
+            notice.write_text(NOTICE)
+            self.assertEqual(mod.main(["--runtime", str(runtime), "--test", str(test),
+                                       "--notice", str(notice)]), 0)
+            runtime.unlink()
+            runtime.symlink_to("/etc/hosts")
+            self.assertEqual(mod.main(["--runtime", str(runtime), "--test", str(test),
+                                       "--notice", str(notice)]), 2)
+
+    def test_correct_scoped_notice_has_no_license_approval(self):
+        data = mod.audit(RUNTIME, TEST)
+        mod.check_partial_notice(data, NOTICE)
+        self.assertFalse(data["releaseApproved"])
+        self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+
+    def test_exact_ci_base_library_requires_pinned_scoped_notice(self):
+        data = mod.audit(RUNTIME_WITH_BASE, TEST)
+        self.assertEqual(data["componentCounts"], {"runtime": 3, "test": 4})
+        self.assertIn(BASE_LIBRARY_PURL,
+            [row["purl"] for row in data["runtimeComponents"]])
+        mod.check_partial_notice(data, NOTICE_WITH_BASE)
+        self.assertFalse(data["releaseApproved"])
+        self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+        self.assertFalse(data["apkPackagingVerified"])
+
+    def test_exact_ci_base_library_missing_or_duplicate_notice_fails_closed(self):
+        data = mod.audit(RUNTIME_WITH_BASE, TEST)
+        for altered, expected_count in [
+            (NOTICE, 0),
+            (NOTICE_WITH_BASE + BASE_LIBRARY_NOTICE_ROW + "\\n", 2),
+        ]:
+            with self.subTest(count=expected_count):
+                with self.assertRaises(mod.AuditError) as caught:
+                    mod.check_partial_notice(data, altered)
+                self.assertIn(
+                    f"baseLibrary@8.13.2 (found {expected_count})",
+                    str(caught.exception))
+
+    def test_observed_compose_gap_inventory_lists_all_missing_purls(self):
+        # The second actual CI revealed androidx.activity:activity-compose
+        # in addition to DataBinding. No unreviewed license is silently
+        # accepted; diagnostics enumerate every missing coordinate.
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- androidx.activity:activity-compose:1.8.2\nBUILD SUCCESSFUL")
+        inventory = mod.audit(runtime, TEST)
+        with self.assertRaises(mod.AuditError) as caught:
+            mod.check_partial_notice(inventory, NOTICE)
+        message = str(caught.exception)
+        self.assertIn("total=2", message)
+        self.assertIn("baseLibrary@8.13.2 (found 0)", message)
+        self.assertIn("activity-compose@1.8.2 (found 0)", message)
+        self.assertFalse(inventory["releaseApproved"])
+
+    def test_exact_ci_base_library_unreviewed_license_label_rejected(self):
+        data = mod.audit(RUNTIME_WITH_BASE, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data,
+                NOTICE_WITH_BASE.replace("Apache-2.0 (supplier POM label",
+                                         "MIT (supplier POM label"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data,
+                NOTICE_WITH_BASE.replace(
+                    BASE_LIBRARY_NOTICE_ROW,
+                    BASE_LIBRARY_NOTICE_ROW.replace(
+                        "distribution NOT VERIFIED", "distribution APPROVED")))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(RUNTIME_WITH_BASE.replace("8.13.2", "8.13.3"), TEST),
+                NOTICE_WITH_BASE)
+
+    def test_real_sha_reviewed_jspecify_row_stays_non_release(self):
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- org.jspecify:jspecify:1.0.0\nBUILD SUCCESSFUL")
+        row = ("| \x60pkg:maven/org.jspecify/jspecify@1.0.0\x60 "
+               "| Android debug runtime + JVM tests, APK packaging NOT VERIFIED "
+               "| Apache-2.0 (official POM/JAR and upstream LICENSE byte parity, "
+               "redistribution review OPEN) |")
+        notice = NOTICE_WITH_BASE + row + "\n"
+        data = mod.audit(runtime, TEST)
+        mod.check_partial_notice(data, notice)
+        self.assertFalse(data["releaseApproved"])
+        self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+        self.assertFalse(data["apkPackagingVerified"])
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, notice.replace(
+                "Apache-2.0 (official POM/JAR", "MIT (official POM/JAR"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE_WITH_BASE)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(runtime.replace("jspecify:1.0.0", "jspecify:1.0.1"), TEST),
+                notice)
+
+    def test_exact_coroutines181_official_byte_review_row_still_not_release(self):
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.1\nBUILD SUCCESSFUL")
+        row = (
+            "| \x60pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.8.1\x60 "
+            "| Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED "
+            "| Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, "
+            "redistribution review OPEN) |")
+        notice = NOTICE_WITH_BASE + row + "\n"
+        inventory = mod.audit(runtime, TEST)
+        mod.check_partial_notice(inventory, notice)
+        self.assertFalse(inventory["releaseApproved"])
+        self.assertFalse(inventory["apkPackagingVerified"])
+        self.assertEqual(inventory["licenseClosure"], "NOT_VERIFIED")
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, NOTICE_WITH_BASE)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, notice.replace(
+                "Apache-2.0 (official Maven", "MIT (official Maven"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(runtime.replace("core-jvm:1.8.1", "core-jvm:1.8.2"), TEST),
+                notice)
+
+    def test_exact_coroutines_android181_official_sources_not_release(self):
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1\nBUILD SUCCESSFUL")
+        row = ("| \x60pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1\x60 "
+               "| Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED "
+               "| Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, "
+               "redistribution review OPEN) |")
+        notice = NOTICE_WITH_BASE + row + "\n"
+        inventory = mod.audit(runtime, TEST)
+        mod.check_partial_notice(inventory, notice)
+        self.assertFalse(inventory["releaseApproved"])
+        self.assertFalse(inventory["apkPackagingVerified"])
+        self.assertEqual(inventory["licenseClosure"], "NOT_VERIFIED")
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, NOTICE_WITH_BASE)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, notice.replace(
+                "Apache-2.0 (official Maven", "MIT (official Maven"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(runtime.replace("coroutines-android:1.8.1",
+                                          "coroutines-android:1.8.2"), TEST), notice)
+
+    def test_serialization_core_jvm173_exact_source_and_notice_not_release(self):
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.7.3\nBUILD SUCCESSFUL")
+        row = (
+            "| \x60pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm@1.7.3\x60 "
+            "| Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED "
+            "| Apache-2.0 (official Maven POM/JAR and upstream LICENSE + NOTICE exact "
+            "byte parity, redistribution review OPEN) |")
+        notice = NOTICE_WITH_BASE + row + "\n"
+        inventory = mod.audit(runtime, TEST)
+        mod.check_partial_notice(inventory, notice)
+        self.assertEqual(inventory["licenseClosure"], "NOT_VERIFIED")
+        self.assertFalse(inventory["releaseApproved"])
+        self.assertFalse(inventory["apkPackagingVerified"])
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, NOTICE_WITH_BASE)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, notice.replace(
+                "Apache-2.0 (official Maven", "MIT (official Maven"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(runtime.replace("core-jvm:1.7.3", "core-jvm:1.7.4"), TEST),
+                notice)
+
+    def test_missing_runtime_notice_entry_rejected(self):
+        data = mod.audit(RUNTIME, TEST)
+        changed = "\n".join(line for line in NOTICE.splitlines()
+                            if "kotlin-stdlib@2.3.21" not in line)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, changed)
+
+    def test_incorrect_junit_license_notice_rejected(self):
+        data = mod.audit(RUNTIME, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE.replace("EPL-1.0", "MIT"))
+
+    def test_new_unreviewed_runtime_dependency_rejected(self):
+        runtime = RUNTIME.replace("BUILD SUCCESSFUL",
+                                  "+--- vendor:unreviewed:1.0\nBUILD SUCCESSFUL")
+        data = mod.audit(runtime, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE)
+
+    def test_notice_without_partial_disclaimer_rejected(self):
+        data = mod.audit(RUNTIME, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE.replace("NOT a full SBOM", "ALL LICENSES APPROVED"))
+
+    def test_no_test_tree_cannot_pass(self):
+        with self.assertRaises(mod.AuditError):
+            mod.audit(RUNTIME, "debugUnitTestRuntimeClasspath - Runtime\nNo dependencies\nBUILD SUCCESSFUL in 0s\n")
+
+
+if __name__ == "__main__":
+    unittest.main()
