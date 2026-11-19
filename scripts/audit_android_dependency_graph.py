@@ -137,6 +137,9 @@ NOTICE_LABELS = {
     # 19-Nov official Maven Central/JAR-cache byte parity and immutable Kotlin
     # 1.8.1-tagged LICENSE proved at PUBLIC Actions 44605162262; NOT legal GO.
     "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.8.1": "Apache-2.0",
+    # Real 19-Nov official Maven JAR/POM and immutable Kotlin 1.8.1 tagged
+    # LICENSE byte parity at CI 44611323479; no distribution authorization.
+    "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1": "Apache-2.0",
     "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21": "Apache-2.0",
     "pkg:maven/org.jetbrains/annotations@13.0": "Apache-2.0",
     "pkg:maven/junit/junit@4.13.2": "EPL-1.0",

@@ -23,6 +23,12 @@ PURL = "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1"
 COORDINATE = ("org.jetbrains.kotlinx", "kotlinx-coroutines-android", "1.8.1")
 TAG_COMMIT = "cd696d3f8f4afdbc735915c2bded974616331b55"
 TAG_LICENSE_GIT_BLOB = "9c308d958bf91eafe83f66106ca692ff414a4965"
+# Actual PUBLIC Android Foundation push 44611323479/job 135868373595:
+# Maven Central exact POM/JAR vs local Gradle-resolved JAR, tagged LICENSE.
+PINNED_POM_SHA256 = "88e8c7ede4d29b8027a2da6ea9e3ce550c556a4213633f8f6de28bb9fb201c90"
+PINNED_JAR_SHA256 = "a134dacf4e6578b29b32e97aa50548d09cb45e3cb3551ce77ac27e55e265d8f5"
+PINNED_LICENSE_SHA256 = "b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8"
+
 # Exact versioned source tag and LICENSE Git blob verified independently.
 # Real upstream Maven SHA-256 pins remain unknown until actual CI.
 
@@ -168,14 +174,18 @@ def audit_bundle(runtime_text: str, test_text: str, pom: bytes, jar: bytes,
         if (group, artifact) == COORDINATE[:2] and version != COORDINATE[2]:
             raise AuditError("selected coroutines Android version drift")
     license_name = validate_pom(pom)
-    # First official-source CI discovers SHA hashes, but does not fabricate pins.
-    # The next reviewed change pins all 3 exact hashes and updates this gate.
-    apply_real_sha_pins = False
-    if expected_shas is not None:
-        if ({key: digest(value) for key, value in {
-                "pom": pom, "jar": jar, "license": upstream_license}.items()}
-                != expected_shas):
-            raise AuditError("exact pinned Maven/tag source SHA256 drift")
+    # Production CLI uses only actually verified official Maven and tag pins.
+    # Synthetic offline tests inject synthetic expected hashes explicitly.
+    apply_real_sha_pins = expected_shas is None
+    expected_shas = expected_shas if expected_shas is not None else {
+        "pom": PINNED_POM_SHA256,
+        "jar": PINNED_JAR_SHA256,
+        "license": PINNED_LICENSE_SHA256,
+    }
+    if ({key: digest(value) for key, value in {
+            "pom": pom, "jar": jar, "license": upstream_license}.items()}
+            != expected_shas):
+        raise AuditError("exact pinned Maven/tag source SHA256 drift")
     if (not 0 < len(upstream_license) <= MAX_LICENSE or
             git_blob(upstream_license) != license_blob or
             b"Apache License" not in upstream_license or

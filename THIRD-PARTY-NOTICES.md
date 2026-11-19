@@ -64,10 +64,50 @@ outside this scoped inventory.
 | `pkg:maven/com.android.databinding/baseLibrary@8.13.2` | Android resolved debug runtime; APK packaging NOT VERIFIED | Apache-2.0 (supplier POM label, distribution NOT VERIFIED) |
 | `pkg:maven/org.jspecify/jspecify@1.0.0` | Android debug runtime + JVM tests, APK packaging NOT VERIFIED | Apache-2.0 (official POM/JAR and upstream LICENSE byte parity, redistribution review OPEN) |
 | `pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.8.1` | Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED | Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, redistribution review OPEN) |
+| `pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1` | Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED | Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, redistribution review OPEN) |
 | `pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/org.jetbrains/annotations@13.0` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/junit/junit@4.13.2` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
 | `pkg:maven/org.hamcrest/hamcrest-core@1.3` | JVM local tests ONLY; absent from Android debug runtime | New BSD (test-only boundary, redistribution review OPEN) |
+
+### Verified kotlinx-coroutines-android 1.8.1 official source bytes — 19 November 2026
+
+Single scope: \`pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1\`.
+This is one resolved Android runtime/test graph module, **not a final APK
+packaging or release SBOM assertion**.
+
+GitHub Actions **actual** Android Foundation push run
+[44611323479](https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/44611323479),
+job 135868373595, PUBLIC source-review commit
+\`73ec781c60a70a27e7ff4a211432f22dd4dda4bf\`:
+official Maven Central exact **2,221-byte POM**,
+SHA-256 \`88e8c7ede4d29b8027a2da6ea9e3ce550c556a4213633f8f6de28bb9fb201c90\`,
+declared \`The Apache Software License, Version 2.0\`;
+official Maven Central exact **20,466-byte JAR**,
+SHA-256 \`a134dacf4e6578b29b32e97aa50548d09cb45e3cb3551ce77ac27e55e265d8f5\`,
+identical SHA-256 and byte size to the local, actually Gradle-resolved JAR.
+The JAR contained **no embedded LICENSE/NOTICE filenames**.
+
+Official Kotlin/kotlinx.coroutines \`1.8.1\` source tag commit
+\`cd696d3f8f4afdbc735915c2bded974616331b55\`
+has exact \`LICENSE.txt\` Git blob
+\`9c308d958bf91eafe83f66106ca692ff414a4965\`, SHA-256
+\`b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8\`.
+This **same upstream source tree and LICENSE blob** was already retained at
+\`third_party/kotlinx-coroutines-core-jvm-1.8.1/LICENSE.txt\` and is reused
+byte-for-byte, rather than publishing a redundant second full Apache text.
+New Android CI explicitly checks the SHA-256 of that reused retained file.
+
+Official sources: https://github.com/Kotlin/kotlinx.coroutines/releases/tag/1.8.1
+and https://central.sonatype.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-android/1.8.1
+and \`docs/COROUTINES-ANDROID181-EXACT-MAVEN-REVIEW-20261119.md\`.
+
+This is source/POM/hash provenance evidence, not proof of downstream
+redistribution authorization, publisher signature, actual APK inclusion,
+complete NOTICE/license inventory, or legal license closure. The separate
+**42 Gradle plugin child-POM** reviews stay open. All other Android missing
+Maven NOTICE rows stay **fail-closed**. Prior missing total=87; any reduction
+to 86 requires real exact-final-HEAD CI log verification. RELEASE **NO-GO**.
 
 ### Verified kotlinx-coroutines-core-jvm 1.8.1 official source bytes — 19 November 2026
 
