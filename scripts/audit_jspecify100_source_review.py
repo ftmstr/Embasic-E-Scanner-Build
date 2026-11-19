@@ -23,6 +23,12 @@ PURL = "pkg:maven/org.jspecify/jspecify@1.0.0"
 COORDINATE = ("org.jspecify", "jspecify", "1.0.0")
 TAG_COMMIT = "b2a10e14bb81c1b7cb6e488c112fe55cb2218d7d"
 TAG_LICENSE_GIT_BLOB = "d645695673349e3947e8e5ae42332d0ac3164cd7"
+# Independent real 19-Nov PUBLIC CI 44576080885, job 135743831186:
+# exact Maven Central POM/JAR + immutable tagged GitHub LICENSE SHA-256.
+PINNED_POM_SHA256 = "cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6"
+PINNED_JAR_SHA256 = "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+PINNED_LICENSE_SHA256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+
 BASE = "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/"
 POM_URL = BASE + "jspecify-1.0.0.pom"
 JAR_URL = BASE + "jspecify-1.0.0.jar"
@@ -152,7 +158,8 @@ def inspect_jar(raw: bytes) -> list[str]:
 
 def audit_bundle(runtime_text: str, test_text: str, pom: bytes, jar: bytes,
                  upstream_license: bytes, cached_jar: bytes,
-                 license_blob: str = TAG_LICENSE_GIT_BLOB) -> dict:
+                 license_blob: str = TAG_LICENSE_GIT_BLOB,
+                 expected_shas: dict[str, str] | None = None) -> dict:
     runtime = resolved_graph(runtime_text, "debugRuntimeClasspath")
     testing = resolved_graph(test_text, "debugUnitTestRuntimeClasspath")
     runtime_selected = COORDINATE in runtime
@@ -164,6 +171,17 @@ def audit_bundle(runtime_text: str, test_text: str, pom: bytes, jar: bytes,
         if (group, artifact) == COORDINATE[:2] and version != COORDINATE[2]:
             raise AuditError("selected JSpecify version drift")
     license_name = validate_pom(pom)
+    # Genuine CLI uses the three exact externally verified CI pins; only
+    # synthetic offline tests inject synthetic expected hashes.
+    expected_shas = expected_shas if expected_shas is not None else {
+        "pom": PINNED_POM_SHA256,
+        "jar": PINNED_JAR_SHA256,
+        "license": PINNED_LICENSE_SHA256,
+    }
+    if ({key: digest(value) for key, value in {
+            "pom": pom, "jar": jar, "license": upstream_license}.items()}
+            != expected_shas):
+        raise AuditError("exact pinned Maven/tag source SHA256 drift")
     if (not 0 < len(upstream_license) <= MAX_LICENSE or
             git_blob(upstream_license) != license_blob or
             b"Apache License" not in upstream_license or

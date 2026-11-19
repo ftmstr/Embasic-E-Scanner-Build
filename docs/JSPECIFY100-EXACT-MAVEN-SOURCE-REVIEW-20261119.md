@@ -70,3 +70,41 @@ LICENSE, signing key, private asset or customer data touches.
 Official sources: https://github.com/jspecify/jspecify/releases/tag/v1.0.0
 https://jspecify.dev/docs/using/
 https://central.sonatype.com/artifact/org.jspecify/jspecify/1.0.0 .
+
+## Actual independent live CI source and retained-license result
+
+After the initial scope document, on exact PUBLIC commit
+795dc8d8a750e77522ca12682d9dc95beee3f1e7, GitHub Android Foundation
+pull_request run 44576080885 / job 135743831186 completed with:
+
+- 13 synthetic offline source-auditor regressions PASS (not source bytes).
+- The independent live source step SUCCESS after the 89-row NOTICE
+  gate intentionally failed, proving the audit does not bypass it.
+- Exact POM 1,511 bytes, SHA-256
+  cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6
+  and directly declared supplier Apache License Version 2.0 label.
+- Exact JAR 3,819 bytes, SHA-256
+  1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab.
+  Real Gradle cache JAR bytes identical; also matches the SHA-256 published
+  by JSpecify official documentation at https://jspecify.dev/docs/using/.
+- Tagged v1.0.0 source LICENSE 11,358 bytes, SHA-256
+  cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
+  and exact Git blob d645695673349e3947e8e5ae42332d0ac3164cd7.
+- JAR legal file inventory was EMPTY: no embedded LICENSE or NOTICE.
+  Downstream exact text attribution/retention is still an open release gate.
+- The independent source JSON persisted as GitHub Actions artifact
+  android-jspecify100-source-evidence (run 44576080885,
+  artifact 14555694081). This is not a release SBOM.
+
+Based on the actual CI output, the reviewed POM/JAR/LICENSE SHA-256 hashes
+are now pinned in the bounded auditor, the complete upstream LICENSE text
+is retained verbatim at third_party/jspecify-1.0.0/LICENSE (identical Git
+blob), and the existing partial THIRD-PARTY-NOTICES.md contains precisely
+one source-backed row. The expected missing-row count becomes 88 if and
+only if the same complete resolved Gradle graph reaches the fail-closed
+NOTICE gate again; no count is declared before exact final CI readback.
+
+Publisher cryptographic signature, Android APK inclusion, permitted exact
+redistribution terms, upstream notices and full product LICENSES/SBOM
+remain NOT VERIFIED. The independent 42 Gradle child-POM gaps persist.
+RELEASE NO-GO.

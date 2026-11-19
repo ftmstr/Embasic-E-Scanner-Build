@@ -131,6 +131,9 @@ NOTICE_LABELS = {
     # 18-Nov exact resolved debugRuntimeClasspath (GitHub Actions 44384810611).
     # Supplier POM label is not a hash of exact POM/JAR or license approval.
     "pkg:maven/com.android.databinding/baseLibrary@8.13.2": "Apache-2.0",
+    # 19-Nov real CI run 44576080885/JSpecify official POM/JAR and
+    # immutable v1.0.0 tagged LICENSE bytes; NOT a distribution grant.
+    "pkg:maven/org.jspecify/jspecify@1.0.0": "Apache-2.0",
     "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21": "Apache-2.0",
     "pkg:maven/org.jetbrains/annotations@13.0": "Apache-2.0",
     "pkg:maven/junit/junit@4.13.2": "EPL-1.0",

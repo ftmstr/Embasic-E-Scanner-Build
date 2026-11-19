@@ -62,10 +62,45 @@ outside this scoped inventory.
 | Exact resolved Maven purl | Scope | Supplier POM license metadata |
 | --- | --- | --- |
 | `pkg:maven/com.android.databinding/baseLibrary@8.13.2` | Android resolved debug runtime; APK packaging NOT VERIFIED | Apache-2.0 (supplier POM label, distribution NOT VERIFIED) |
+| `pkg:maven/org.jspecify/jspecify@1.0.0` | Android debug runtime + JVM tests, APK packaging NOT VERIFIED | Apache-2.0 (official POM/JAR and upstream LICENSE byte parity, redistribution review OPEN) |
 | `pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/org.jetbrains/annotations@13.0` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/junit/junit@4.13.2` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
 | `pkg:maven/org.hamcrest/hamcrest-core@1.3` | JVM local tests ONLY; absent from Android debug runtime | New BSD (test-only boundary, redistribution review OPEN) |
+
+### Verified JSpecify 1.0.0 source bytes — 19 November 2026 (not distribution approval)
+
+PUBLIC exact HEAD `795dc8d8a750e77522ca12682d9dc95beee3f1e7`,
+Android Foundation PR run [44576080885](https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/44576080885)
+(job 135743831186), independently downloaded official Maven Central bytes
+and compared the 3,819-byte JAR against the locally resolved Gradle JAR.
+The 1,511-byte Maven POM declares "The Apache License, Version 2.0".
+Maven JAR contains **no embedded LICENSE or NOTICE member**; downstream
+attribution/retention obligations and source headers require review.
+
+- Maven exact POM SHA-256:
+  `cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6`
+- Maven exact JAR SHA-256:
+  `1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab`
+- Release v1.0.0 source LICENSE exact Git blob SHA-1:
+  `d645695673349e3947e8e5ae42332d0ac3164cd7`
+  at immutable GitHub commit `b2a10e14bb81c1b7cb6e488c112fe55cb2218d7d`
+- Source LICENSE SHA-256:
+  `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`
+- Upstream LICENSE retained verbatim at
+  `third_party/jspecify-1.0.0/LICENSE`; PUBLIC Git blob SHA-1
+  `d645695673349e3947e8e5ae42332d0ac3164cd7` equals tagged upstream.
+- Original releases: https://github.com/jspecify/jspecify/releases/tag/v1.0.0 ;
+  Maven artefact: https://central.sonatype.com/artifact/org.jspecify/jspecify/1.0.0 ;
+  source evidence details: `docs/JSPECIFY100-EXACT-MAVEN-SOURCE-REVIEW-20261119.md`.
+
+This evidence is limited to one exact resolved Maven coordinate.
+The other **88** unresolved Android NOTICE rows remain fail-closed, and
+the **42** separate Gradle plugin child-POM legal reviews remain open.
+Exact APK inclusion, signed publisher origin, embedded notice obligations,
+transitive third-party terms, full NOTICE/LICENSES/SBOM, commercial
+redistribution rights and release package smoke are **NOT VERIFIED**.
+A supplier POM declaration is not an approval or a product source license.
 
 Publisher metadata (not independently verified byte-for-byte license texts):
 - https://central.sonatype.com/artifact/org.jetbrains.kotlin/kotlin-stdlib/2.3.21

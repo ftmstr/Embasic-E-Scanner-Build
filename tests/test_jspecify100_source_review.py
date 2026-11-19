@@ -55,7 +55,9 @@ def run(pom: bytes = POM, jar: bytes | None = None,
     cached = cached if cached is not None else jar
     blob = blob if blob is not None else m.git_blob(LICENSE)
     return m.audit_bundle(runtime, test, pom, jar, license_text, cached,
-                          license_blob=blob)
+                          license_blob=blob, expected_shas={
+                              "pom": m.digest(pom), "jar": m.digest(jar),
+                              "license": m.digest(license_text)})
 
 
 class JspecifyExactSourceTests(unittest.TestCase):
@@ -77,6 +79,20 @@ class JspecifyExactSourceTests(unittest.TestCase):
         self.assertFalse(report["sbomComplete"])
         self.assertEqual(report["licenseClosure"], "NOT_VERIFIED")
         self.assertEqual(report["noticeClosure"], "NOT_VERIFIED")
+
+    def test_real_source_sha_pins_cannot_be_replaced_by_synthetic_bytes(self):
+        self.assertEqual(
+            m.PINNED_JAR_SHA256,
+            "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab")
+        self.assertEqual(
+            m.PINNED_POM_SHA256,
+            "cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6")
+        self.assertEqual(
+            m.PINNED_LICENSE_SHA256,
+            "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30")
+        with self.assertRaisesRegex(m.AuditError, "pinned Maven/tag source SHA256 drift"):
+            m.audit_bundle(RUNTIME, TEST, POM, jar_bytes(), LICENSE, jar_bytes(),
+                           license_blob=m.git_blob(LICENSE))
 
     def test_byte_changed_gradle_cache_rejected(self):
         with self.assertRaisesRegex(m.AuditError, "BYTE_MISMATCH"):

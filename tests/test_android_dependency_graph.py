@@ -199,6 +199,30 @@ class DependencyGraphAuditTests(unittest.TestCase):
                 mod.audit(RUNTIME_WITH_BASE.replace("8.13.2", "8.13.3"), TEST),
                 NOTICE_WITH_BASE)
 
+    def test_real_sha_reviewed_jspecify_row_stays_non_release(self):
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- org.jspecify:jspecify:1.0.0\nBUILD SUCCESSFUL")
+        row = ("| \x60pkg:maven/org.jspecify/jspecify@1.0.0\x60 "
+               "| Android debug runtime + JVM tests, APK packaging NOT VERIFIED "
+               "| Apache-2.0 (official POM/JAR and upstream LICENSE byte parity, "
+               "redistribution review OPEN) |")
+        notice = NOTICE_WITH_BASE + row + "\n"
+        data = mod.audit(runtime, TEST)
+        mod.check_partial_notice(data, notice)
+        self.assertFalse(data["releaseApproved"])
+        self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+        self.assertFalse(data["apkPackagingVerified"])
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, notice.replace(
+                "Apache-2.0 (official POM/JAR", "MIT (official POM/JAR"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data, NOTICE_WITH_BASE)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(runtime.replace("jspecify:1.0.0", "jspecify:1.0.1"), TEST),
+                notice)
+
     def test_missing_runtime_notice_entry_rejected(self):
         data = mod.audit(RUNTIME, TEST)
         changed = "\n".join(line for line in NOTICE.splitlines()

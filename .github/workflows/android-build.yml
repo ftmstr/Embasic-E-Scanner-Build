@@ -458,6 +458,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_jspecify100_source_review.py' -v
+          sha256sum --check <<'JSPECIFY_LICENSE_SHA'
+          cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  third_party/jspecify-1.0.0/LICENSE
+          JSPECIFY_LICENSE_SHA
           python3 scripts/audit_jspecify100_source_review.py \
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
             --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
