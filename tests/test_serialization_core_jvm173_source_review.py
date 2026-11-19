@@ -88,12 +88,24 @@ class SerializationCoreJvm173ExactSourceTests(unittest.TestCase):
         self.assertEqual(report["licenseClosure"], "NOT_VERIFIED")
         self.assertEqual(report["noticeClosure"], "NOT_VERIFIED")
 
-    def test_first_source_run_does_not_fabricate_exact_maven_sha_pins(self):
+    def test_verified_sha_pins_are_exact_and_synthetic_cannot_replace(self):
         self.assertFalse(run()["sourceHashPinsVerified"])
         self.assertFalse(run()["releaseApproved"])
         self.assertEqual(m.TAG_COMMIT, "d4d066d72a9f92f06c640be5a36a22f75d0d7659")
         self.assertEqual(m.TAG_LICENSE_GIT_BLOB, "9c8f3ea0871e0bfe81da0fa6e7c1d7d156dc380e")
         self.assertEqual(m.TAG_NOTICE_GIT_BLOB, "ee516ec09649791af5ff26c0346e748a881cacb7")
+        self.assertEqual(m.PINNED_POM_SHA256,
+                         "734f5f749208dd0bef3d98caa594cf9222afdf0fee5b6843347a8fe64e240427")
+        self.assertEqual(m.PINNED_JAR_SHA256,
+                         "f0adde45864144475385cf4aa7e0b7feb27f61fcf9472665ed98cc971b06b1eb")
+        self.assertEqual(m.PINNED_LICENSE_SHA256,
+                         "c5accbbd8546e94c34aed24afe689a617627d18eed5a6c48277e48db57c23851")
+        self.assertEqual(m.PINNED_NOTICE_SHA256,
+                         "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6")
+        with self.assertRaisesRegex(m.AuditError, "exact pinned Maven/tag source SHA256 drift"):
+            m.audit_bundle(RUNTIME, TEST, POM, jar_bytes(), LICENSE, NOTICE,
+                           jar_bytes(), license_blob=m.git_blob(LICENSE),
+                           notice_blob=m.git_blob(NOTICE))
         with self.assertRaisesRegex(m.AuditError, "exact pinned Maven/tag source SHA256 drift"):
             m.audit_bundle(RUNTIME, TEST, POM, jar_bytes(), LICENSE, NOTICE,
                            jar_bytes(), license_blob=m.git_blob(LICENSE),

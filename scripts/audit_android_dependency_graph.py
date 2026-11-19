@@ -140,6 +140,10 @@ NOTICE_LABELS = {
     # Real 19-Nov official Maven JAR/POM and immutable Kotlin 1.8.1 tagged
     # LICENSE byte parity at CI 44611323479; no distribution authorization.
     "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1": "Apache-2.0",
+    # Actual 20-Nov immutable Kotlinx Serialization v1.7.3 source LICENSE
+    # and separate NOTICE, official Maven POM/JAR local Gradle byte parity
+    # (CI 44626811889); source label only, redistribution still NOT VERIFIED.
+    "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm@1.7.3": "Apache-2.0",
     "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21": "Apache-2.0",
     "pkg:maven/org.jetbrains/annotations@13.0": "Apache-2.0",
     "pkg:maven/junit/junit@4.13.2": "EPL-1.0",

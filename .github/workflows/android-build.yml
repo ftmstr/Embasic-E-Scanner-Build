@@ -590,6 +590,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_serialization_core_jvm173_source_review.py' -v
+          sha256sum --check <<'SERIALIZATION173_SOURCE_LEGAL_SHAS'
+          c5accbbd8546e94c34aed24afe689a617627d18eed5a6c48277e48db57c23851  third_party/kotlinx-serialization-core-jvm-1.7.3/LICENSE.txt
+          ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6  third_party/kotlinx-serialization-core-jvm-1.7.3/NOTICE.txt
+          SERIALIZATION173_SOURCE_LEGAL_SHAS
           python3 scripts/audit_serialization_core_jvm173_source_review.py \
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
             --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
@@ -605,7 +609,7 @@ jobs:
           assert e["taggedLicense"]["commit"] == "d4d066d72a9f92f06c640be5a36a22f75d0d7659"
           assert e["taggedLicense"]["gitBlobSha1"] == "9c8f3ea0871e0bfe81da0fa6e7c1d7d156dc380e"
           assert e["taggedNotice"]["gitBlobSha1"] == "ee516ec09649791af5ff26c0346e748a881cacb7"
-          assert e["sourceHashPinsVerified"] is False
+          assert e["sourceHashPinsVerified"] is True
           assert e["publisherSignatureVerified"] is False and e["apkPackagingVerified"] is False
           assert e["redistributionRightsVerified"] is False
           assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
@@ -615,7 +619,7 @@ jobs:
           print("SERIALIZATION_CORE_JVM173_JAR_SHA256", e["mavenJar"]["sha256"])
           print("SERIALIZATION_CORE_JVM173_LICENSE_SHA256", e["taggedLicense"]["sha256"])
           print("SERIALIZATION_CORE_JVM173_NOTICE_SHA256", e["taggedNotice"]["sha256"])
-          print("NOT VERIFIED: source hash final pins, 86 remaining Maven NOTICE, 42 Gradle POMs, signatures, APK/SBOM, commercial redistribution")
+          print("NOT VERIFIED: 85 other Maven NOTICE entries (pending exact-head confirmation), 42 Gradle POMs, publisher signatures, APK/SBOM, redistribution")
           PY
       - name: Retain kotlinx-serialization core JVM 1.7.3 source evidence (NOT an SBOM)
         if: ${{ !cancelled() }}

@@ -65,10 +65,57 @@ outside this scoped inventory.
 | `pkg:maven/org.jspecify/jspecify@1.0.0` | Android debug runtime + JVM tests, APK packaging NOT VERIFIED | Apache-2.0 (official POM/JAR and upstream LICENSE byte parity, redistribution review OPEN) |
 | `pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.8.1` | Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED | Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, redistribution review OPEN) |
 | `pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1` | Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED | Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, redistribution review OPEN) |
+| `pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm@1.7.3` | Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED | Apache-2.0 (official Maven POM/JAR and upstream LICENSE + NOTICE exact byte parity, redistribution review OPEN) |
 | `pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/org.jetbrains/annotations@13.0` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/junit/junit@4.13.2` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
 | `pkg:maven/org.hamcrest/hamcrest-core@1.3` | JVM local tests ONLY; absent from Android debug runtime | New BSD (test-only boundary, redistribution review OPEN) |
+
+### Verified kotlinx-serialization-core-jvm 1.7.3 official LICENSE and separate NOTICE source — 20 November 2026
+
+**One** Android Gradle-resolved exact coordinate:
+\`pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm@1.7.3\`.
+Actual PUBLIC Android Foundation **push** run
+[44626811889](https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/44626811889),
+job 135922705707, source-review commit
+\`f870e419d9e23532c8f4d1718f1e26569901e135\`,
+checked official Maven Central bytes over exact HTTPS literal endpoints.
+
+- Exact official Maven Central **2,044-byte POM**, SHA-256
+  \`734f5f749208dd0bef3d98caa594cf9222afdf0fee5b6843347a8fe64e240427\`.
+  Direct supplier POM license metadata:
+  \`The Apache Software License, Version 2.0\`.
+- Exact Maven Central **390,987-byte JAR**, SHA-256
+  \`f0adde45864144475385cf4aa7e0b7feb27f61fcf9472665ed98cc971b06b1eb\`.
+  The actual resolved local Gradle cached JAR matches length and SHA-256.
+  Inspected JAR has **no embedded LICENSE/NOTICE filenames**.
+- Official \`Kotlin/kotlinx.serialization\` tag \`v1.7.3\`, immutable commit
+  \`d4d066d72a9f92f06c640be5a36a22f75d0d7659\`, full source
+  \`LICENSE.txt\`: Git blob \`9c8f3ea0871e0bfe81da0fa6e7c1d7d156dc380e\`,
+  **11,356 bytes**, SHA-256
+  \`c5accbbd8546e94c34aed24afe689a617627d18eed5a6c48277e48db57c23851\`.
+- Same tagged source contains a **distinct** \`license/NOTICE.txt\` file
+  corresponding to Apache 2.0 Section 4(d), with copyright notice,
+  Git blob \`ee516ec09649791af5ff26c0346e748a881cacb7\`,
+  **497 bytes**, SHA-256
+  \`ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6\`.
+- Full upstream source legal texts are retained verbatim in
+  \`third_party/kotlinx-serialization-core-jvm-1.7.3/LICENSE.txt\` and
+  \`third_party/kotlinx-serialization-core-jvm-1.7.3/NOTICE.txt\`,
+  with exact upstream Git blob parity and CI \`sha256sum --check\`.
+- Official release: https://github.com/Kotlin/kotlinx.serialization/releases/tag/v1.7.3 ;
+  exact coordinate: https://central.sonatype.com/artifact/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm/1.7.3 ;
+  detailed bounded review:
+  \`docs/SERIALIZATION-CORE-JVM173-EXACT-MAVEN-LICENSE-NOTICE-20261120.md\`.
+
+The source-specific NOTICE is preserved separately; this does **not** prove
+complete downstream \`NOTICE\` retention, APK inclusion or commercial
+redistribution rights. Exact Maven source hashes are proof of byte parity
+against this CI's Gradle cache, **not a signed publisher attestation**. Other
+Maven NOTICE discrepancies (baseline 86, **85 only if final HEAD CI confirms**),
+separate **42 Gradle plugin child-POM** legal reviews, APK/AAB packaging,
+publisher signatures, all NOTICE/LICENSES and transitive SBOM duties are
+**NOT VERIFIED**. All missing purls still fail-closed. RELEASE **NO-GO**.
 
 ### Verified kotlinx-coroutines-android 1.8.1 official source bytes — 19 November 2026
 
