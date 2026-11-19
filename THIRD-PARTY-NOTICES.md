@@ -63,10 +63,52 @@ outside this scoped inventory.
 | --- | --- | --- |
 | `pkg:maven/com.android.databinding/baseLibrary@8.13.2` | Android resolved debug runtime; APK packaging NOT VERIFIED | Apache-2.0 (supplier POM label, distribution NOT VERIFIED) |
 | `pkg:maven/org.jspecify/jspecify@1.0.0` | Android debug runtime + JVM tests, APK packaging NOT VERIFIED | Apache-2.0 (official POM/JAR and upstream LICENSE byte parity, redistribution review OPEN) |
+| `pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.8.1` | Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED | Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, redistribution review OPEN) |
 | `pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/org.jetbrains/annotations@13.0` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/junit/junit@4.13.2` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
 | `pkg:maven/org.hamcrest/hamcrest-core@1.3` | JVM local tests ONLY; absent from Android debug runtime | New BSD (test-only boundary, redistribution review OPEN) |
+
+### Verified kotlinx-coroutines-core-jvm 1.8.1 official source bytes — 19 November 2026
+
+One exact Android Gradle-resolved coordinate only; this is not product SBOM
+closure or redistribution authorization.
+
+PUBLIC Android Kotlin Foundation push run
+[44605162262](https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/44605162262)
+(job 135846781951) on commit \`7c5c836354ecacb217ce44204c6511f51df7a4d3\`
+read official Maven Central POM and JAR over strict HTTPS, and compared the
+**1,546,991-byte JAR** byte-for-byte by SHA-256 to the resolved local
+Gradle JAR. The Maven **2,196-byte POM** directly declares
+"The Apache Software License, Version 2.0".
+Source byte review succeeded while the previous 88-row NOTICE audit
+remained FAIL as intended.
+
+- Official exact Maven POM SHA-256:
+  \`47c6a50b14151e8faf7f350a95235c37d12abc38bfb055b668974293172daf2c\`
+- Official exact Maven JAR SHA-256:
+  \`f3d4f5de1c391bbcc20f3b3435ccbac013521e76b6902d7d59635ec15c1f797e\`
+- Kotlin/kotlinx.coroutines immutable tag \`1.8.1\` at Git commit
+  \`cd696d3f8f4afdbc735915c2bded974616331b55\`.
+  Its \`LICENSE.txt\` has Git blob
+  \`9c308d958bf91eafe83f66106ca692ff414a4965\` and SHA-256
+  \`b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8\`.
+- Upstream tagged LICENSE retained byte-identically as
+  \`third_party/kotlinx-coroutines-core-jvm-1.8.1/LICENSE.txt\`; same Git blob.
+- Maven JAR **no embedded LICENSE or NOTICE filenames**; exact required
+  downstream notices, dependencies, notices from transitive binaries, tag
+  signature and APK contents remain open.
+- Official release https://github.com/Kotlin/kotlinx.coroutines/releases/tag/1.8.1 ;
+  canonical module https://central.sonatype.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.8.1 ;
+  review \`docs/COROUTINES-CORE-JVM181-EXACT-MAVEN-REVIEW-20261119.md\`.
+
+Only this one PURL is source-backed and may pass the scoped NOTICE row
+consistency gate. The **87 other resolved Android NOTICE gaps**, separate
+**42 Gradle plugin child-POM legal gaps**, full dependencies/LICENSES/NOTICE
+and SBOM are not closed. The decrease from 88 to 87 is a **hypothesis until
+verified at a new exact GitHub Actions HEAD**. Publisher signatures,
+source-specific NOTICE obligations, APK/AAB package contents, redistribution
+terms and commercial approval are **NOT VERIFIED**. Release **NO-GO**.
 
 ### Verified JSpecify 1.0.0 source bytes — 19 November 2026 (not distribution approval)
 

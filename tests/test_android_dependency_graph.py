@@ -223,6 +223,31 @@ class DependencyGraphAuditTests(unittest.TestCase):
                 mod.audit(runtime.replace("jspecify:1.0.0", "jspecify:1.0.1"), TEST),
                 notice)
 
+    def test_exact_coroutines181_official_byte_review_row_still_not_release(self):
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.1\nBUILD SUCCESSFUL")
+        row = (
+            "| \x60pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.8.1\x60 "
+            "| Android resolved debug runtime + JVM tests; APK packaging NOT VERIFIED "
+            "| Apache-2.0 (official Maven POM/JAR and tagged LICENSE byte parity, "
+            "redistribution review OPEN) |")
+        notice = NOTICE_WITH_BASE + row + "\n"
+        inventory = mod.audit(runtime, TEST)
+        mod.check_partial_notice(inventory, notice)
+        self.assertFalse(inventory["releaseApproved"])
+        self.assertFalse(inventory["apkPackagingVerified"])
+        self.assertEqual(inventory["licenseClosure"], "NOT_VERIFIED")
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, NOTICE_WITH_BASE)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(inventory, notice.replace(
+                "Apache-2.0 (official Maven", "MIT (official Maven"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(runtime.replace("core-jvm:1.8.1", "core-jvm:1.8.2"), TEST),
+                notice)
+
     def test_missing_runtime_notice_entry_rejected(self):
         data = mod.audit(RUNTIME, TEST)
         changed = "\n".join(line for line in NOTICE.splitlines()

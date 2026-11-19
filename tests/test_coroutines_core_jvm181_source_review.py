@@ -80,9 +80,22 @@ class CoroutinesCoreJvm181ExactSourceTests(unittest.TestCase):
         self.assertEqual(report["licenseClosure"], "NOT_VERIFIED")
         self.assertEqual(report["noticeClosure"], "NOT_VERIFIED")
 
-    def test_initial_source_sha_pins_not_fabricated(self):
+    def test_real_sha_pins_not_synthetic_or_license_approval(self):
         self.assertFalse(run()["sourceHashPinsVerified"])
         self.assertFalse(run()["releaseApproved"])
+        self.assertEqual(
+            m.PINNED_POM_SHA256,
+            "47c6a50b14151e8faf7f350a95235c37d12abc38bfb055b668974293172daf2c")
+        self.assertEqual(
+            m.PINNED_JAR_SHA256,
+            "f3d4f5de1c391bbcc20f3b3435ccbac013521e76b6902d7d59635ec15c1f797e")
+        self.assertEqual(
+            m.PINNED_LICENSE_SHA256,
+            "b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8")
+        with self.assertRaisesRegex(m.AuditError, "exact pinned Maven/tag source SHA256 drift"):
+            m.audit_bundle(RUNTIME, TEST, POM, jar_bytes(), LICENSE,
+                           jar_bytes(), license_blob=m.git_blob(LICENSE))
+
         self.assertEqual(m.TAG_COMMIT, "cd696d3f8f4afdbc735915c2bded974616331b55")
         self.assertEqual(m.TAG_LICENSE_GIT_BLOB, "9c308d958bf91eafe83f66106ca692ff414a4965")
         with self.assertRaisesRegex(m.AuditError, "exact pinned Maven/tag source SHA256 drift"):

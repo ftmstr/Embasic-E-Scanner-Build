@@ -501,6 +501,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_coroutines_core_jvm181_source_review.py' -v
+          sha256sum --check <<'COROUTINES181_LICENSE_SHA'
+          b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8  third_party/kotlinx-coroutines-core-jvm-1.8.1/LICENSE.txt
+          COROUTINES181_LICENSE_SHA
           python3 scripts/audit_coroutines_core_jvm181_source_review.py \
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
             --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
@@ -516,7 +519,7 @@ jobs:
           assert e["mavenJar"]["localGradleBytesMatch"] is True
           assert e["taggedLicense"]["commit"] == "cd696d3f8f4afdbc735915c2bded974616331b55"
           assert e["taggedLicense"]["gitBlobSha1"] == "9c308d958bf91eafe83f66106ca692ff414a4965"
-          assert e["sourceHashPinsVerified"] is False
+          assert e["sourceHashPinsVerified"] is True
           assert e["publisherSignatureVerified"] is False
           assert e["apkPackagingVerified"] is False and e["redistributionRightsVerified"] is False
           assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
@@ -525,7 +528,7 @@ jobs:
           print("COROUTINES_CORE_JVM181_EXACT_POM_SHA256", e["mavenPom"]["sha256"])
           print("COROUTINES_CORE_JVM181_EXACT_JAR_SHA256", e["mavenJar"]["sha256"])
           print("COROUTINES_CORE_JVM181_TAGGED_LICENSE_SHA256", e["taggedLicense"]["sha256"])
-          print("NOT VERIFIED: final SHA pins, publisher signature, APK, remaining 88 NOTICE, 42 Gradle POMs")
+          print("NOT VERIFIED: publisher signature, APK, remaining 87 NOTICE, 42 Gradle POMs")
           PY
       - name: Retain coroutines core JVM 1.8.1 source evidence (NOT an SBOM)
         if: ${{ !cancelled() }}

@@ -29,3 +29,48 @@ The independent source-check step runs after the existing 88-row Android NOTICE 
 Actual Android DocumentsProvider JPG/PNG and native 1/20/100 raster PDF **NOT RUN**; Windows WinRT PDF save/reopen/render **NOT VERIFIED/BLOCKED**. Android and Windows image/PDF/crop/rotation/staging code untouched. Windows App SDK REDIST/EULA, signed release packages, store privacy/consent, real device visual QA, offline OCR, searchable PDF, secure QR/TLS phone capture, rollback and full platform parity are not release-approved.
 
 **RELEASE NO-GO.** Source audit does not waive the other **87** potential NOTICE entries or the **42** separate Gradle-POM legal gaps. Any count decrease requires the final exact-HEAD Android CI logs to demonstrate it. No imagined product-completion percentage.
+
+## Real first PUBLIC Android Foundation upstream-source CI — 19 November 2026
+
+At initial strict-source-audit commit `7c5c836354ecacb217ce44204c6511f51df7a4d3`,
+the ACTUAL GitHub Actions Android Kotlin Foundation push run
+[44605162262](https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/44605162262),
+job `135846781951`, logged all of the following:
+
+- New synthetic source-audit regressions: `Ran 14 tests`, `OK`.
+- Independent live source-audit step **SUCCESS** after existing NOTICE
+  gate correctly exited FAILURE at `total=88`; scoped GitHub artifact
+  uploaded. Full Android workflow remained FAILURE.
+- Maven Central exact POM **2,196 bytes**, SHA-256
+  `47c6a50b14151e8faf7f350a95235c37d12abc38bfb055b668974293172daf2c`,
+  direct supplier licence metadata: `The Apache Software License, Version 2.0`.
+- Maven Central exact JAR **1,546,991 bytes**, SHA-256
+  `f3d4f5de1c391bbcc20f3b3435ccbac013521e76b6902d7d59635ec15c1f797e`,
+  equal in exact bytes to locally resolved Gradle-cache JAR.
+- Kotlin/kotlinx.coroutines tagged upstream `1.8.1` full
+  `LICENSE.txt` **11,398 bytes**, immutable Git blob
+  `9c308d958bf91eafe83f66106ca692ff414a4965`, SHA-256
+  `b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8`.
+- Maven JAR legal file inventory was empty:
+  no `META-INF/*LICENSE*` or `*NOTICE*` records were present.
+  Downstream attribution and packaging checks remain open.
+
+These precise *observed* source SHA-256s are now pinned in the bounded
+auditor; offline synthetic fixtures cannot replace them in CI. The verbatim
+upstream tagged LICENSE is independently retained at
+`third_party/kotlinx-coroutines-core-jvm-1.8.1/LICENSE.txt`, with Git
+blob equality to original source, and verified by CI `sha256sum --check`.
+One exact Maven purl row is included in the **PARTIAL**
+`THIRD-PARTY-NOTICES.md`; all other unseen licenses remain fail-closed.
+
+This is **one** package-level source identity and supplier license metadata
+check; no cryptographic publisher-signature, APK/AAB inclusion, complete
+transitive rights, statutory notices, SBOM, Windows REDIST/EULA, signing or
+production license is approved. The separate 42 Gradle child-POM legal
+reviews persist.
+
+The reduction from NOTICE missing `total=88` to `total=87` is an
+anticipated effect, **not a verified fact until new final commit HEAD CI**.
+Source-signature and redistribution gates remain NOT_VERIFIED and release
+NO-GO. Do not count an Android Maven network resolution failure as a source
+compile bug.
