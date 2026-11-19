@@ -148,13 +148,13 @@ def check_partial_notice(inventory: dict, notice: str) -> None:
         raise AuditError("NOTICE must explicitly state its incomplete scope")
     purls = {item["purl"] for item in
              inventory["runtimeComponents"] + inventory["testComponents"]}
+    missing_or_duplicate = []
     for purl in sorted(purls):
         rows = [line for line in notice.splitlines()
                 if line.startswith("|") and f"\x60{purl}\x60" in line]
         if len(rows) != 1:
-            raise AuditError(
-                f"missing or duplicate resolved Maven NOTICE row: {purl} "
-                f"(found {len(rows)})")
+            missing_or_duplicate.append((purl, len(rows)))
+            continue
         # Parse the exact three-column Markdown row, not a coincidental
         # substring elsewhere in a row (including the scope column).
         fields = [value.strip() for value in rows[0].split("|")]
@@ -173,6 +173,18 @@ def check_partial_notice(inventory: dict, notice: str) -> None:
             "pkg:maven/org.hamcrest/hamcrest-core@1.3",
         ) and "tests ONLY" not in rows[0]:
             raise AuditError("test-only module lacks runtime exclusion notice")
+    if missing_or_duplicate:
+        # Enumerate all Gradle-resolved missing/duplicate purls in one report.
+        # Do not manufacture license labels, suppress the gate, or turn gaps
+        # into a 'PASS' when the network-resolved graph changes.
+        examples = "; ".join(
+            f"{purl} (found {count})"
+            for purl, count in missing_or_duplicate[:128])
+        if len(missing_or_duplicate) > 128:
+            examples += f"; ... plus {len(missing_or_duplicate) - 128} further gaps"
+        raise AuditError(
+            f"missing or duplicate resolved Maven NOTICE rows: "
+            f"total={len(missing_or_duplicate)}; {examples}")
 
 
 def main(argv: list[str] | None = None) -> int:

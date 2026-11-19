@@ -166,6 +166,22 @@ class DependencyGraphAuditTests(unittest.TestCase):
                     f"baseLibrary@8.13.2 (found {expected_count})",
                     str(caught.exception))
 
+    def test_observed_compose_gap_inventory_lists_all_missing_purls(self):
+        # The second actual CI revealed androidx.activity:activity-compose
+        # in addition to DataBinding. No unreviewed license is silently
+        # accepted; diagnostics enumerate every missing coordinate.
+        runtime = RUNTIME_WITH_BASE.replace(
+            "BUILD SUCCESSFUL",
+            "+--- androidx.activity:activity-compose:1.8.2\nBUILD SUCCESSFUL")
+        inventory = mod.audit(runtime, TEST)
+        with self.assertRaises(mod.AuditError) as caught:
+            mod.check_partial_notice(inventory, NOTICE)
+        message = str(caught.exception)
+        self.assertIn("total=2", message)
+        self.assertIn("baseLibrary@8.13.2 (found 0)", message)
+        self.assertIn("activity-compose@1.8.2 (found 0)", message)
+        self.assertFalse(inventory["releaseApproved"])
+
     def test_exact_ci_base_library_unreviewed_license_label_rejected(self):
         data = mod.audit(RUNTIME_WITH_BASE, TEST)
         with self.assertRaises(mod.AuditError):
