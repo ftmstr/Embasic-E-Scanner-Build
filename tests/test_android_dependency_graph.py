@@ -160,9 +160,11 @@ class DependencyGraphAuditTests(unittest.TestCase):
             (NOTICE_WITH_BASE + BASE_LIBRARY_NOTICE_ROW + "\\n", 2),
         ]:
             with self.subTest(count=expected_count):
-                with self.assertRaisesRegex(mod.AuditError,
-                    rf"baseLibrary@8\\.13\\.2 \\(found {expected_count}\\)"):
+                with self.assertRaises(mod.AuditError) as caught:
                     mod.check_partial_notice(data, altered)
+                self.assertIn(
+                    f"baseLibrary@8.13.2 (found {expected_count})",
+                    str(caught.exception))
 
     def test_exact_ci_base_library_unreviewed_license_label_rejected(self):
         data = mod.audit(RUNTIME_WITH_BASE, TEST)
