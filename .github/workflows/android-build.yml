@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_jspecify100_source_review.py', 'tests/test_jspecify100_source_review.py', 'scripts/audit_coroutines_core_jvm181_source_review.py', 'tests/test_coroutines_core_jvm181_source_review.py', 'scripts/audit_coroutines_android181_source_review.py', 'tests/test_coroutines_android181_source_review.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'scripts/audit_jaxbapi232_exact_license.py', 'tests/test_jaxbapi232_exact_license.py', 'scripts/audit_fastinfoset1216_exact_license.py', 'tests/test_fastinfoset1216_exact_license.py', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_jspecify100_source_review.py', 'tests/test_jspecify100_source_review.py', 'scripts/audit_coroutines_core_jvm181_source_review.py', 'tests/test_coroutines_core_jvm181_source_review.py', 'scripts/audit_coroutines_android181_source_review.py', 'tests/test_coroutines_android181_source_review.py', 'scripts/audit_serialization_core_jvm173_source_review.py', 'tests/test_serialization_core_jvm173_source_review.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'scripts/audit_jaxbapi232_exact_license.py', 'tests/test_jaxbapi232_exact_license.py', 'scripts/audit_fastinfoset1216_exact_license.py', 'tests/test_fastinfoset1216_exact_license.py', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_jspecify100_source_review.py', 'tests/test_jspecify100_source_review.py', 'scripts/audit_coroutines_core_jvm181_source_review.py', 'tests/test_coroutines_core_jvm181_source_review.py', 'scripts/audit_coroutines_android181_source_review.py', 'tests/test_coroutines_android181_source_review.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'scripts/audit_jaxbapi232_exact_license.py', 'tests/test_jaxbapi232_exact_license.py', 'scripts/audit_fastinfoset1216_exact_license.py', 'tests/test_fastinfoset1216_exact_license.py', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', 'THIRD-PARTY-NOTICES.md']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_jspecify100_source_review.py', 'tests/test_jspecify100_source_review.py', 'scripts/audit_coroutines_core_jvm181_source_review.py', 'tests/test_coroutines_core_jvm181_source_review.py', 'scripts/audit_coroutines_android181_source_review.py', 'tests/test_coroutines_android181_source_review.py', 'scripts/audit_serialization_core_jvm173_source_review.py', 'tests/test_serialization_core_jvm173_source_review.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'scripts/audit_jaxbapi232_exact_license.py', 'tests/test_jaxbapi232_exact_license.py', 'scripts/audit_fastinfoset1216_exact_license.py', 'tests/test_fastinfoset1216_exact_license.py', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -583,6 +583,48 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           path: ${{ runner.temp }}/coroutines-android181-source-evidence.json
+      - name: Review kotlinx-serialization core JVM 1.7.3 official Maven POM JAR LICENSE NOTICE (NOT rights clearance)
+        # Existing 86-row NOTICE gate above remains deliberately fail-closed.
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_serialization_core_jvm173_source_review.py' -v
+          python3 scripts/audit_serialization_core_jvm173_source_review.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/serialization-core-jvm173-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) / "serialization-core-jvm173-source-evidence.json").read_text(encoding="utf-8"))
+          assert e["purl"] == "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm@1.7.3"
+          assert e["status"] == "EXACT_MAVEN_TAG_BYTES_MATCH_LEGAL_REVIEW_OPEN"
+          assert e["mavenJar"]["localGradleBytesMatch"] is True
+          assert e["taggedLicense"]["commit"] == "d4d066d72a9f92f06c640be5a36a22f75d0d7659"
+          assert e["taggedLicense"]["gitBlobSha1"] == "9c8f3ea0871e0bfe81da0fa6e7c1d7d156dc380e"
+          assert e["taggedNotice"]["gitBlobSha1"] == "ee516ec09649791af5ff26c0346e748a881cacb7"
+          assert e["sourceHashPinsVerified"] is False
+          assert e["publisherSignatureVerified"] is False and e["apkPackagingVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["independent42PluginPomReviewStillOpen"] is True
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("SERIALIZATION_CORE_JVM173_POM_SHA256", e["mavenPom"]["sha256"])
+          print("SERIALIZATION_CORE_JVM173_JAR_SHA256", e["mavenJar"]["sha256"])
+          print("SERIALIZATION_CORE_JVM173_LICENSE_SHA256", e["taggedLicense"]["sha256"])
+          print("SERIALIZATION_CORE_JVM173_NOTICE_SHA256", e["taggedNotice"]["sha256"])
+          print("NOT VERIFIED: source hash final pins, 86 remaining Maven NOTICE, 42 Gradle POMs, signatures, APK/SBOM, commercial redistribution")
+          PY
+      - name: Retain kotlinx-serialization core JVM 1.7.3 source evidence (NOT an SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-serialization-core-jvm173-source-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/serialization-core-jvm173-source-evidence.json
       - name: Verify JAF 1.2.0 exact release-tag licence and embedded Maven JAR text (NOT rights clearance)
         shell: bash
         run: |
