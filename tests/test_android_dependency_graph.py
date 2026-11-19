@@ -41,6 +41,26 @@ NOT a full SBOM.
 | \x60pkg:maven/org.hamcrest/hamcrest-core@1.3\x60 | JVM tests ONLY | New BSD (review OPEN) |
 """
 
+# Real exact-HEAD Android 18-Nov workflow 44384810611 resolved one additional
+# module in debugRuntimeClasspath; the four previously noticed rows remained
+# unique. This synthetic fixture tests that exact *observed* coordinate only.
+BASE_LIBRARY_PURL = "pkg:maven/com.android.databinding/baseLibrary@8.13.2"
+RUNTIME_WITH_BASE = RUNTIME.replace(
+    "+--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21",
+    "+--- com.android.databinding:baseLibrary:8.13.2\n"
+    "+--- org.jetbrains.kotlin:kotlin-stdlib:2.3.21",
+)
+BASE_LIBRARY_NOTICE_ROW = (
+    "| \x60pkg:maven/com.android.databinding/baseLibrary@8.13.2\x60 "
+    "| Android resolved debug runtime; APK packaging NOT VERIFIED "
+    "| Apache-2.0 (supplier POM label, distribution NOT VERIFIED) |"
+)
+NOTICE_WITH_BASE = NOTICE.replace(
+    "| \x60pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\x60",
+    BASE_LIBRARY_NOTICE_ROW + "\n"
+    "| \x60pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21\x60",
+)
+
 
 class DependencyGraphAuditTests(unittest.TestCase):
     def test_complete_scoped_graph_reports_partial_non_release(self):
@@ -122,6 +142,44 @@ class DependencyGraphAuditTests(unittest.TestCase):
         mod.check_partial_notice(data, NOTICE)
         self.assertFalse(data["releaseApproved"])
         self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+
+    def test_exact_ci_base_library_requires_pinned_scoped_notice(self):
+        data = mod.audit(RUNTIME_WITH_BASE, TEST)
+        self.assertEqual(data["componentCounts"], {"runtime": 3, "test": 4})
+        self.assertIn(BASE_LIBRARY_PURL,
+            [row["purl"] for row in data["runtimeComponents"]])
+        mod.check_partial_notice(data, NOTICE_WITH_BASE)
+        self.assertFalse(data["releaseApproved"])
+        self.assertEqual(data["licenseClosure"], "NOT_VERIFIED")
+        self.assertFalse(data["apkPackagingVerified"])
+
+    def test_exact_ci_base_library_missing_or_duplicate_notice_fails_closed(self):
+        data = mod.audit(RUNTIME_WITH_BASE, TEST)
+        for altered, expected_count in [
+            (NOTICE, 0),
+            (NOTICE_WITH_BASE + BASE_LIBRARY_NOTICE_ROW + "\\n", 2),
+        ]:
+            with self.subTest(count=expected_count):
+                with self.assertRaisesRegex(mod.AuditError,
+                    rf"baseLibrary@8\\.13\\.2 \\(found {expected_count}\\)"):
+                    mod.check_partial_notice(data, altered)
+
+    def test_exact_ci_base_library_unreviewed_license_label_rejected(self):
+        data = mod.audit(RUNTIME_WITH_BASE, TEST)
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data,
+                NOTICE_WITH_BASE.replace("Apache-2.0 (supplier POM label",
+                                         "MIT (supplier POM label"))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(data,
+                NOTICE_WITH_BASE.replace(
+                    BASE_LIBRARY_NOTICE_ROW,
+                    BASE_LIBRARY_NOTICE_ROW.replace(
+                        "distribution NOT VERIFIED", "distribution APPROVED")))
+        with self.assertRaises(mod.AuditError):
+            mod.check_partial_notice(
+                mod.audit(RUNTIME_WITH_BASE.replace("8.13.2", "8.13.3"), TEST),
+                NOTICE_WITH_BASE)
 
     def test_missing_runtime_notice_entry_rejected(self):
         data = mod.audit(RUNTIME, TEST)

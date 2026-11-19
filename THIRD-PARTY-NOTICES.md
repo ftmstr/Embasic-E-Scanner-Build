@@ -61,6 +61,7 @@ outside this scoped inventory.
 
 | Exact resolved Maven purl | Scope | Supplier POM license metadata |
 | --- | --- | --- |
+| `pkg:maven/com.android.databinding/baseLibrary@8.13.2` | Android resolved debug runtime; APK packaging NOT VERIFIED | Apache-2.0 (supplier POM label, distribution NOT VERIFIED) |
 | `pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/org.jetbrains/annotations@13.0` | Android debug runtime; also JVM tests | Apache-2.0 (NOT VERIFIED for distribution) |
 | `pkg:maven/junit/junit@4.13.2` | JVM local tests ONLY; absent from Android debug runtime | EPL-1.0 (test-only boundary, redistribution review OPEN) |
@@ -71,6 +72,26 @@ Publisher metadata (not independently verified byte-for-byte license texts):
 - https://central.sonatype.com/artifact/org.jetbrains/annotations/13.0
 - https://central.sonatype.com/artifact/junit/junit/4.13.2
 - https://central.sonatype.com/artifact/org.hamcrest/hamcrest-core/1.3
+
+**19 November 2026 exact Gradle graph reconciliation:** Android Kotlin Foundation
+GitHub Actions run [44384810611](https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/44384810611),
+job 135086319411, at commit `7df09ec03a71d2704c9d2df68152f8b05cca2e5b`,
+reported `pkg:maven/com.android.databinding/baseLibrary@8.13.2` in
+`:app:debugRuntimeClasspath`; no corresponding NOTICE table row existed.
+The other four scoped coordinates each had exactly one existing row.
+The build-tool module is listed *as Gradle-resolved*, not declared to be
+inside any APK/AAB. Google Maven coordinates are
+`com.android.databinding:baseLibrary:8.13.2`, with a publisher-POM
+Apache-2.0 licence *label* indexed at
+https://mvnrepository.com/artifact/com.android.databinding/baseLibrary/8.13.2
+and official Google Maven repository described at
+https://developer.android.com/build/remote-repositories .
+The official exact POM and embedded JAR licence bytes were **NOT** retrieved
+or SHA-256 verified in this tour; Maven third-party indexes are metadata,
+not independent proof of authenticity, redistributability or source-license
+obligations. This partial NOTICE consistency correction does not grant a
+commercial license, complete the remaining 42 direct child POM legal reviews,
+or establish plugin/build-tool/Android runtime package closure.
 
 **Boundary:** The two Kotlin/JetBrains dependencies must undergo real
 APK/AAB package inspection, notice/license retention and any transitive

@@ -128,6 +128,9 @@ def audit(runtime_text: str, test_text: str) -> dict:
 
 # Only metadata labels; these strings are not proof of license grants.
 NOTICE_LABELS = {
+    # 18-Nov exact resolved debugRuntimeClasspath (GitHub Actions 44384810611).
+    # Supplier POM label is not a hash of exact POM/JAR or license approval.
+    "pkg:maven/com.android.databinding/baseLibrary@8.13.2": "Apache-2.0",
     "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21": "Apache-2.0",
     "pkg:maven/org.jetbrains/annotations@13.0": "Apache-2.0",
     "pkg:maven/junit/junit@4.13.2": "EPL-1.0",
@@ -149,11 +152,21 @@ def check_partial_notice(inventory: dict, notice: str) -> None:
         rows = [line for line in notice.splitlines()
                 if line.startswith("|") and f"\x60{purl}\x60" in line]
         if len(rows) != 1:
-            raise AuditError("missing or duplicate resolved Maven NOTICE row")
+            raise AuditError(
+                f"missing or duplicate resolved Maven NOTICE row: {purl} "
+                f"(found {len(rows)})")
+        # Parse the exact three-column Markdown row, not a coincidental
+        # substring elsewhere in a row (including the scope column).
+        fields = [value.strip() for value in rows[0].split("|")]
+        if (len(fields) != 5 or fields[0] or fields[-1]
+                or fields[1] != f"`{purl}`"):
+            raise AuditError("malformed or imprecise Maven NOTICE table row")
         expected = NOTICE_LABELS.get(purl)
-        if expected is None or expected not in rows[0]:
+        label = fields[3]
+        if expected is None or expected not in label:
             raise AuditError("unreviewed Maven module or mismatched license label")
-        if "NOT VERIFIED" not in rows[0] and "review OPEN" not in rows[0]:
+        if ("NOT VERIFIED" not in label and "review OPEN" not in label
+                or "APPROVED" in label):
             raise AuditError("NOTICE row makes unreviewed distribution claim")
         if purl in (
             "pkg:maven/junit/junit@4.13.2",
