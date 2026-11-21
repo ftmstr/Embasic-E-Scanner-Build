@@ -65,13 +65,6 @@ class TestKotlinStdlibSourceProbe(unittest.TestCase):
                 sources[mod.JAR] = local + b"altered"
                 with self.assertRaises(mod.AuditError):
                     mod.audit(cache, *reports, get=sources.__getitem__)
-            return
-            self.assertTrue(result["mavenJAR"]["gradleByteParity"])
-            self.assertFalse(result["releaseApproved"])
-            self.assertEqual(result["taggedNotice"]["appliesToStdlibJar"], "NOT_VERIFIED_COMPILER_SCOPE")
-            sources[mod.JAR] = local + b"altered"
-            with self.assertRaises(mod.AuditError):
-                mod.audit(cache, *reports, get=sources.__getitem__)
 
 
 if __name__ == "__main__":
