@@ -162,6 +162,10 @@ def main() -> int:
         args.output.write_text(json.dumps(evidence, sort_keys=True, indent=2) + "\n", encoding="utf-8")
         print("KOTLIN_STDLIB_EXACT_POM_SHA256", evidence["mavenPOM"]["sha256"])
         print("KOTLIN_STDLIB_EXACT_JAR_SHA256", evidence["mavenJAR"]["sha256"])
+        print("KOTLIN_STDLIB_LICENSE_SHA256", evidence["taggedLicense"]["sha256"])
+        print("KOTLIN_STDLIB_NOTICE_SHA256", evidence["taggedNotice"]["sha256"])
+        print("KOTLIN_STDLIB_LICENSE_GIT_BLOB", evidence["taggedLicense"]["gitBlobSha1"])
+        print("KOTLIN_STDLIB_NOTICE_GIT_BLOB", evidence["taggedNotice"]["gitBlobSha1"])
         print("KOTLIN_STDLIB_GRADLE_MAVEN_PARITY", evidence["mavenJAR"]["gradleByteParity"])
         print("KOTLIN_STDLIB_RELEASE_APPROVED", False)
         return 0
