@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Synthetic guardrails only; real Maven/Gradle bytes are checked by CI."""
 import importlib.util
+from contextlib import ExitStack
+from unittest import mock
 from io import BytesIO
 from pathlib import Path
 import tempfile
@@ -51,7 +53,19 @@ class TestKotlinStdlibSourceProbe(unittest.TestCase):
             sources = {mod.POM: POM, mod.JAR: local,
                        mod.LICENSE: b"Apache License Version 2.0",
                        mod.NOTICE: b"Kotlin Compiler distribution"}
-            result = mod.audit(cache, *reports, get=sources.__getitem__)
+            with ExitStack() as stack:
+                stack.enter_context(mock.patch.object(mod, "POM_SHA256", mod.sha(POM)))
+                stack.enter_context(mock.patch.object(mod, "JAR_SHA256", mod.sha(local)))
+                stack.enter_context(mock.patch.object(mod, "LICENSE_BLOB", mod.blob(sources[mod.LICENSE])))
+                stack.enter_context(mock.patch.object(mod, "NOTICE_BLOB", mod.blob(sources[mod.NOTICE])))
+                result = mod.audit(cache, *reports, get=sources.__getitem__)
+                self.assertTrue(result["mavenJAR"]["gradleByteParity"])
+                self.assertFalse(result["releaseApproved"])
+                self.assertEqual(result["taggedNotice"]["appliesToStdlibJar"], "NOT_VERIFIED_COMPILER_SCOPE")
+                sources[mod.JAR] = local + b"altered"
+                with self.assertRaises(mod.AuditError):
+                    mod.audit(cache, *reports, get=sources.__getitem__)
+            return
             self.assertTrue(result["mavenJAR"]["gradleByteParity"])
             self.assertFalse(result["releaseApproved"])
             self.assertEqual(result["taggedNotice"]["appliesToStdlibJar"], "NOT_VERIFIED_COMPILER_SCOPE")
