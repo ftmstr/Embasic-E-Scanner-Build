@@ -26,6 +26,12 @@ JAR = BASE + "kotlin-stdlib-2.3.21.jar"
 LICENSE = "https://raw.githubusercontent.com/JetBrains/kotlin/" + TAG_COMMIT + "/license/LICENSE.txt"
 NOTICE = "https://raw.githubusercontent.com/JetBrains/kotlin/" + TAG_COMMIT + "/license/NOTICE.txt"
 LIMITS = {POM: 65536, JAR: 6000000, LICENSE: 40000, NOTICE: 10000}
+# Exact PUBLIC CI 44943058383, job 136964276999 (21-Nov-2026).
+POM_SHA256 = "3e0b48daa14dc73f8029d8d9e15ed32940377caf7b915510f88d33219b350186"
+JAR_SHA256 = "6f64eac736db9434dd6925b4a518b9d1d17177652320c37916cf9ba3ce7d7d7a"
+# Exact immutable JetBrains/kotlin tag v2.3.21 Git tree blob identities.
+LICENSE_BLOB = "d645695673349e3947e8e5ae42332d0ac3164cd7"
+NOTICE_BLOB = "80dbbefa483f605b7e69a1458f9f66b277b61988"
 
 
 class AuditError(ValueError):
@@ -104,8 +110,14 @@ def audit(cache: Path, runtime: Path, testing: Path, get=fetch) -> dict:
     hits = list(folder.glob("*/kotlin-stdlib-2.3.21.jar"))
     if len(hits) != 1 or hits[0].is_symlink() or hits[0].parent.is_symlink():
         raise AuditError("missing/ambiguous exact Gradle JAR")
+    if hits[0].stat().st_size > LIMITS[JAR]:
+        raise AuditError("oversized local Gradle JAR")
     local = hits[0].read_bytes()
     pom, jar, license_raw, notice_raw = [get(url) for url in (POM, JAR, LICENSE, NOTICE)]
+    if sha(pom) != POM_SHA256 or sha(jar) != JAR_SHA256:
+        raise AuditError("official Maven source hash pin mismatch")
+    if blob(license_raw) != LICENSE_BLOB or blob(notice_raw) != NOTICE_BLOB:
+        raise AuditError("immutable upstream legal source blob pin mismatch")
     name = validate_pom(pom)
     if not zipfile.is_zipfile(BytesIO(jar)) or len(jar) > LIMITS[JAR]:
         raise AuditError("invalid Maven JAR")
