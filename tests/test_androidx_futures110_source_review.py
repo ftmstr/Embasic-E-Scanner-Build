@@ -78,7 +78,7 @@ class TestFutures110(unittest.TestCase):
         self.assertEqual(audit.validate_tree(tree())["release110NoticeCorrespondence"], "NOT_VERIFIED")
         for source in (tree(with_notice=False),
                        tree().replace(audit.SNAPSHOT_MODULE_TREE.encode(), b"0"*40),
-                       tree().replace(b'"truncated": false', b'"truncated": true),
+                       tree().replace(b'"truncated": false', b'"truncated": true'),
                        tree().replace(audit.SNAPSHOT_NOTICE_BLOB.encode(), b"1"*40)):
             with self.assertRaises(audit.AuditError):
                 audit.validate_tree(source)
