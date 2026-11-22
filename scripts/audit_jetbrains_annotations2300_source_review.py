@@ -25,7 +25,8 @@ BASE = "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/23.0.0/"
 POM = BASE + "annotations-23.0.0.pom"
 JAR = BASE + "annotations-23.0.0.jar"
 LICENSE = "https://raw.githubusercontent.com/JetBrains/java-annotations/" + TAG_COMMIT + "/LICENSE.txt"
-TAG_TREE = "https://api.github.com/repos/JetBrains/java-annotations/git/trees/" + TAG_COMMIT + "?recursive=1"
+TAG_TREE_SHA = "409e01e2a372f76692a4737c007b5ad8719ffb82"
+TAG_TREE = "https://api.github.com/repos/JetBrains/java-annotations/git/trees/" + TAG_TREE_SHA + "?recursive=1"
 LIMITS = {POM: 65536, JAR: 2000000, LICENSE: 20000, TAG_TREE: 250000}
 # Set to observed full-byte official hashes only after independent live CI.
 POM_SHA256 = ""
@@ -112,7 +113,7 @@ def validate_tag_tree(raw: bytes) -> int:
         tree = json.loads(raw.decode("utf-8"))
     except (UnicodeError, ValueError) as exc:
         raise AuditError("invalid immutable Git tree JSON") from exc
-    if not isinstance(tree, dict) or tree.get("sha") != TAG_COMMIT or tree.get("truncated") is not False:
+    if not isinstance(tree, dict) or tree.get("sha") != TAG_TREE_SHA or tree.get("truncated") is not False:
         raise AuditError("GitHub tag tree changed, incomplete or unverified")
     entries = tree.get("tree")
     if not isinstance(entries, list) or not 1 <= len(entries) <= 2000:
@@ -189,7 +190,7 @@ def audit(cache: Path, runtime: Path, testing: Path, get=fetch) -> dict:
         "mavenPOM": {"url": POM, "sha256": sha(pom), "size": len(pom), "supplierLicenseClaim": claim},
         "mavenJAR": {"url": JAR, "sha256": sha(jar), "size": len(jar),
                      "gradleByteParity": True, "embeddedLegalFileNames": embedded},
-        "tagCommit": TAG_COMMIT,
+        "tagCommit": TAG_COMMIT, "tagTreeSha": TAG_TREE_SHA,
         "taggedLicense": {"url": LICENSE, "sha256": sha(legal),
                           "gitBlobSha1": blob(legal), "size": len(legal)},
         "taggedNotice": {"treeUrl": TAG_TREE, "entriesScanned": tree_count,
