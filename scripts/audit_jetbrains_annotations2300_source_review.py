@@ -29,8 +29,8 @@ TAG_TREE_SHA = "409e01e2a372f76692a4737c007b5ad8719ffb82"
 TAG_TREE = "https://api.github.com/repos/JetBrains/java-annotations/git/trees/" + TAG_TREE_SHA + "?recursive=1"
 LIMITS = {POM: 65536, JAR: 2000000, LICENSE: 20000, TAG_TREE: 250000}
 # Set to observed full-byte official hashes only after independent live CI.
-POM_SHA256 = ""
-JAR_SHA256 = ""
+POM_SHA256 = "c9490f655132328df2cfbcfdf743f53fc3916d6c1d10437175a6ca6e3a67771c"
+JAR_SHA256 = "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
 
 
 class AuditError(ValueError):
