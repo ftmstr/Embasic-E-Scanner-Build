@@ -26,3 +26,19 @@ At this document creation time official Maven source SHA-256 values and Gradle p
 Physical Android DocumentsProvider JPEG/PNG, native 1/20/100-page PDF: NOT RUN; physical Windows WinRT save/reopen/render: NOT VERIFIED. Draft PR #1 remains unmerged. No PRIVATE/main, force, root LICENSE, signing, release or installer operation is permitted. HARD RELEASE NO-GO.
 
 NEXT: Complete exact-HEAD CI run and check the independent annotations step. Pin the actually observed official Maven hashes if successful, then obtain final seven PR workflow results and save/read back the Google Drive Raporlar technical report.
+
+## Observed live PUBLIC PR CI source evidence (22 November 2026)
+Commit 10c68195b0311d718bee58f0521cd73353e155e3; pull_request Android Foundation run 45006281088, job 137158489864 (https://github.com/ftmstr/Embasic-E-Scanner-Build/actions/runs/45006281088).
+The new exact official-source step SUCCESS and source artifact upload SUCCESS, while Android Foundation overall FAILURE is preserved because the earlier 85-row resolved NOTICE gate failed closed.
+
+- Maven Central exact annotations-23.0.0.pom SHA-256: c9490f655132328df2cfbcfdf743f53fc3916d6c1d10437175a6ca6e3a67771c
+- Maven Central exact annotations-23.0.0.jar SHA-256: 7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05
+- Upstream pinned immutable LICENSE.txt SHA-256: 8c1e966c7855fb54027bcaf6ebe7a43abe4785791e8cf9148c363761d493d097
+- Exact source LICENSE Git blob: 4c4a741bfd6103cc173315b0c699ea93bfe71383.
+- Tag commit 5d06c0c48e0a4fe44b2bc0d5d3e8b113c7a57de2 resolves to pinned tree 409e01e2a372f76692a4737c007b5ad8719ffb82; tagged NOTICE filename absent in complete 71-entry tree, downstream legal scope still NOT VERIFIED.
+- Actual local Gradle selected JAR SHA-256 and full byte size equal the official Maven Central JAR, verified in real runner.
+- Source artifact android-annotations2300-source-evidence, ID 14747719082, uploaded 1146 bytes; retained for 14 days, not an SBOM.
+- All five new offline source regression tests PASS in the real CI job; these synthetic tests are distinct from real-source byte evidence.
+- Existing JSpecify source synthetic ZIP fixture timestamp flakiness was independently fixed in tests/test_jspecify100_source_review.py and its 14-test suite then passed in this real CI job; the 85 NOTICE gate remains intentionally blocked.
+
+This source-only evidence is not licence clearance, publisher-signed provenance, a downstream NOTICE waiver, full attribution, actual APK packaging or a release approval. The separate 42 child POM gaps remain open. Pin the observed Maven SHA-256 values into the bounded auditor and re-run seven exact-final-HEAD PR workflows before declaring final CI state.
