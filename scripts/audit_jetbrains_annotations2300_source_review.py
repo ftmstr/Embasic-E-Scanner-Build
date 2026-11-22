@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import re
 import sys
-from urllib import request
+from urllib import error, request
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -61,8 +61,14 @@ def fetch(url: str) -> bytes:
             if stream.status != 200:
                 raise AuditError("upstream HTTP status not 200")
             raw = stream.read(LIMITS[url] + 1)
-    except OSError as exc:
-        raise AuditError("official source unavailable") from exc
+    except error.HTTPError as exc:
+        raise AuditError("official source HTTP " + str(exc.code) + ": " +
+                         ("MAVEN_POM" if url == POM else "MAVEN_JAR" if url == JAR
+                          else "TAGGED_LICENSE" if url == LICENSE else "TAG_TREE")) from exc
+    except (error.URLError, OSError, TimeoutError) as exc:
+        raise AuditError("official source transport unavailable: " +
+                         ("MAVEN_POM" if url == POM else "MAVEN_JAR" if url == JAR
+                          else "TAGGED_LICENSE" if url == LICENSE else "TAG_TREE")) from exc
     if not 0 < len(raw) <= LIMITS[url]:
         raise AuditError("official source byte bound violated")
     return raw
