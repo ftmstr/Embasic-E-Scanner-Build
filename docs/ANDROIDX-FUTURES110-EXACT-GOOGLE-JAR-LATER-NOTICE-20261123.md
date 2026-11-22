@@ -16,3 +16,14 @@
 - **At initial commit, official POM/JAR SHA, cached byte parity and CI completion NOT VERIFIED.** Pin only real hosted CI bytes; rerun exact-final-HEAD CI and recheck all seven. Preserve 85 NOTICE FAIL-CLOSED, 42 plugin POM, Windows hostile rename, no code rewrite, no release.
 
 **RELEASE HARD NO-GO**: full NOTICE/LICENSES, source-to-1.1.0 reproducibility, publisher signatures, APK/AAB and WinUI3 runtime, SBOM, device parity and installer/signing NOT VERIFIED. No PRIVATE/main, force, merge, tag, release or installer.
+
+
+## First real Google Maven/Gradle byte evidence and next exact pin (23 Nov 2026)
+
+- Initial source run on corrected audit HEAD `bb54643efd6874717a01c24ccff5abaa07e3df7a`: Android Kotlin Foundation PR run `45075676749`, job `137372242536`. 8/8 deterministic hostile-input tests PASS; independent official Maven JAR byte-parity/source NOTICE probe SUCCESS; source receipt upload SUCCESS. Foundation overall FAILURE solely from unfilled 85 resolved Android NOTICE rows.
+- Official Google Maven 1.1.0 POM SHA-256 `748a34eb5d13d19d187adecaea82667fded5f1b0b98a655e13ed2e4a8b3d8ae6` (actually fetched/parsed in hosted CI).
+- Official Google Maven 1.1.0 JAR SHA-256 `0ce067c514a0d1049d1bebdf709e344ed3266fe9744275682937cdcb13334e9e`, 25,987 bytes; unique actual Gradle cached 1.1.0 JAR identical by SHA-256 **and size**; CallbackToFutureAdapter.class present. Official JAR contained no separately named LICENSE/NOTICE entries in the inspected archive. This is NOT a downstream NOTICE clearance.
+- Immutable **later 2026 source snapshot NOTICE** SHA-256 `bbc5cb91e1d3001b0ae4516809602e7698d3694afd6683b29effa8b80ec01de2`, 12,024 bytes, Git blob `ff3ce54955d5b1300c096bd5a61a8129597a6122`. Independently retained exact source file; different from unverified 2020 1.1.0 binary release notice obligations.
+- AndroidX root Apache-2.0 LICENSE SHA-256 `809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0`, previously retained and checked.
+- First source receipt `android-futures110-source-evidence` artifact ID `14774964199`, **1,283 bytes**, 14-day retention to 2026-12-06. Not complete NOTICE or SBOM.
+- This follow-up PUBLIC normal fast-forward commit pins the observed full official Maven POM/JAR SHA values, the retained 2026 NOTICE SHA on disk and all individual assertions. Re-run seven exact-final-HEAD PR workflows; do not claim final CI success before their completion.

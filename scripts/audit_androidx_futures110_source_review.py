@@ -35,8 +35,8 @@ TREE_URL = ("https://api.github.com/repos/androidx/androidx/git/trees/" + SNAPSH
 LIMITS = {POM_URL: 65536, JAR_URL: 2000000, NOTICE_URL: 40000,
           LICENSE_URL: 20000, TREE_URL: 250000}
 # Fill from real Google Maven and Gradle-selected cache equality on first hosted CI.
-POM_SHA256 = ""
-JAR_SHA256 = ""
+POM_SHA256 = "748a34eb5d13d19d187adecaea82667fded5f1b0b98a655e13ed2e4a8b3d8ae6"
+JAR_SHA256 = "0ce067c514a0d1049d1bebdf709e344ed3266fe9744275682937cdcb13334e9e"
 
 
 class AuditError(ValueError):
