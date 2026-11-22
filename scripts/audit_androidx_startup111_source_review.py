@@ -30,8 +30,8 @@ LICENSE_URL = "https://raw.githubusercontent.com/androidx/androidx/" + SOURCE_CO
 SOURCE_TREE_URL = "https://api.github.com/repos/androidx/androidx/git/trees/" + SOURCE_MODULE_TREE + "?recursive=1"
 LIMITS = {POM_URL: 65536, AAR_URL: 2000000, LICENSE_URL: 20000, SOURCE_TREE_URL: 250000}
 # Pin only after the first full official Google Maven & real Gradle CI match.
-POM_SHA256 = ""
-AAR_SHA256 = ""
+POM_SHA256 = "f4114b5c6859bb1bc3caf281cb6d6f25998fa7f7292c64ceaea74a93210e746b"
+AAR_SHA256 = "e0a6329a371262fe4c450372b70fdaf33b769ef6917094723787cfce896b1dd3"
 
 
 class AuditError(ValueError):

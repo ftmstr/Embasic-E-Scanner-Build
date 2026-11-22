@@ -1089,6 +1089,10 @@ jobs:
           assert e["purl"] == "pkg:maven/androidx.startup/startup-runtime@1.1.1"
           assert e["status"] == "GOOGLE_MAVEN_GRADLE_AAR_BYTES_MATCH_LEGAL_OPEN"
           assert e["officialAAR"]["gradleByteParity"] is True
+          assert e["hashPinsVerified"] is True
+          assert e["officialPOM"]["sha256"] == "f4114b5c6859bb1bc3caf281cb6d6f25998fa7f7292c64ceaea74a93210e746b"
+          assert e["officialAAR"]["sha256"] == "e0a6329a371262fe4c450372b70fdaf33b769ef6917094723787cfce896b1dd3"
+          assert e["upstreamLicense"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
           assert e["upstreamModule"]["treeSha"] == "df712df9c71872c5d70a462f2c20be29de662410"
           assert e["upstreamModule"]["sourceToPublishedAarReproducibility"] == "NOT_VERIFIED"
           assert e["android85NoticeRowsOpen"] is True and e["plugin42PomReviewOpen"] is True
