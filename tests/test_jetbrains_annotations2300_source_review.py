@@ -69,7 +69,11 @@ class TestAnnotationsSourceAudit(unittest.TestCase):
             runtime.write_text("BUILD SUCCESSFUL\n", encoding="utf-8")
             testing.write_text("org.jetbrains:annotations:23.0.0\nBUILD SUCCESSFUL\n", encoding="utf-8")
             sources = {audit.POM: POM, audit.JAR: jar, audit.LICENSE: LEGAL, audit.TAG_TREE: tree()}
-            with mock.patch.object(audit, "LICENSE_BLOB", audit.blob(LEGAL)):
+            # Synthetic regression bytes deliberately differ from pinned official Maven bytes.
+            # Mock the expected hashes only for this isolated fixture, never in live CI audit.
+            with mock.patch.object(audit, "LICENSE_BLOB", audit.blob(LEGAL)), \
+                 mock.patch.object(audit, "POM_SHA256", audit.sha(POM)), \
+                 mock.patch.object(audit, "JAR_SHA256", audit.sha(jar)):
                 # Independently validate the test tree against the modified pinned blob.
                 sources[audit.TAG_TREE] = json.dumps({"sha": audit.TAG_TREE_SHA, "truncated": False,
                     "tree": [{"path": "LICENSE.txt", "type": "blob", "sha": audit.blob(LEGAL)}]}).encode()
