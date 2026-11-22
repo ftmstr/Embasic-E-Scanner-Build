@@ -1005,6 +1005,8 @@ jobs:
           assert x["purl"] == "pkg:maven/org.jetbrains/annotations@23.0.0"
           assert x["status"] == "SOURCE_BYTE_PARITY_VERIFIED_LEGAL_OPEN"
           assert x["mavenJAR"]["gradleByteParity"] is True
+          assert x["liveMavenHashPinsVerified"] is True
+          assert x["tagTreeSha"] == "409e01e2a372f76692a4737c007b5ad8719ffb82"
           assert x["taggedNotice"]["taggedTreeFileStatus"] == "ABSENT_IN_EXACT_TAGGED_TREE"
           assert x["licenseClosure"] == "NOT_VERIFIED" and x["noticeClosure"] == "NOT_VERIFIED"
           assert x["independent42GradlePomGapsOpen"] is True and x["full85AndroidNoticeRowsStillOpen"] is True
