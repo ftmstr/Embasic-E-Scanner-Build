@@ -28,7 +28,7 @@ def tree(notice=False):
     entries = [{"path": "LICENSE.txt", "type": "blob", "sha": audit.LICENSE_BLOB}]
     if notice:
         entries.append({"path": "src/NOTICE.txt", "type": "blob", "sha": "a" * 40})
-    return json.dumps({"sha": audit.TAG_COMMIT, "truncated": False, "tree": entries}).encode()
+    return json.dumps({"sha": audit.TAG_TREE_SHA, "truncated": False, "tree": entries}).encode()
 
 
 class TestAnnotationsSourceAudit(unittest.TestCase):
@@ -44,7 +44,7 @@ class TestAnnotationsSourceAudit(unittest.TestCase):
     def test_tagged_legal_notice_absence_and_tree_invariants(self):
         self.assertEqual(audit.validate_tag_tree(tree()), 1)
         for bad in (tree(True), tree().replace(b'"truncated": false', b'"truncated": true'),
-                    tree().replace(audit.TAG_COMMIT.encode(), b"a" * 40),
+                    tree().replace(audit.TAG_TREE_SHA.encode(), b"a" * 40),
                     tree().replace(audit.LICENSE_BLOB.encode(), b"b" * 40)):
             with self.subTest(bad=bad[:70]), self.assertRaises(audit.AuditError):
                 audit.validate_tag_tree(bad)
@@ -71,7 +71,7 @@ class TestAnnotationsSourceAudit(unittest.TestCase):
             sources = {audit.POM: POM, audit.JAR: jar, audit.LICENSE: LEGAL, audit.TAG_TREE: tree()}
             with mock.patch.object(audit, "LICENSE_BLOB", audit.blob(LEGAL)):
                 # Independently validate the test tree against the modified pinned blob.
-                sources[audit.TAG_TREE] = json.dumps({"sha": audit.TAG_COMMIT, "truncated": False,
+                sources[audit.TAG_TREE] = json.dumps({"sha": audit.TAG_TREE_SHA, "truncated": False,
                     "tree": [{"path": "LICENSE.txt", "type": "blob", "sha": audit.blob(LEGAL)}]}).encode()
                 evidence = audit.audit(cache, runtime, testing, get=sources.__getitem__)
                 self.assertTrue(evidence["mavenJAR"]["gradleByteParity"])
