@@ -105,6 +105,7 @@ class TestFutures110(unittest.TestCase):
                  mock.patch.object(audit, "SNAPSHOT_LICENSE_BLOB", audit.blob(LICENSE)), \
                  mock.patch.object(audit, "POM_SHA256", audit.sha(POM)), \
                  mock.patch.object(audit, "JAR_SHA256", audit.sha(raw_jar)):
+                sources[audit.TREE_URL] = tree()  # create fixture after mocked NOTICE blob pin
                 result = audit.audit(cache, runtime, test, getter=sources.__getitem__)
                 self.assertTrue(result["officialJAR"]["gradleByteParity"])
                 self.assertFalse(result["releaseApproved"])
