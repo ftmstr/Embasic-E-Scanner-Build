@@ -10,6 +10,7 @@ import argparse
 import hashlib
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -53,10 +54,19 @@ def blob(raw: bytes) -> str:
 def fetch(url: str) -> bytes:
     if url not in LIMITS:
         raise AuditError("unallowlisted upstream URL")
-    req = request.Request(url, headers={
+    headers = {
         "User-Agent": "Embasic-E-Scanner-Annotations2300-ScopeAudit/1",
         "Accept": "application/vnd.github+json" if url == TAG_TREE else "application/octet-stream",
-    })
+    }
+    # Only the fixed GitHub API tree URL may receive the ephemeral CI read token.
+    # Maven Central and raw.githubusercontent.com never receive credentials.
+    if url == TAG_TREE:
+        token = os.environ.get("E_SCANNER_GITHUB_TREE_READ_TOKEN", "")
+        if token:
+            if len(token) > 4096 or any(c in token for c in "\\r\\n"):
+                raise AuditError("invalid GitHub read-token boundary")
+            headers["Authorization"] = "Bearer " + token
+    req = request.Request(url, headers=headers)
     try:
         with request.build_opener(DenyRedirect).open(req, timeout=20) as stream:
             if stream.status != 200:
