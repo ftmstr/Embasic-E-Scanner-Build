@@ -125,9 +125,9 @@ def check_zip(raw: bytes, cap: int, max_members: int) -> zipfile.ZipFile:
         raise AuditError("ZIP member bounds exceeded")
     names = [x.filename for x in entries]
     if len(set(names)) != len(names) or any(
-        x.startswith("/") or ".." in x.split("/") or "\\" in x or
+        x.filename.startswith("/") or ".." in x.filename.split("/") or "\\" in x.filename or
         ((x.external_attr >> 16) & 0o170000) == 0o120000
-        for x in entries for _ in (0,) if isinstance(x, zipfile.ZipInfo)
+        for x in entries
     ):
         zf.close()
         raise AuditError("unsafe ZIP member")
