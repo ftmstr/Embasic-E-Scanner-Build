@@ -1118,6 +1118,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_guava_listenablefuture100_source_review.py' -v
+          sha256sum --check <<'GUAVA100_LICENSE_COPYING_SHA256'
+          cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  third_party/guava-listenablefuture100-v27-source/COPYING
+          GUAVA100_LICENSE_COPYING_SHA256
           python3 scripts/audit_guava_listenablefuture100_source_review.py \
             --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
@@ -1131,6 +1134,10 @@ jobs:
           assert x["purl"] == "pkg:maven/com.google.guava/listenablefuture@1.0"
           assert x["status"] == "EXACT_MAVEN_GRADLE_JAR_BYTES_MATCH_LEGAL_OPEN"
           assert x["officialJAR"]["gradleByteParity"] is True
+          assert x["hashPinsVerified"] is True
+          assert x["officialPOM"]["sha256"] == "53873caf26bc1ed8a567ea6c939ab2aaa3f47a5e32d5cade95ddf5080d23238a"
+          assert x["officialJAR"]["sha256"] == "e4ad7607e5c0477c6f890ef26a49cb8d1bb4dffb650bab4502afee64644e3069"
+          assert x["upstreamCopying"]["sha256"] == "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
           assert x["officialJAR"]["classNames"] == ["com/google/common/util/concurrent/ListenableFuture.class"]
           assert x["upstreamTagModule"]["treeSha"] == "2d264994055c7f26a8e85dbdc31f979a3ccb8445"
           assert x["upstreamTagModule"]["sourceToPublishedJarReproducibility"] == "NOT_VERIFIED"

@@ -31,3 +31,17 @@
 At initial commit official Maven POM/JAR SHA-256, local Gradle byte parity, exact JAR class/legal inventory, hosted CI and source artifact are **NOT VERIFIED**. After first real source CI passes, pin observed full Maven hashes, rerun all seven exact-final-HEAD PR workflows and record their independently verified results. Do not invent hashes, intermediate PASS claims, or percentages.
 
 Android physical DocumentsProvider JPEG/PNG and native 1/20/100-page PDF: **NOT RUN**. Windows physical WinRT save/reopen/render: **NOT VERIFIED**. No changes to scan-domain imaging, PDF, crop/rotation, thumbnail/workspace, SDK, dependency versions or QR/TLS. Windows hostile rename historical timeout/follow-up success is retained unchanged. Android 85 NOTICE and separate 42 Gradle child POM remain OPEN; complete NOTICE/LICENSES, source/commercial obligations, signatures, SBOM, package smoke and platform parity are NOT VERIFIED. No PRIVATE/main merge/force/tag/release/installer. **RELEASE HARD NO-GO.**
+
+
+## First hosted source verification on initial audit HEAD — 22 Nov 2026
+
+- Public PR HEAD `a2c72d3a897eeefa2373e29bf04c4341f926859a`, Android Kotlin Foundation run `45029722116`, job `137230412305`.
+- Eight synthetic hostile byte/version cases PASS. Independently fetched official Maven Central POM/JAR, actual Gradle dependency selections and cached JAR; source probe SUCCESS and 14-day receipt upload SUCCESS.
+- Real official `listenablefuture-1.0.pom` SHA-256: `53873caf26bc1ed8a567ea6c939ab2aaa3f47a5e32d5cade95ddf5080d23238a`.
+- Real official `listenablefuture-1.0.jar` SHA-256: `e4ad7607e5c0477c6f890ef26a49cb8d1bb4dffb650bab4502afee64644e3069`; **3,149 bytes**, exact full-byte equality with a unique Gradle module cache JAR. Contains only `com/google/common/util/concurrent/ListenableFuture.class`; distinct from the placeholder 9999.0 version.
+- Pinned v27.0 source `COPYING` SHA-256: `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`, exact Git blob `d645695673349e3947e8e5ae42332d0ac3164cd7`; **11,358 bytes**, now retained verbatim at `third_party/guava-listenablefuture100-v27-source/COPYING` and checked in CI by SHA-256. Upstream tagged subtree lacks a NOTICE file; JAR has no LICENSE/NOTICE filenames; no downstream notice exemption or complete legal attribution clearance is inferred.
+- First source receipt: `android-guava-listenablefuture100-source-evidence`, GitHub Actions artifact ID `14757202947`, 1,236 bytes, expires 2026-12-06. Not a complete SBOM.
+- Android Foundation overall failure is the unchanged **85 missing resolved NOTICE** gate. The independent **42 Gradle child POM** gaps remain OPEN. Parent POM inherited licence text, publisher signature and source-to-JAR reproducible build remain NOT VERIFIED.
+- Android clean-room first attempt run `45029722051` FAILED: numerous existing Maven/Kotlin/AGP transitive POM resolution errors (environmental external dependency resolution, no component source compile diagnosis); rerun **attempt 2 SUCCESS** on exact same HEAD. Neither attempt was hidden or reclassified.
+
+This turn now pins both official Maven POM/JAR observed hashes, retains the official tagged source COPYING bytes and adds exact hash checks to the independent Android CI probe. The final exact-HEAD workflow attempt results **must** be checked before claiming a final percentage.

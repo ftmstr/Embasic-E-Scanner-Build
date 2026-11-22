@@ -31,8 +31,8 @@ LICENSE_URL = "https://raw.githubusercontent.com/google/guava/" + TAG_COMMIT + "
 TREE_URL = "https://api.github.com/repos/google/guava/git/trees/" + TAG_MODULE_TREE + "?recursive=1"
 LIMITS = {POM_URL: 65536, JAR_URL: 1500000, LICENSE_URL: 20000, TREE_URL: 65536}
 # Filled only using complete official Maven bytes observed in real hosted CI.
-POM_SHA256 = ""
-JAR_SHA256 = ""
+POM_SHA256 = "53873caf26bc1ed8a567ea6c939ab2aaa3f47a5e32d5cade95ddf5080d23238a"
+JAR_SHA256 = "e4ad7607e5c0477c6f890ef26a49cb8d1bb4dffb650bab4502afee64644e3069"
 
 
 class ProbeError(ValueError):
@@ -149,7 +149,7 @@ def validate_jar(raw: bytes) -> dict:
             raise ProbeError("wrong empty/placeholder JAR: ListenableFuture.class absent")
         classes = sorted(n for n in names if n.endswith(".class"))
         if classes != [core]:
-            raise ProbeError("unexpected Java class inventory in Listen­ableFuture JAR")
+            raise ProbeError("unexpected Java class inventory in ListenableFuture JAR")
         legal = sorted(n for n in names
                        if n.rsplit("/", 1)[-1].lower() in
                        ("notice", "notice.txt", "notice.md", "license", "license.txt",
