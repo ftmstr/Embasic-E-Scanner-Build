@@ -55,7 +55,7 @@ def fetch(url: str) -> bytes:
         raise AuditError("unallowlisted upstream URL")
     req = request.Request(url, headers={
         "User-Agent": "Embasic-E-Scanner-Annotations2300-ScopeAudit/1",
-        "Accept": "application/octet-stream",
+        "Accept": "application/vnd.github+json" if url == TAG_TREE else "application/octet-stream",
     })
     try:
         with request.build_opener(DenyRedirect).open(req, timeout=20) as stream:
