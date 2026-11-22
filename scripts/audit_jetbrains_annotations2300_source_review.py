@@ -63,7 +63,7 @@ def fetch(url: str) -> bytes:
     if url == TAG_TREE:
         token = os.environ.get("E_SCANNER_GITHUB_TREE_READ_TOKEN", "")
         if token:
-            if len(token) > 4096 or any(c in token for c in "\\r\\n"):
+            if len(token) > 4096 or not token.isascii() or any(ord(c) < 33 or ord(c) > 126 for c in token):
                 raise AuditError("invalid GitHub read-token boundary")
             headers["Authorization"] = "Bearer " + token
     req = request.Request(url, headers=headers)
