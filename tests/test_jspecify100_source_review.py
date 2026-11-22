@@ -38,13 +38,19 @@ LICENSE = b"\nApache License\nVersion 2.0\nsynthetic, tests only\n"
 
 def jar_bytes(missing: bool = False, zip_slip: bool = False) -> bytes:
     stream = BytesIO()
+    # Pin ZIP entry timestamps: zipfile.writestr(name, bytes) otherwise inserts
+    # current local time and breaks cross-second exact SHA checks in CI.
+    def deterministic_entry(name: str, value: bytes, archive: zipfile.ZipFile) -> None:
+        info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_STORED
+        archive.writestr(info, value)
     with zipfile.ZipFile(stream, "w") as archive:
-        archive.writestr("org/jspecify/annotations/Nullable.class", b"\xca\xfe\xba\xbe")
+        deterministic_entry("org/jspecify/annotations/Nullable.class", b"\xca\xfe\xba\xbe", archive)
         if not missing:
-            archive.writestr("org/jspecify/annotations/NullMarked.class", b"\xca\xfe\xba\xbe")
+            deterministic_entry("org/jspecify/annotations/NullMarked.class", b"\xca\xfe\xba\xbe", archive)
         if zip_slip:
-            archive.writestr("../unsafe.class", b"x")
-        archive.writestr("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\n")
+            deterministic_entry("../unsafe.class", b"x", archive)
+        deterministic_entry("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\n", archive)
     return stream.getvalue()
 
 
