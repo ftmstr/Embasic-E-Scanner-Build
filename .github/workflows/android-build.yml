@@ -988,6 +988,8 @@ jobs:
         # Intentionally retain the 85-row fail-closed NOTICE error above.
         if: ${{ !cancelled() }}
         shell: bash
+        env:
+          E_SCANNER_GITHUB_TREE_READ_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_jetbrains_annotations2300_source_review.py' -v
