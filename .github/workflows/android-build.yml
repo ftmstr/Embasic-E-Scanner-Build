@@ -1033,6 +1033,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_androidx_interpolator100_source_review.py' -v
+          sha256sum --check <<'ANDROIDX_SOURCE_LICENSE'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          ANDROIDX_SOURCE_LICENSE
           python3 scripts/audit_androidx_interpolator100_source_review.py \
             --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
@@ -1046,6 +1049,7 @@ jobs:
           assert e["purl"] == "pkg:maven/androidx.interpolator/interpolator@1.0.0"
           assert e["status"] == "GOOGLE_MAVEN_GRADLE_AAR_BYTES_MATCH_LEGAL_OPEN"
           assert e["officialAAR"]["gradleByteParity"] is True
+          assert e["hashPinsVerified"] is True
           assert e["upstreamModule"]["treeSha"] == "2eea69702006ce32a9832cc5f8f1b7fe7b7143c6"
           assert e["upstreamModule"]["release2018SourceIdentity"] == "NOT_VERIFIED"
           assert e["android85NoticeRowsOpen"] is True and e["plugin42PomReviewOpen"] is True

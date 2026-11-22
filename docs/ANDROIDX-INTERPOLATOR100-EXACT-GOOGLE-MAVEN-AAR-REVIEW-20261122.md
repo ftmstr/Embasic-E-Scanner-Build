@@ -35,3 +35,18 @@ Official publisher artifact URLs:
 Unchanged: 85 Android resolved NOTICE gaps, 42 Gradle plugin child-POM issues, Windows hostile rename failure/success history, SDK REDIST/Terms, complete NOTICE/LICENSES/SBOM, publisher signing, real APK/AAB package content, Android/Windows feature parity, secure QR/TLS pairing and signed release.
 
 Physical Android DocumentsProvider JPEG/PNG and genuine 1/20/100-page PDF: **NOT RUN**, no connected real target. Physical Windows WinRT save/reopen/render and PDF visual acceptance: **NOT VERIFIED**. App image, PDF, crop, rotation and workspace implementation is untouched. PUBLIC Draft PR #1 remains open, no main/PRIVATE/merge/tag/release/installer. **HARD RELEASE NO-GO.**
+
+## First real Google Maven AAR readback and separate NOTICE outcome (22 Nov 2026)
+
+PUBLIC PR head `65e10e447b4a668fec4b49c0661fd99f2b7b5d05`, real pull_request Android Foundation run `45018236746`, job `137195127675`:
+- The scoped Interpolator source step SUCCESS, and source artifact upload SUCCESS.
+- Seven isolated deterministic synthetic regressions PASS (they are **not** upstream source bytes).
+- Real official Google Maven `interpolator-1.0.0.pom` SHA-256: `0ddc07cc39699f48ecd9ec894b5830c0f09e22e82959294edf37217224c88b7b`.
+- Real official Google Maven `interpolator-1.0.0.aar` SHA-256: `33193135a64fe21fa2c35eec6688f1a76e512606c0fc83dc1b689e37add7732a`, 7,669 bytes, exact byte equality with actual Gradle module-cache AAR.
+- Verified upstream pre-deletion `LICENSE.txt` SHA-256: `809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0`, pinned Git blob `e454a52586f29b8ce8a6799163eac1f875e9ac01`. Full source text retained verbatim at `third_party/androidx-interpolator-source-snapshot/LICENSE.txt`, guarded by CI SHA-256. This is **not** proven to be exact 2018 release material.
+- No AAR-embedded LICENSE/NOTICE filenames (count zero). This is NOT a legal/redistribution waiver. The root Apache-2.0 text plus the old module tree's absent NOTICE filename do not prove complete release obligations.
+- Retained 14-day GitHub Actions source artifact `android-interpolator100-source-evidence`, ID `14752852097`, 1,139 bytes; not an SBOM.
+- Overall Android Foundation still FAILURE **by design**, because the original 85 unresolved runtime/test NOTICE rows remain fail-closed. Separate 42 Gradle plugin POM gaps OPEN.
+- Physical Android DocumentsProvider and Windows WinRT remains NOT RUN/NOT VERIFIED. RELEASE NO-GO.
+
+Observed official POM/AAR SHA-256 values are now pinned in the bounded auditor. The exact source LICENSE is separately retained; CI asserts both pins and retained source checksum without relaxing NOTICE. **A subsequent exact-final-HEAD seven PR workflow result is required** before stating a new aggregate CI success ratio.
