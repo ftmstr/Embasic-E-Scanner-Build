@@ -34,7 +34,8 @@ class CoreRuntimeTests(unittest.TestCase):
         self.jar.write_bytes(self.data["aar"])
     def run_audit(self):
         return a.audit(self.cache, self.runtime, self.test, self.data.__getitem__,
-                       license_pin=a.sha(b"synthetic license"))
+                       license_pin=a.sha(b"synthetic license"),
+                       published_pins={k: a.sha(self.data[k]) for k in ("pom", "aar", "sources")})
     def test_scope(self):
         result = self.run_audit()
         self.assertTrue(result["gradleByteParity"])
@@ -53,6 +54,16 @@ class CoreRuntimeTests(unittest.TestCase):
         self.jar.write_bytes(self.data["aar"])
         with self.assertRaises(a.AuditError):
             self.run_audit()
+
+    def test_published_pin_drift(self):
+        pins = {k: a.sha(self.data[k]) for k in ("pom", "aar", "sources")}
+        for kind in pins:
+            changed = dict(self.data)
+            changed[kind] += b"changed"
+            with self.subTest(kind=kind), self.assertRaisesRegex(a.AuditError, "pin mismatch"):
+                a.verify_published_pins(changed, pins)
+        with self.assertRaisesRegex(a.AuditError, "incomplete"):
+            a.verify_published_pins(self.data, {"pom": pins["pom"]})
 
     def test_mismatch(self):
         self.jar.write_bytes(b"wrong")

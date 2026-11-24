@@ -19,7 +19,12 @@ URLS = {"pom": BASE + ".pom", "aar": BASE + ".aar", "sources": BASE + "-sources.
         "license": "https://raw.githubusercontent.com/androidx/androidx/4a63db244f62d809948bc2fb6676d62710c72609/LICENSE.txt"}
 LIMITS = {"pom": 65536, "aar": 2000000, "sources": 2000000, "license": 20000}
 ROOT_LICENSE_SHA = "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
-# Initial real hosted CI receipt required before POM/AAR/sources pins.
+# Observed in actual hosted PR run 45486577539, job 138773473231.
+PUBLISHED_SHA256 = {
+    "pom": "0f953706598140d9d8735cdd5aeb1fa35933f4e2f31c0bf3eb81a053a4c8c1a5",
+    "aar": "a1be5e0caa2b07623862af6ae21b3ab0718123245184d0e30dea81b53f990a47",
+    "sources": "4adaab3a8ab711634d566d2e239e199af8b5ac92c1de85540dc34c7040754e96"
+}
 CLASS = "androidx/arch/core/executor/ArchTaskExecutor.class"
 SOURCE = "androidx/arch/core/executor/ArchTaskExecutor.java"
 
@@ -93,7 +98,16 @@ def archive_info(kind, raw):
             result["classesJar"] = archive_info("jar", marker)
         return result
 
-def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
+def verify_published_pins(data, pins):
+    if set(pins) != {"pom", "aar", "sources"}:
+        raise AuditError("incomplete published SHA-256 pins")
+    for kind, expected in pins.items():
+        if not re.fullmatch(r"[0-9a-f]{64}", expected) or sha(data[kind]) != expected:
+            raise AuditError("published SHA-256 pin mismatch: " + kind)
+
+
+def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA, *, published_pins=None):
+    pins = PUBLISHED_SHA256 if published_pins is None else published_pins
     graphs = {}
     pattern = re.compile(r"(?<![\w.-])" + re.escape(GAV) + r"(?![\w.-])")
     for label, path in (("debugRuntimeClasspath", runtime), ("debugUnitTestRuntimeClasspath", test)):
@@ -119,6 +133,7 @@ def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
     if not candidates[0].is_file() or not 0 < candidates[0].stat().st_size <= LIMITS["aar"]:
         raise AuditError("unsafe cached AAR")
     data = {k: checked(k, getter(k)) for k in URLS}
+    verify_published_pins(data, pins)
     claims = pom_info(data["pom"])
     binary = archive_info("aar", data["aar"])
     source = archive_info("sources", data["sources"])
@@ -134,7 +149,7 @@ def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
             "rootLicenseScope": "LATER_SNAPSHOT_ONLY", "releaseNoticeClosure": "NOT_VERIFIED",
             "licenseClosure": "NOT_VERIFIED", "sourceToBinaryReproducibility": "NOT_VERIFIED",
             "publisherSignatureVerified": False,
-            "hashPinsVerified": False,
+            "hashPinsVerified": pins == PUBLISHED_SHA256 and license_pin == ROOT_LICENSE_SHA,
             "android85MissingNoticeRowsOpen": True, "gradle42PomGapsOpen": True,
             "sbomComplete": False, "releaseApproved": False}
 
