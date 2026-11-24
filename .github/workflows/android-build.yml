@@ -1206,3 +1206,26 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/androidx-futures110-source-evidence.json
+
+      - name: Audit exact AndroidX core-common 2.2.0 published POM JAR and sources (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_corecommon220_source_review.py' -v
+          sha256sum --check <<'CORECOMMON220_ROOT'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          CORECOMMON220_ROOT
+          python3 scripts/audit_androidx_corecommon220_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-corecommon220-source-evidence.json"
+      - name: Retain AndroidX core-common 2.2.0 receipt (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-corecommon220-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-corecommon220-source-evidence.json
