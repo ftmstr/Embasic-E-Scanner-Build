@@ -1221,6 +1221,23 @@ jobs:
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
             --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
             --output "${RUNNER_TEMP}/androidx-corecommon220-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "androidx-corecommon220-source-evidence.json").read_text())
+          assert x["purl"] == "pkg:maven/androidx.arch.core/core-common@2.2.0"
+          assert x["hashPinsVerified"] is True and x["gradleByteParity"] is True
+          assert x["official"]["pom"]["sha256"] == "1e17d4af8d6425be2a69f8af4d654a87e0456259a9eef1542869bcb023547e28"
+          assert x["official"]["jar"]["sha256"] == "65308a06b1c00ee186cb9e19321383f043b993813f1522c47f4a3e3303bdba41"
+          assert x["official"]["sources"]["sha256"] == "563d430880d847890029234386ef03adb95403c34f3c9dec3a7002e2f4007ae4"
+          assert x["official"]["license"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert x["releaseNoticeClosure"] == "NOT_VERIFIED"
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["android85MissingNoticeRowsOpen"] and x["gradle42PomGapsOpen"]
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("CORECOMMON220_PINNED_SCOPE: exact bytes; legal closure NOT VERIFIED")
+          PY
       - name: Retain AndroidX core-common 2.2.0 receipt (NOT SBOM)
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

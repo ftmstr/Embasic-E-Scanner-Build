@@ -4,3 +4,11 @@
 - Official release: https://developer.android.com/jetpack/androidx/releases/arch-core#2.2.0 . Scope: androidx.arch.core:core-common:2.2.0 only; exact Google Maven POM, JAR, sources JAR, actual Gradle cache byte equality and archive legal-file hashes. Later AndroidX root LICENSE snapshot pinned separately. Source tree at 4a63db244f62d809948bc2fb6676d62710c72609, src tree f4f55697c104c55b824e47b08886f1701e4106a5, is later than release, not a 2023 legal clearance.
 - First hosted run must establish real hashes; no POM/JAR/source hash pins claimed yet. A missing embedded NOTICE does not waive attribution; exact release source-to-binary reproducibility, full license/NOTICE applicability, publisher signature, packaging and SBOM NOT VERIFIED.
 - Physical Android SAF DocumentsProvider JPEG/PNG and 1/20/100 PDF NOT RUN; Windows GUI WinRT save/reopen/render NOT VERIFIED. RELEASE HARD NO-GO.
+
+## Real hosted CI evidence and pin follow-up (24 Nov 2026)
+- Exact HEAD 23c6b4ac4ba24261318488df7fd96fa009fa4f46: seven PR workflows completed, six success, one Android Foundation failure (85 missing NOTICE rows). Android JUnit 74/74, core-common audit 7/7 tests, source probe and artifact upload SUCCESS. Run 45418721365 / job 138532004608; artifact 14933651605, 1155 bytes, NOT SBOM.
+- Official pom: SHA-256 `1e17d4af8d6425be2a69f8af4d654a87e0456259a9eef1542869bcb023547e28`, 1704 bytes.
+- Official jar: SHA-256 `65308a06b1c00ee186cb9e19321383f043b993813f1522c47f4a3e3303bdba41`, 11657 bytes.
+- Official sources: SHA-256 `563d430880d847890029234386ef03adb95403c34f3c9dec3a7002e2f4007ae4`, 5684 bytes.
+- Exact Gradle cached binary byte equality TRUE; selected runtime and JVM test configurations TRUE. Binary archive 16 entries; sources archive 10 entries; no separately named legal files under inspected filename rule in either. POM claim Apache 2.0 and source marker license header observed; later root LICENSE SHA-256 `809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0` is not exact release legal clearance.
+- Follow-up pins all three published SHA-256 values and adds drift/incomplete pin regression coverage. CI independently asserts receipt pins and legal boundaries. New exact HEAD must be verified; no claim of new CI success until completed. 85 NOTICE, 42 POM, Windows hostile rename, physical device and release gates remain OPEN. RELEASE HARD NO-GO.

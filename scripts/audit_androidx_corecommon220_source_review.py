@@ -19,6 +19,12 @@ URLS = {"pom": BASE + ".pom", "jar": BASE + ".jar", "sources": BASE + "-sources.
         "license": "https://raw.githubusercontent.com/androidx/androidx/4a63db244f62d809948bc2fb6676d62710c72609/LICENSE.txt"}
 LIMITS = {"pom": 65536, "jar": 2000000, "sources": 2000000, "license": 20000}
 ROOT_LICENSE_SHA = "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+# Observed in actual hosted PR run 45418721365, job 138532004608.
+PUBLISHED_SHA256 = {
+    "pom": "1e17d4af8d6425be2a69f8af4d654a87e0456259a9eef1542869bcb023547e28",
+    "jar": "65308a06b1c00ee186cb9e19321383f043b993813f1522c47f4a3e3303bdba41",
+    "sources": "563d430880d847890029234386ef03adb95403c34f3c9dec3a7002e2f4007ae4"
+}
 CLASS = "androidx/arch/core/internal/SafeIterableMap.class"
 SOURCE = "androidx/arch/core/internal/SafeIterableMap.java"
 
@@ -87,7 +93,16 @@ def archive_info(kind, raw):
         return {"entries": len(entries), "legalEntries": legal,
                 "marker": required, "markerSha256": sha(marker)}
 
-def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
+def verify_published_pins(data, pins):
+    if set(pins) != {"pom", "jar", "sources"}:
+        raise AuditError("incomplete published SHA-256 pins")
+    for kind, expected in pins.items():
+        if not re.fullmatch(r"[0-9a-f]{64}", expected) or sha(data[kind]) != expected:
+            raise AuditError("published SHA-256 pin mismatch: " + kind)
+
+
+def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA, *, published_pins=None):
+    pins = PUBLISHED_SHA256 if published_pins is None else published_pins
     graphs = {}
     pattern = re.compile(r"(?<![\w.-])" + re.escape(GAV) + r"(?![\w.-])")
     for label, path in (("debugRuntimeClasspath", runtime), ("debugUnitTestRuntimeClasspath", test)):
@@ -113,6 +128,7 @@ def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
     if not candidates[0].is_file() or not 0 < candidates[0].stat().st_size <= LIMITS["jar"]:
         raise AuditError("unsafe cached JAR")
     data = {k: checked(k, getter(k)) for k in URLS}
+    verify_published_pins(data, pins)
     claims = pom_info(data["pom"])
     binary = archive_info("jar", data["jar"])
     source = archive_info("sources", data["sources"])
@@ -127,7 +143,8 @@ def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
             "binary": binary, "publishedSources": source, "gradleByteParity": True,
             "rootLicenseScope": "LATER_SNAPSHOT_ONLY", "releaseNoticeClosure": "NOT_VERIFIED",
             "licenseClosure": "NOT_VERIFIED", "sourceToBinaryReproducibility": "NOT_VERIFIED",
-            "publisherSignatureVerified": False, "hashPinsVerified": False,
+            "publisherSignatureVerified": False,
+            "hashPinsVerified": pins == PUBLISHED_SHA256 and license_pin == ROOT_LICENSE_SHA,
             "android85MissingNoticeRowsOpen": True, "gradle42PomGapsOpen": True,
             "sbomComplete": False, "releaseApproved": False}
 

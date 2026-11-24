@@ -34,13 +34,24 @@ class CoreCommonTests(unittest.TestCase):
         self.jar.write_bytes(self.data["jar"])
     def run_audit(self):
         return a.audit(self.cache, self.runtime, self.test, self.data.__getitem__,
-                       license_pin=a.sha(b"synthetic license"))
+                       license_pin=a.sha(b"synthetic license"),
+                       published_pins={k: a.sha(self.data[k]) for k in ("pom", "jar", "sources")})
     def test_scope(self):
         result = self.run_audit()
         self.assertTrue(result["gradleByteParity"])
         self.assertFalse(result["releaseApproved"])
         self.assertFalse(result["hashPinsVerified"])
         self.assertEqual(result["releaseNoticeClosure"], "NOT_VERIFIED")
+    def test_published_pin_drift(self):
+        pins = {k: a.sha(self.data[k]) for k in ("pom", "jar", "sources")}
+        for kind in pins:
+            changed = dict(self.data)
+            changed[kind] += b"changed"
+            with self.subTest(kind=kind), self.assertRaisesRegex(a.AuditError, "pin mismatch"):
+                a.verify_published_pins(changed, pins)
+        with self.assertRaisesRegex(a.AuditError, "incomplete"):
+            a.verify_published_pins(self.data, {"pom": pins["pom"]})
+
     def test_mismatch(self):
         self.jar.write_bytes(b"wrong")
         with self.assertRaises(a.AuditError):
