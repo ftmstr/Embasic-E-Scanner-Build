@@ -1289,3 +1289,26 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: ${{ runner.temp }}/androidx-coreruntime220-source-evidence.json
+
+      - name: Audit exact AndroidX tracing 1.2.0 published AAR and sources (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_tracing120_source_review.py' -v
+          sha256sum --check <<'TRACING120_ROOT'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          TRACING120_ROOT
+          python3 scripts/audit_androidx_tracing120_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-tracing120-source-evidence.json"
+      - name: Retain AndroidX tracing 1.2.0 receipt (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-tracing120-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-tracing120-source-evidence.json
