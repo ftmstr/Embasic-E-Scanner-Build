@@ -1347,6 +1347,26 @@ jobs:
             --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
             --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
             --output "${RUNNER_TEMP}/androidx-pooling100-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "androidx-pooling100-source-evidence.json").read_text())
+          assert x["purl"] == "pkg:maven/androidx.customview/customview-poolingcontainer@1.0.0"
+          assert x["hashPinsVerified"] is True and x["gradleByteParity"] is True
+          assert x["official"]["pom"]["sha256"] == "9fa62196c4c4e79b6a58dbb38a8c022bef8db21989d7dae2da0f6f5b66289a9c"
+          assert x["official"]["aar"]["sha256"] == "3584102fc49bf399c56e3b7be4bfe12000c46112320cd8cf85cc0a8f93f3e752"
+          assert x["official"]["sources"]["sha256"] == "0715571baa86e8f7683fcc1d59fe2881c5e8603af9ff212c82423ae098d34c62"
+          assert x["official"]["license"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert x["binary"]["markerSha256"] == "0690e2d3b17755c30c52246078e82fa3f448ab652ca0f0f72da00a8c75c81d5f"
+          assert x["binary"]["classesJar"]["markerSha256"] == "13f077958ddffaea733f023cef7cc0e2faa6c23431ba7b0edaaefa2d7c7ae071"
+          assert x["publishedSources"]["markerSha256"] == "0ba62d4635397c5a31b07ef63c0ceeb8befd3808922dd81eefa97f0221476c89"
+          assert x["releaseNoticeClosure"] == "NOT_VERIFIED"
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["android85MissingNoticeRowsOpen"] and x["gradle42PomGapsOpen"]
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("POOLING100_PINNED_SCOPE: exact bytes; legal closure NOT VERIFIED")
+          PY
       - name: Retain AndroidX customview-poolingcontainer 1.0.0 receipt (NOT SBOM)
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

@@ -19,7 +19,12 @@ URLS = {"pom": BASE + ".pom", "aar": BASE + ".aar", "sources": BASE + "-sources.
         "license": "https://raw.githubusercontent.com/androidx/androidx/4a63db244f62d809948bc2fb6676d62710c72609/LICENSE.txt"}
 LIMITS = {"pom": 65536, "aar": 2000000, "sources": 2000000, "license": 20000}
 ROOT_LICENSE_SHA = "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
-# Initial real hosted CI receipt required before POM/AAR/sources pins.
+# Observed in actual hosted PR run 45655245605, job 139350043391.
+PUBLISHED_SHA256 = {
+    "pom": "9fa62196c4c4e79b6a58dbb38a8c022bef8db21989d7dae2da0f6f5b66289a9c",
+    "aar": "3584102fc49bf399c56e3b7be4bfe12000c46112320cd8cf85cc0a8f93f3e752",
+    "sources": "0715571baa86e8f7683fcc1d59fe2881c5e8603af9ff212c82423ae098d34c62"
+}
 CLASS = "androidx/customview/poolingcontainer/PoolingContainer.class"
 SOURCE = "androidx/customview/poolingcontainer/PoolingContainer.kt"
 
@@ -97,7 +102,16 @@ def archive_info(kind, raw):
             result["classesJar"] = archive_info("jar", marker)
         return result
 
-def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
+def verify_published_pins(data, pins):
+    if set(pins) != {"pom", "aar", "sources"}:
+        raise AuditError("incomplete published SHA-256 pins")
+    for kind, expected in pins.items():
+        if not re.fullmatch(r"[0-9a-f]{64}", expected) or sha(data[kind]) != expected:
+            raise AuditError("published SHA-256 pin mismatch: " + kind)
+
+
+def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA, *, published_pins=None):
+    pins = PUBLISHED_SHA256 if published_pins is None else published_pins
     graphs = {}
     pattern = re.compile(r"(?<![\w.-])" + re.escape(GAV) + r"(?![\w.-])")
     for label, path in (("debugRuntimeClasspath", runtime), ("debugUnitTestRuntimeClasspath", test)):
@@ -123,6 +137,7 @@ def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
     if not candidates[0].is_file() or not 0 < candidates[0].stat().st_size <= LIMITS["aar"]:
         raise AuditError("unsafe cached AAR")
     data = {k: checked(k, getter(k)) for k in URLS}
+    verify_published_pins(data, pins)
     claims = pom_info(data["pom"])
     binary = archive_info("aar", data["aar"])
     source = archive_info("sources", data["sources"])
@@ -138,7 +153,7 @@ def audit(cache, runtime, test, getter=fetch, license_pin=ROOT_LICENSE_SHA):
             "rootLicenseScope": "LATER_SNAPSHOT_ONLY", "releaseNoticeClosure": "NOT_VERIFIED",
             "licenseClosure": "NOT_VERIFIED", "sourceToBinaryReproducibility": "NOT_VERIFIED",
             "publisherSignatureVerified": False,
-            "hashPinsVerified": False,
+            "hashPinsVerified": pins == PUBLISHED_SHA256 and license_pin == ROOT_LICENSE_SHA,
             "android85MissingNoticeRowsOpen": True, "gradle42PomGapsOpen": True,
             "sbomComplete": False, "releaseApproved": False}
 
