@@ -1,0 +1,4 @@
+# case_id	open_decision	recovery_status
+# Synthetic host filesystem, not Android device QA or pinned-handle TOCTOU proof
+owner_private_0700	ACCEPT	FRESH
+world_writer_grant	REJECT	POISONED

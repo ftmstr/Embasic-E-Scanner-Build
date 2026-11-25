@@ -1,9 +1,9 @@
 name: Android Kotlin Foundation
 'on':
   push:
-    paths: ['android/**', '.github/workflows/android-build.yml']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_jspecify100_source_review.py', 'tests/test_jspecify100_source_review.py', 'scripts/audit_coroutines_core_jvm181_source_review.py', 'tests/test_coroutines_core_jvm181_source_review.py', 'scripts/audit_coroutines_android181_source_review.py', 'tests/test_coroutines_android181_source_review.py', 'scripts/audit_kotlin_stdlib_2321_source_review.py', 'scripts/audit_jetbrains_annotations2300_source_review.py', 'scripts/audit_androidx_interpolator100_source_review.py', 'scripts/audit_androidx_startup111_source_review.py', 'scripts/audit_guava_listenablefuture100_source_review.py', 'scripts/audit_androidx_futures110_source_review.py', 'tests/test_androidx_futures110_source_review.py', 'tests/test_guava_listenablefuture100_source_review.py', 'tests/test_androidx_startup111_source_review.py', 'tests/test_androidx_interpolator100_source_review.py', 'tests/test_jetbrains_annotations2300_source_review.py', 'tests/test_kotlin_stdlib_2321_source_review.py', 'scripts/audit_serialization_core_jvm173_source_review.py', 'tests/test_serialization_core_jvm173_source_review.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'scripts/audit_jaxbapi232_exact_license.py', 'tests/test_jaxbapi232_exact_license.py', 'scripts/audit_fastinfoset1216_exact_license.py', 'tests/test_fastinfoset1216_exact_license.py', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', 'THIRD-PARTY-NOTICES.md']
   pull_request:
-    paths: ['android/**', '.github/workflows/android-build.yml']
+    paths: ['android/**', '.github/workflows/android-build.yml', 'scripts/audit_android_dependency_graph.py', 'tests/test_android_dependency_graph.py', 'scripts/audit_android_cached_artifacts.py', 'tests/test_android_cached_artifacts.py', 'scripts/audit_gradle_plugin_graph.py', 'tests/test_gradle_plugin_graph.py', 'scripts/audit_gradle_plugin_artifacts.py', 'tests/test_gradle_plugin_artifacts.py', 'scripts/audit_missing_maven_pom_sources.py', 'tests/test_missing_maven_pom_sources.py', 'scripts/audit_maven_release_jar_bytes.py', 'tests/test_maven_release_jar_bytes.py', 'scripts/audit_jspecify100_source_review.py', 'tests/test_jspecify100_source_review.py', 'scripts/audit_coroutines_core_jvm181_source_review.py', 'tests/test_coroutines_core_jvm181_source_review.py', 'scripts/audit_coroutines_android181_source_review.py', 'tests/test_coroutines_android181_source_review.py', 'scripts/audit_kotlin_stdlib_2321_source_review.py', 'scripts/audit_jetbrains_annotations2300_source_review.py', 'scripts/audit_androidx_interpolator100_source_review.py', 'scripts/audit_androidx_startup111_source_review.py', 'scripts/audit_guava_listenablefuture100_source_review.py', 'scripts/audit_androidx_futures110_source_review.py', 'tests/test_androidx_futures110_source_review.py', 'tests/test_guava_listenablefuture100_source_review.py', 'tests/test_androidx_startup111_source_review.py', 'tests/test_androidx_interpolator100_source_review.py', 'tests/test_jetbrains_annotations2300_source_review.py', 'tests/test_kotlin_stdlib_2321_source_review.py', 'scripts/audit_serialization_core_jvm173_source_review.py', 'tests/test_serialization_core_jvm173_source_review.py', 'scripts/audit_pinned_gradle_plugin_jars.py', 'tests/test_pinned_gradle_plugin_jars.py', 'scripts/audit_gradle_central_binary_batch.py', 'tests/test_gradle_central_binary_batch.py', 'scripts/audit_gradle813_classifier_jars.py', 'tests/test_gradle813_classifier_jars.py', 'scripts/reconcile_gradle_pom_license_gaps.py', 'tests/test_reconcile_gradle_pom_license_gaps.py', 'scripts/audit_jaf120_exact_license.py', 'tests/test_jaf120_exact_license.py', 'scripts/audit_activation_api121_exact_license.py', 'tests/test_activation_api121_exact_license.py', 'scripts/audit_istack308_exact_license.py', 'tests/test_istack308_exact_license.py', 'scripts/audit_jaxbapi232_exact_license.py', 'tests/test_jaxbapi232_exact_license.py', 'scripts/audit_fastinfoset1216_exact_license.py', 'tests/test_fastinfoset1216_exact_license.py', 'tests/golden/**', 'docs/DURABLE-RECEIVE-JOURNAL-V1-RESTART-20261110.md', 'docs/RECEIVE-GATE-V1-SESSION-ADMISSION-20261110.md', 'THIRD-PARTY-NOTICES.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -21,13 +23,1355 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f android/gradle/wrapper/gradle-wrapper.jar ]]; then
-            echo 'BLOCKED: Android wrapper provenance not approved; no downloaded or private wrapper binary is trusted.'
-            exit 1
-          fi
+          test -x android/gradlew || { echo '::error::Android gradlew missing or not executable'; exit 2; }
+          cd android
+          test -f gradle/wrapper/gradle-wrapper.jar || { echo '::error::Missing reviewed wrapper JAR'; exit 2; }
+          grep -Fx 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.6-bin.zip' gradle/wrapper/gradle-wrapper.properties
+          grep -Fx 'distributionSha256Sum=7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24' gradle/wrapper/gradle-wrapper.properties
+          grep -Fx 'ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0' gradle/wrapper/gradle-wrapper.jar.sha256
+          sha256sum --check <<'SHA256'
+          ad16bca46cb71bb5887c546860d93992aeee35c1fdaf4a242b0a612375d937e0  gradle/wrapper/gradle-wrapper.jar
+          SHA256
       - name: Android unit tests and lint (after source audit)
         shell: bash
         run: |
           set -euo pipefail
           cd android
           ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+      - name: Require executed JUnit test cases (not NO-SOURCE)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          import re
+          xmls = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          if not xmls:
+              raise SystemExit("BLOCKED: JUnit XML absent; task may have been NO-SOURCE")
+          tests = failures = errors = skipped = 0
+          perf = {}
+          for xml in xmls:
+              root = ET.parse(xml).getroot()
+              tests += int(root.get("tests", "0"))
+              failures += int(root.get("failures", "0"))
+              errors += int(root.get("errors", "0"))
+              skipped += int(root.get("skipped", "0"))
+              for node in root.iter("system-out"):
+                  for line in (node.text or "").splitlines():
+                      match = re.fullmatch(
+                          r"FOUNDATION_PERF_ANDROID_JVM pages=(20|100) elapsedMs=([0-9]+) syntheticBytesPerPage=3 noLatencySla=true",
+                          line.strip())
+                      if match:
+                          pages = int(match.group(1))
+                          if pages in perf:
+                              raise SystemExit("BLOCKED: duplicate synthetic Android performance evidence")
+                          perf[pages] = int(match.group(2))
+          print(f"JUnit cases={tests}, failures={failures}, errors={errors}, skipped={skipped}")
+          if set(perf) != {20, 100}:
+              raise SystemExit("BLOCKED: expected 20/100-page JUnit system-out measurements missing")
+          for pages in (20, 100):
+              print(f"FOUNDATION_PERF_ANDROID_JVM pages={pages} elapsedMs={perf[pages]} syntheticBytesPerPage=3 noLatencySla=true")
+          if tests == 0 or failures or errors or skipped:
+              raise SystemExit("BLOCKED: JUnit not fully executed or not passing")
+          PY
+      - name: Inspect JVM test-only licensing boundary (not an SBOM)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew --no-daemon :app:dependencies --configuration debugRuntimeClasspath > "${RUNNER_TEMP}/android-debug-runtime-deps.txt"
+          ./gradlew --no-daemon :app:dependencies --configuration debugUnitTestRuntimeClasspath > "${RUNNER_TEMP}/android-jvm-test-deps.txt"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          folder = Path(os.environ["RUNNER_TEMP"])
+          release = (folder / "android-debug-runtime-deps.txt").read_text()
+          testing = (folder / "android-jvm-test-deps.txt").read_text()
+          require_test = ("junit:junit:4.13.2", "org.hamcrest:hamcrest-core:1.3")
+          if not all(value in testing for value in require_test):
+              raise SystemExit("BLOCKED: reviewed JUnit/Hamcrest test graph changed")
+          if any(value in release for value in require_test):
+              raise SystemExit("BLOCKED: EPL JUnit or BSD Hamcrest leaked into production runtime")
+          print("PASS: 2 reviewed test-only modules isolated from debugRuntimeClasspath")
+          print("NOT VERIFIED: full transitive license inventory, binary provenance, release SBOM")
+          PY
+      - name: Collect resolved Gradle plugin buildEnvironment evidence (not SBOM)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew --no-daemon buildEnvironment :app:buildEnvironment > "${RUNNER_TEMP}/gradle-build-environment.txt"
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import re
+          path = Path(os.environ["RUNNER_TEMP"]) / "gradle-build-environment.txt"
+          raw = path.read_bytes()
+          print("PLUGIN_GRAPH_CAPTURE_BYTES:", len(raw))
+          print("PLUGIN_GRAPH_CAPTURE_SHA256:", hashlib.sha256(raw).hexdigest())
+          lines = raw.decode("utf-8", errors="replace").splitlines()
+          for line in lines:
+              if (line.startswith("> Task ") or line.startswith("classpath -")
+                      or line.startswith("BUILD SUCCESSFUL") or "No dependencies" in line):
+                  print("PLUGIN_GRAPH_STRUCTURE:", line[:200])
+          coords = sorted(set(re.findall(
+              r"[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[0-9][A-Za-z0-9_.-]*", "\n".join(lines))))
+          print("PLUGIN_GRAPH_COORDINATE_CANDIDATES:", len(coords))
+          for coordinate in coords[:12]:
+              print("PLUGIN_GRAPH_SAMPLE:", coordinate)
+          print("NOT VERIFIED: plugin/build tool full transitive licensing or SBOM")
+          PY
+      - name: Audit pinned root and app Gradle plugin buildEnvironment graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle_plugin_graph.py' -v
+          python3 scripts/audit_gradle_plugin_graph.py \
+            --input "${RUNNER_TEMP}/gradle-build-environment.txt" \
+            --output "${RUNNER_TEMP}/gradle-plugin-partial-inventory.json"
+          echo '::notice::Plugin graph coordinates recorded; binary license and complete SBOM NOT VERIFIED'
+      - name: Audit scoped Gradle plugin local artifact bytes and POM claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle_plugin_artifacts.py' -v
+          python3 scripts/audit_gradle_plugin_artifacts.py \
+            --graph "${RUNNER_TEMP}/gradle-plugin-partial-inventory.json" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --notice THIRD-PARTY-NOTICES.md \
+            --output "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-plugin-artifact-evidence.json"
+          data = json.loads(p.read_text(encoding="utf-8"))
+          counts = data["counts"]
+          assert counts["modules"] == counts["withLocalBytes"] + counts["withoutLocalBytes"]
+          assert data["status"] == "PASS_WITH_GAPS"
+          assert data["partialNoticeCheck"] == "PASS"
+          assert data["releaseApproved"] is False and data["sbomComplete"] is False
+          assert data["licenseApproval"] == "NOT_VERIFIED" and data["originVerified"] is False
+          print("PLUGIN_CACHE_HASHED:", counts["hashedFiles"])
+          classifier_rows = [
+              (module["purl"], entry) for module in data["modules"]
+              for entry in module.get("cachedFiles", [])
+              if entry.get("classifier") is not None
+          ]
+          assert counts["classifierJarFiles"] == len(classifier_rows)
+          assert counts["classifierJarModules"] == len({p for p, _ in classifier_rows})
+          assert counts["classifierJarFiles"] >= 1
+          assert all(entry["binaryOrigin"] == "NOT_VERIFIED"
+                     and entry["sourceVerification"] == "LOCAL_BYTES_ONLY"
+                     for _, entry in classifier_rows)
+          print("CLASSIFIER_JAR_FILES_LOCAL_SHA:", len(classifier_rows))
+          print("CLASSIFIER_JAR_MODULES:", counts["classifierJarModules"])
+          for purl, entry in classifier_rows:
+              print("CLASSIFIER_UNVERIFIED_LOCAL_SHA:", purl,
+                    entry["filename"], entry["sha256"], entry["classifier"])
+          print("PLUGIN_CACHE_UNVERIFIED_MODULES:", counts["withoutLocalBytes"])
+          print("PLUGIN_POM_LICENSING_METADATA_ROWS:", counts["pomWithLicenseNames"])
+          gaps = data["missingDirectLicenseEvidence"]
+          assert len(gaps) == counts["modules"] - counts["pomWithLicenseNames"]
+          assert data["parentLicenseInheritanceVerified"] is False
+          print("POM_GAP_REASON_COUNTS:", {k: counts[k] for k in
+                ("pomNotCached", "pomWithoutDirectLicenseName", "unreadablePom",
+                 "pomHasUnresolvedParent")})
+          by_purl = {x["purl"]: x for x in data["modules"]}
+          observed_parents = 0
+          for gap in gaps:
+              module = by_purl[gap["purl"]]
+              chains = module.get("parentPomEvidence", [])
+              print("POM_LICENSE_GAP:", gap["purl"], gap["reason"],
+                    "PARENT_UNVERIFIED:", ",".join(gap["unresolvedPomParents"]))
+              for chain in chains:
+                  for parent in chain:
+                      observed_parents += 1
+                      print("PARENT_POM_EVIDENCE:", gap["purl"], parent["coordinate"],
+                            parent["status"], parent["sha256"],
+                            ",".join(parent["unverifiedLicenseNames"]))
+                      assert parent["licenseApproved"] is False
+          print("UNVERIFIED_PARENT_POM_EVIDENCE_RECORDS:", observed_parents)
+          print("NOT VERIFIED: POM parent inheritance, publisher identity, legal rights, SBOM")
+          print("NOT VERIFIED: publication origin, complete transitive notices and signing")
+          PY
+      - name: Verify pinned AGP and Kotlin Gradle build-tool JARs from official HTTPS source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_pinned_gradle_plugin_jars.py' -v
+          python3 scripts/audit_pinned_gradle_plugin_jars.py \
+            --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/android-pinned-plugin-jar-byte-parity.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path(os.environ["RUNNER_TEMP"]) / "android-pinned-plugin-jar-byte-parity.json"
+          x = json.loads(path.read_text(encoding="utf-8"))
+          assert x["selectedPinnedPluginJarCount"] == 2
+          assert x["sourceByteMatches"] + x["unverifiedPinnedPluginJars"] == 2
+          assert x["status"] in ("SOURCE_BYTE_PARITY_PASS", "PARTIAL_EVIDENCE_ONLY")
+          assert x["publisherSignatureVerified"] is False
+          assert x["originAttributionVerified"] is False
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          inventory = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                                  "gradle-plugin-artifact-evidence.json").read_text())
+          kotlin = next(m for m in inventory["modules"] if
+                        m["purl"] == "pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin@2.3.21")
+          classified = [entry for entry in kotlin.get("cachedFiles", [])
+                        if entry["filename"] == "kotlin-gradle-plugin-2.3.21-gradle813.jar"]
+          assert len(classified) == 1
+          candidate = classified[0]
+          assert candidate["classifier"] == "gradle813"
+          assert candidate["binaryOrigin"] == "NOT_VERIFIED"
+          pinned = next(r for r in x["records"] if
+                        r["purl"] == kotlin["purl"])
+          assert candidate["sha256"] == pinned["localSha256"]
+          assert candidate["byteSize"] == pinned["localByteSize"]
+          if pinned["status"] == "SOURCE_BYTES_MATCH_LOCAL":
+              assert candidate["sha256"] == pinned["remoteSha256"]
+          print("KOTLIN_CLASSIFIER_INVENTORY_CROSSCHECK:", candidate["sha256"],
+                pinned["status"])
+          print("PINNED_PLUGIN_JARS_MATCHED:", x["sourceByteMatches"])
+          print("PINNED_PLUGIN_JARS_NOT_VERIFIED:", x["unverifiedPinnedPluginJars"])
+          for record in x["records"]:
+              print("PINNED_PLUGIN_ORIGIN:", record["purl"], record["status"],
+                    record["remoteSha256"] or "NO_REMOTE_HASH", record["repositoryUrl"])
+          print("NOT VERIFIED: 147-module publisher provenance and entire plugin license inventory")
+          PY
+      - name: Verify two additional Kotlin gradle813 classifier JARs against exact official Maven Central bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle813_classifier_jars.py' -v
+          python3 scripts/audit_gradle813_classifier_jars.py \
+            --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --output "${RUNNER_TEMP}/gradle813-other-two-classifier-byte-evidence.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          directory = Path(os.environ["RUNNER_TEMP"])
+          evidence = json.loads((directory / "gradle813-other-two-classifier-byte-evidence.json").read_text())
+          inventory = json.loads((directory / "gradle-plugin-artifact-evidence.json").read_text())
+          expected = {
+              "pkg:maven/org.jetbrains.kotlin/fus-statistics-gradle-plugin@2.3.21":
+                  "73379b384d9da66419b5f4d5c83de1a99dd7f195662bc45c39443859e63e18b2",
+              "pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin-api@2.3.21":
+                  "ad58d2638ee041f6ce4e73e9782ebf528e18cf9003b1099aa7045ec958e3c195",
+          }
+          assert evidence["selectedClassifierCount"] == 2
+          assert evidence["sourceByteMatches"] == 2 and evidence["notSourceVerified"] == 0
+          assert evidence["status"] == "SOURCE_BYTE_PARITY_PASS"
+          assert {row["purl"] for row in evidence["records"]} == set(expected)
+          # Real 14-Nov runner 43637471662: classifierJarFiles=4 and
+          # classifierJarModules=4 after Compose toolchain resolution.
+          # Only the TWO allowlisted gradle813 classifiers are compared
+          # with Maven Central here; other files remain NOT VERIFIED.
+          assert inventory["counts"]["classifierJarFiles"] == 4
+          # 14-Nov PUBLIC Compose/rotation CI run 43637079880 counted 299
+          # actual locally hashed plugin-cache files, with BOTH classified
+          # Gradle JARs byte-equal to official Maven Central. This count is
+          # NOT supplier rights, NOTICE/SBOM closure or release approval.
+          assert inventory["counts"]["hashedFiles"] == 299
+          for row in evidence["records"]:
+              assert row["status"] == "SOURCE_BYTES_MATCH_LOCAL"
+              assert row["officialSha256"] == row["localSha256"] == expected[row["purl"]]
+              assert row["officialByteSize"] == row["localByteSize"]
+              module = next(m for m in inventory["modules"] if m["purl"] == row["purl"])
+              cached = [f for f in module["cachedFiles"] if f["filename"] == row["filename"]]
+              assert len(cached) == 1
+              assert cached[0]["sha256"] == row["localSha256"]
+              assert cached[0]["byteSize"] == row["localByteSize"]
+              assert cached[0]["classifier"] == "gradle813"
+              assert cached[0]["binaryOrigin"] == "NOT_VERIFIED"
+              print("GRADLE813_OFFICIAL_BYTE_MATCH:", row["purl"], row["officialSha256"],
+                    row["officialByteSize"], row["officialUrl"])
+          assert evidence["publisherSignatureVerified"] is False
+          assert evidence["originAttributionVerified"] is False
+          assert evidence["parentLicenseInheritanceVerified"] is False
+          assert evidence["licenseClosure"] == "NOT_VERIFIED"
+          assert evidence["noticeClosure"] == "NOT_VERIFIED"
+          assert evidence["sbomComplete"] is False and evidence["releaseApproved"] is False
+          print("NOT VERIFIED: signed publisher provenance, license rights, NOTICE, SBOM or release")
+          PY
+      - name: Probe four distinct POM-license-gap Gradle JARs against Maven Central
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_gradle_central_binary_batch.py' -v
+          python3 scripts/audit_gradle_central_binary_batch.py \
+            --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --output "${RUNNER_TEMP}/gradle-central-buildtool-jar-byte-evidence.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-central-buildtool-jar-byte-evidence.json"
+          x = json.loads(p.read_text(encoding="utf-8"))
+          assert x["selectedArtifactCount"] == 4
+          assert x["sourceByteMatches"] + x["notSourceVerified"] == 4
+          assert {r["purl"] for r in x["records"]} == {
+              "pkg:maven/com.google.guava/failureaccess@1.0.2",
+              "pkg:maven/com.google.protobuf/protobuf-java-util@3.25.5",
+              "pkg:maven/com.google.jimfs/jimfs@1.1",
+              "pkg:maven/com.google.auto.value/auto-value-annotations@1.6.2",
+          }
+          assert all(r["directPomLicenseMetadata"] == "POM_WITHOUT_DIRECT_LICENSE_NAME"
+                     and r["licenseApproved"] is False for r in x["records"])
+          assert x["status"] in ("SOURCE_BYTE_PARITY_PASS", "PARTIAL_EVIDENCE_ONLY")
+          assert x["publisherSignatureVerified"] is False
+          assert x["originAttributionVerified"] is False
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["noticeClosure"] == "NOT_VERIFIED"
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("GRADLE_CENTRAL_JARS_MATCHED:", x["sourceByteMatches"])
+          print("GRADLE_CENTRAL_JARS_NOT_VERIFIED:", x["notSourceVerified"])
+          for item in x["records"]:
+              print("GRADLE_CENTRAL_BYTE:", item["purl"], item["status"],
+                    item["officialSha256"] or "NO_REMOTE_HASH", item["officialSourceUrl"])
+          print("NOT VERIFIED: full 147 modules, publisher signatures, licensing or SBOM")
+          PY
+      - name: Research exact missing child and parent POM metadata from official Maven HTTPS
+        shell: bash
+        continue-on-error: false
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_missing_maven_pom_sources.py' -v
+          python3 scripts/audit_missing_maven_pom_sources.py \
+            --plugin-report "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --output "${RUNNER_TEMP}/gradle-missing-pom-source-research.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-missing-pom-source-research.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["status"] == "PARTIAL_EVIDENCE_ONLY"
+          assert result["releaseApproved"] is False
+          assert result["originVerified"] is False
+          assert result["artifactBinaryVerified"] is False
+          assert result["parentLicenseInheritanceVerified"] is False
+          assert result["licenseClosure"] == "NOT_VERIFIED"
+          assert result["originalDirectLicenseGaps"] == 42
+          assert result["targets"] <= 32
+          print("POM_SOURCE_RESEARCH_TARGETS:", result["targets"])
+          print("POM_SOURCE_RESEARCH_RETRIEVED:", result["remotePomMetadataRetrieved"])
+          print("POM_SOURCE_RESEARCH_UNAVAILABLE:", result["stillUnretrieved"])
+          print("NOT VERIFIED: source POM metadata is not artifact signature or license clearance")
+          PY
+      - name: Reconcile 42 selected Maven POM license gaps with bounded official-source research (NOT legal approval)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_reconcile_gradle_pom_license_gaps.py' -v
+          python3 scripts/reconcile_gradle_pom_license_gaps.py \
+            --plugin-report "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --pom-research "${RUNNER_TEMP}/gradle-missing-pom-source-research.json" \
+            --output "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "gradle-pom-legal-review-queue.json"
+          report = json.loads(p.read_text(encoding="utf-8"))
+          c = report["counts"]
+          assert report["status"] == "REVIEW_QUEUE_ONLY_LEGAL_NO_GO"
+          # Real review queue run 43637854136: 149 root plugin modules,
+          # exactly 42 unresolved child POM licensing gaps. Keep NO-GO.
+          assert c["selectedModules"] == 149
+          assert c["directPOMLicenseGaps"] == 42
+          assert c["childPOMNotCached"] == 12
+          assert c["childPOMWithoutDirectLicenseName"] == 30
+          assert c["unreadableChildPOM"] == 0
+          assert c["remoteResearchTargets"] <= 32
+          assert len(report["reviewQueue"]) == 42
+          assert all(item["evidenceOnly"] is True
+                     and item["licenseApproved"] is False
+                     and item["redistributionRightsVerified"] is False
+                     for item in report["reviewQueue"])
+          assert report["allChildGapsRemainUnresolved"] is True
+          assert report["parentMetadataTextTriageNotALicenseConclusion"] is True
+          assert c["parentEvidenceRows"] >= 1
+          assert c["withComplexParentMetadataSignals"] >= 1
+          flagged = [r for r in report["reviewQueue"]
+                     if r["complexParentMetadataReviewRequired"]]
+          assert len(flagged) == c["withComplexParentMetadataSignals"]
+          for item in report["reviewQueue"]:
+              evidence = item["cachedParentPOMReviewEvidence"]
+              assert all(x["supplierMetadataOnly"] is True
+                         and x["effectiveChildLicenseVerified"] is False
+                         and x["licenseApproved"] is False for x in evidence)
+              assert item["licenseApproved"] is False
+              assert item["redistributionRightsVerified"] is False
+          print("PARENT_POM_METADATA_REVIEW_ROWS:", c["parentEvidenceRows"])
+          print("COMPLEX_PARENT_LICENSE_METADATA_REVIEW_ROWS:",
+                c["withComplexParentMetadataSignals"])
+          for row in flagged:
+              print("PARENT_COMPLEX_REVIEW_NOT_APPROVAL:", row["purl"],
+                    "|".join(row["complexParentLicenseMetadataNames"]))
+          assert report["parentLicenseInheritanceVerified"] is False
+          assert report["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert report["licenseClosure"] == "NOT_VERIFIED"
+          assert report["noticeClosure"] == "NOT_VERIFIED"
+          assert report["sbomComplete"] is False and report["releaseApproved"] is False
+          print("LEGAL_REVIEW_QUEUE_SELECTED:", c["selectedModules"])
+          print("LEGAL_REVIEW_QUEUE_GAPS:", c["directPOMLicenseGaps"])
+          print("LEGAL_REVIEW_QUEUE_REMOTE_METADATA:", c["remoteMetadataRetrieved"])
+          print("LEGAL_REVIEW_QUEUE_UNRESOLVED:", len(report["reviewQueue"]))
+          print("NOT VERIFIED: 42 child license rights, exact Microsoft REDIST terms and product release")
+          PY
+      - name: Audit resolved app and test configurations (partial inventory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_android_dependency_graph.py' -v
+          python3 scripts/audit_android_dependency_graph.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --notice THIRD-PARTY-NOTICES.md \
+            --output "${RUNNER_TEMP}/android-dependency-partial-inventory.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "android-dependency-partial-inventory.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["graphAudit"] == "PASS"
+          assert result["inventoryCompleteness"] == "PARTIAL"
+          assert result["licenseClosure"] == "NOT_VERIFIED"
+          assert result["noticeScopeCheck"] == "PASS"
+          assert result["noticeCompleteness"] == "PARTIAL"
+          assert result["releaseApproved"] is False
+          print("PASS: resolved app/test module inventory and partial NOTICE consistency")
+          print("COUNTS:", result["componentCounts"])
+          print("BLOCKED: full Gradle plugin/build-tool graph, licenses and final SBOM")
+          PY
+      - name: Review JSpecify 1.0.0 exact Maven POM/JAR + tagged LICENSE bytes (NOT rights clearance)
+        # The 89-row NOTICE gate above intentionally fails closed. This
+        # independent source check must still produce inspectable evidence.
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_jspecify100_source_review.py' -v
+          sha256sum --check <<'JSPECIFY_LICENSE_SHA'
+          cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  third_party/jspecify-1.0.0/LICENSE
+          JSPECIFY_LICENSE_SHA
+          python3 scripts/audit_jspecify100_source_review.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/jspecify100-exact-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "jspecify100-exact-source-evidence.json"
+          e = json.loads(p.read_text(encoding="utf-8"))
+          assert e["purl"] == "pkg:maven/org.jspecify/jspecify@1.0.0"
+          assert e["status"] == "EXACT_MAVEN_TAG_BYTES_MATCH_LEGAL_REVIEW_OPEN"
+          assert e["mavenJar"]["localGradleBytesMatch"] is True
+          assert e["taggedLicense"]["commit"] == "b2a10e14bb81c1b7cb6e488c112fe55cb2218d7d"
+          assert e["taggedLicense"]["gitBlobSha1"] == "d645695673349e3947e8e5ae42332d0ac3164cd7"
+          assert e["publisherSignatureVerified"] is False
+          assert e["apkPackagingVerified"] is False and e["redistributionRightsVerified"] is False
+          assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["independent42PluginPomReviewStillOpen"] is True
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("JSPECIFY100_EXACT_POM_SHA256", e["mavenPom"]["sha256"])
+          print("JSPECIFY100_EXACT_JAR_SHA256", e["mavenJar"]["sha256"])
+          print("JSPECIFY100_TAGGED_LICENSE_SHA256", e["taggedLicense"]["sha256"])
+          print("NOT VERIFIED: JAR embedded text / publisher signature / APK / 89 NOTICE entries / 42 Gradle POMs")
+          PY
+      - name: Retain independent JSpecify source audit result (NOT an SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-jspecify100-source-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/jspecify100-exact-source-evidence.json
+      - name: Review coroutines core JVM 1.8.1 exact Maven POM JAR + tagged LICENSE (NOT rights clearance)
+        # Explicit post-NOTICE fail-closed diagnostic: no change to legal gate.
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_coroutines_core_jvm181_source_review.py' -v
+          sha256sum --check <<'COROUTINES181_LICENSE_SHA'
+          b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8  third_party/kotlinx-coroutines-core-jvm-1.8.1/LICENSE.txt
+          COROUTINES181_LICENSE_SHA
+          python3 scripts/audit_coroutines_core_jvm181_source_review.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/coroutines-core-jvm181-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "coroutines-core-jvm181-source-evidence.json"
+          e = json.loads(p.read_text(encoding="utf-8"))
+          assert e["purl"] == "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm@1.8.1"
+          assert e["status"] == "EXACT_MAVEN_TAG_BYTES_MATCH_LEGAL_REVIEW_OPEN"
+          assert e["mavenJar"]["localGradleBytesMatch"] is True
+          assert e["taggedLicense"]["commit"] == "cd696d3f8f4afdbc735915c2bded974616331b55"
+          assert e["taggedLicense"]["gitBlobSha1"] == "9c308d958bf91eafe83f66106ca692ff414a4965"
+          assert e["sourceHashPinsVerified"] is True
+          assert e["publisherSignatureVerified"] is False
+          assert e["apkPackagingVerified"] is False and e["redistributionRightsVerified"] is False
+          assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["independent42PluginPomReviewStillOpen"] is True
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("COROUTINES_CORE_JVM181_EXACT_POM_SHA256", e["mavenPom"]["sha256"])
+          print("COROUTINES_CORE_JVM181_EXACT_JAR_SHA256", e["mavenJar"]["sha256"])
+          print("COROUTINES_CORE_JVM181_TAGGED_LICENSE_SHA256", e["taggedLicense"]["sha256"])
+          print("NOT VERIFIED: publisher signature, APK, remaining 87 NOTICE, 42 Gradle POMs")
+          PY
+      - name: Retain coroutines core JVM 1.8.1 source evidence (NOT an SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-coroutines-core-jvm181-source-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/coroutines-core-jvm181-source-evidence.json
+      - name: Verify coroutines Android 1.8.1 official Maven POM JAR and tagged LICENSE (NOT rights clearance)
+        # Fail-closed NOTICE graph above stays FAILURE even if source parity succeeds.
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_coroutines_android181_source_review.py' -v
+          # This exact upstream Kotlin 1.8.1 LICENSE was already retained
+          # for the independently reviewed coroutines-core-jvm module.
+          sha256sum --check <<'COROUTINES_ANDROID181_LICENSE_SHA'
+          b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8  third_party/kotlinx-coroutines-core-jvm-1.8.1/LICENSE.txt
+          COROUTINES_ANDROID181_LICENSE_SHA
+          python3 scripts/audit_coroutines_android181_source_review.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/coroutines-android181-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) / "coroutines-android181-source-evidence.json").read_text(encoding="utf-8"))
+          assert e["purl"] == "pkg:maven/org.jetbrains.kotlinx/kotlinx-coroutines-android@1.8.1"
+          assert e["status"] == "EXACT_MAVEN_TAG_BYTES_MATCH_LEGAL_REVIEW_OPEN"
+          assert e["mavenJar"]["localGradleBytesMatch"] is True
+          assert e["taggedLicense"]["commit"] == "cd696d3f8f4afdbc735915c2bded974616331b55"
+          assert e["taggedLicense"]["gitBlobSha1"] == "9c308d958bf91eafe83f66106ca692ff414a4965"
+          assert e["sourceHashPinsVerified"] is True
+          assert e["publisherSignatureVerified"] is False and e["apkPackagingVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["independent42PluginPomReviewStillOpen"] is True
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("COROUTINES_ANDROID181_POM_SHA256", e["mavenPom"]["sha256"])
+          print("COROUTINES_ANDROID181_JAR_SHA256", e["mavenJar"]["sha256"])
+          print("COROUTINES_ANDROID181_LICENSE_SHA256", e["taggedLicense"]["sha256"])
+          print("NOT VERIFIED: full NOTICE/SBOM, publisher cryptographic signature, APK package contents, redistribution")
+          PY
+      - name: Retain coroutines Android 1.8.1 source-review evidence (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-coroutines-android181-source-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/coroutines-android181-source-evidence.json
+      - name: Review kotlinx-serialization core JVM 1.7.3 official Maven POM JAR LICENSE NOTICE (NOT rights clearance)
+        # Existing 86-row NOTICE gate above remains deliberately fail-closed.
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_serialization_core_jvm173_source_review.py' -v
+          sha256sum --check <<'SERIALIZATION173_SOURCE_LEGAL_SHAS'
+          c5accbbd8546e94c34aed24afe689a617627d18eed5a6c48277e48db57c23851  third_party/kotlinx-serialization-core-jvm-1.7.3/LICENSE.txt
+          ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6  third_party/kotlinx-serialization-core-jvm-1.7.3/NOTICE.txt
+          SERIALIZATION173_SOURCE_LEGAL_SHAS
+          python3 scripts/audit_serialization_core_jvm173_source_review.py \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/serialization-core-jvm173-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) / "serialization-core-jvm173-source-evidence.json").read_text(encoding="utf-8"))
+          assert e["purl"] == "pkg:maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm@1.7.3"
+          assert e["status"] == "EXACT_MAVEN_TAG_BYTES_MATCH_LEGAL_REVIEW_OPEN"
+          assert e["mavenJar"]["localGradleBytesMatch"] is True
+          assert e["taggedLicense"]["commit"] == "d4d066d72a9f92f06c640be5a36a22f75d0d7659"
+          assert e["taggedLicense"]["gitBlobSha1"] == "9c8f3ea0871e0bfe81da0fa6e7c1d7d156dc380e"
+          assert e["taggedNotice"]["gitBlobSha1"] == "ee516ec09649791af5ff26c0346e748a881cacb7"
+          assert e["sourceHashPinsVerified"] is True
+          assert e["publisherSignatureVerified"] is False and e["apkPackagingVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["independent42PluginPomReviewStillOpen"] is True
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("SERIALIZATION_CORE_JVM173_POM_SHA256", e["mavenPom"]["sha256"])
+          print("SERIALIZATION_CORE_JVM173_JAR_SHA256", e["mavenJar"]["sha256"])
+          print("SERIALIZATION_CORE_JVM173_LICENSE_SHA256", e["taggedLicense"]["sha256"])
+          print("SERIALIZATION_CORE_JVM173_NOTICE_SHA256", e["taggedNotice"]["sha256"])
+          print("NOT VERIFIED: 85 other Maven NOTICE entries (pending exact-head confirmation), 42 Gradle POMs, publisher signatures, APK/SBOM, redistribution")
+          PY
+      - name: Retain kotlinx-serialization core JVM 1.7.3 source evidence (NOT an SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-serialization-core-jvm173-source-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/serialization-core-jvm173-source-evidence.json
+      - name: Verify JAF 1.2.0 exact release-tag licence and embedded Maven JAR text (NOT rights clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_jaf120_exact_license.py' -v
+          python3 scripts/audit_jaf120_exact_license.py \
+            --plugin-inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/jaf120-exact-source-license-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "jaf120-exact-source-license-evidence.json"
+          evidence = json.loads(p.read_text(encoding="utf-8"))
+          assert evidence["status"] == "EXACT_JAF120_SOURCE_BYTES_AND_LICENSE_TEXT_MATCH_REVIEW_OPEN"
+          assert evidence["purl"] == "pkg:maven/com.sun.activation/javax.activation@1.2.0"
+          assert evidence["tag"]["name"] == "JAF-1_2_0"
+          assert evidence["tag"]["commit"] == "8f8ec08d736983c839d31a7bd98d29594e508785"
+          assert evidence["tag"]["licenseGitBlobSha1"] == "5ad62c442b336861b5832b7a8197a507b7df61f0"
+          assert evidence["embeddedLicense"]["matchesExactTaggedLicenseBytes"] is True
+          assert evidence["mavenJAR"]["matchesLocalGradleCache"] is True
+          assert evidence["mavenParentPOM"]["supplierLicenseName"] == "CDDL/GPLv2+CE"
+          assert evidence["licenseOptionSelected"] is False
+          assert evidence["productRuntimeInclusionVerified"] is False
+          assert evidence["parentLicenseInheritanceVerified"] is False
+          assert evidence["publisherSignatureVerified"] is False
+          assert evidence["all42ChildLicenseReviewGapsOpen"] is True
+          assert evidence["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert evidence["licenseClosure"] == "NOT_VERIFIED"
+          assert evidence["sbomComplete"] is False and evidence["releaseApproved"] is False
+          print("JAF120_MAVEN_JAR_SHA256:", evidence["mavenJAR"]["sha256"])
+          print("JAF120_TAG_LICENSE_SHA256:", evidence["tag"]["licenseSha256"])
+          print("JAF120_BYTE_EQUALITY:", evidence["embeddedLicense"]["matchesExactTaggedLicenseBytes"])
+          print("NOT VERIFIED: exact chosen licence, per-source header exception, signed provenance, APK packaging or legal permission")
+          PY
+      - name: Verify Jakarta Activation API 1.2.1 exact unsigned release-tag LICENSE/NOTICE and Maven JAR (NOT rights clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_activation_api121_exact_license.py' -v
+          python3 scripts/audit_activation_api121_exact_license.py \
+            --inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/activation-api121-exact-source-license-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "activation-api121-exact-source-license-evidence.json"
+          e = json.loads(p.read_text(encoding="utf-8"))
+          assert e["status"] == "EXACT_ACTIVATION_API121_SOURCE_BYTES_MATCH_LEGAL_REVIEW_OPEN"
+          assert e["purl"] == "pkg:maven/jakarta.activation/jakarta.activation-api@1.2.1"
+          assert e["upstreamTag"]["name"] == "1.2.1"
+          assert e["upstreamTag"]["commit"] == "41bad0bd6ba821abd8652c80e8e3c50b55851da2"
+          assert e["upstreamTag"]["licenseGitBlobSha1"] == "e0358f972175d83cc567fcd129cc205ea9d40ff0"
+          assert e["upstreamTag"]["noticeGitBlobSha1"] == "d6492f81ccce4efec1e8d03248ca64d3b26c164f"
+          assert e["upstreamTag"]["apiPomGitBlobSha1"] == "09697c4589fb48882fb8ad28aaffe5d097054351"
+          assert e["upstreamTag"]["tagCryptographicallySigned"] is False
+          assert e["mavenChildPOM"]["tagSourceByteParity"] is True
+          assert e["mavenJar"]["matchesLocalGradleBytes"] is True
+          assert e["mavenJar"]["embeddedTextTagByteParity"] is True
+          assert e["mavenJar"]["embeddedNoticeTagByteParity"] is True
+          assert e["mavenJar"]["embeddedLicenseSha256"] == e["upstreamTag"]["licenseSha256"]
+          assert e["mavenJar"]["embeddedNoticeSha256"] == e["upstreamTag"]["noticeSha256"]
+          assert e["mavenParentPOM"]["supplierDeclaredLicenceName"] == "EDL 1.0"
+          assert e["organizationalAncestor"]["effectiveChildLicenseNotInferred"] is True
+          assert e["licenseOptionSelected"] is False
+          assert e["publisherSignatureVerified"] is False
+          assert e["apkPackagingVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["all42DirectPOMMetadataGapsOpen"] is True
+          assert e["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("ACTIVATION121_JAR_SHA256:", e["mavenJar"]["sha256"])
+          print("ACTIVATION121_TAG_LICENSE_SHA256:", e["upstreamTag"]["licenseSha256"])
+          print("ACTIVATION121_TAG_NOTICE_SHA256:", e["upstreamTag"]["noticeSha256"])
+          print("ACTIVATION121_EMBEDDED_LICENSE_NOTICE_PARITY:", True)
+          print("ACTIVATION121_ALL42_LEGAL_REVIEW_GAPS_OPEN:",
+                e["all42DirectPOMMetadataGapsOpen"])
+          print("NOT VERIFIED: unsigned tag publisher signature, exact legal choice, runtime packaging and release rights")
+          PY
+      - name: Verify iStack Commons 3.0.8 exact unsigned tagged EDL LICENSE/NOTICE Maven JAR (NOT legal clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_istack308_exact_license.py' -v
+          python3 scripts/audit_istack308_exact_license.py \
+            --inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/istack308-exact-source-legal-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "istack308-exact-source-legal-evidence.json").read_text(encoding="utf-8"))
+          assert e["schemaVersion"] == 1
+          assert e["status"] == "EXACT_ISTACK308_MAVEN_TAG_LICENSE_NOTICE_PARITY_LEGAL_REVIEW_OPEN"
+          assert e["purl"] == "pkg:maven/com.sun.istack/istack-commons-runtime@3.0.8"
+          assert e["tag"]["name"] == "3.0.8"
+          assert e["tag"]["commit"] == "5384038f6a62c7e4ed32b609fa15c796732dd3c5"
+          assert e["tag"]["tagObject"] == "f7e3de724c9c87fe7bdb59acc4b2588508907e22"
+          assert e["tag"]["tagCryptographicallySigned"] is False
+          assert e["tag"]["licenseBlobSha1"] == "c739f78bc05856bfbfe35a5b76f2d4e6242cea66"
+          assert e["tag"]["noticeBlobSha1"] == "85121e7dd8aac65432eec604c6fe12cce454e79c"
+          assert e["tag"]["runtimePomBlobSha1"] == "3900bb38f6cea873fcfca9cb85ea867fd4d9193a"
+          assert e["tag"]["parentPomBlobSha1"] == "1bf55a0f4655d0dd63187f1b905e48764c623c59"
+          assert e["mavenChildPOM"]["tagSourceByteParity"] is True
+          assert e["mavenParentPOM"]["tagSourceByteParity"] is True
+          assert e["mavenJar"]["matchesSelectedLocalGradleCache"] is True
+          assert e["mavenJar"]["embeddedLicenseNoticeTagByteParity"] is True
+          assert e["mavenJar"]["sha256"] == "4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef"
+          assert e["mavenParentPOM"]["sha256"] == "a0f0517e8512f0fbcc7b8295c12f6566a3d0c2d86d655639dc662ef8c0c7ebe5"
+          assert e["tag"]["licenseSha256"] == "525447f3da8d1e96f48760714de8b27fbc5c5452b5283c9d74dfde810d95f30a"
+          assert e["tag"]["noticeSha256"] == "f0d964e3984ac60b0aedefe518860f559f1c4b63b0a0cb010f95834ee2d6dc3b"
+          assert e["mavenJar"]["embeddedLicenseSha256"] == e["tag"]["licenseSha256"]
+          assert e["mavenJar"]["embeddedNoticeSha256"] == e["tag"]["noticeSha256"]
+          assert e["mavenParentPOM"]["licenseName"] == "Eclipse Distribution License - v 1.0"
+          assert e["organizationalAncestor"]["effectiveChildLicenseNotInferred"] is True
+          assert e["all42ChildPOMReviewGapsOpen"] is True
+          assert e["licenseOptionSelected"] is False
+          assert e["publisherSignatureVerified"] is False
+          assert e["productRuntimeInclusionVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("ISTACK308_EXACT_JAR_SHA256:", e["mavenJar"]["sha256"])
+          print("ISTACK308_TAG_LICENSE_SHA256:", e["tag"]["licenseSha256"])
+          print("ISTACK308_TAG_NOTICE_SHA256:", e["tag"]["noticeSha256"])
+          print("ISTACK308_TAGGED_LEGAL_BYTES_MATCH:", True)
+          print("ISTACK308_REVIEW_GAPS_OPEN:", e["all42ChildPOMReviewGapsOpen"])
+          print("NOT VERIFIED: effective child/source licenses, publisher signature, release APK/MSIX file scope or commercial rights")
+          PY
+      - name: Verify JAXB API 2.3.2 exact unsigned tagged EDL LICENSE/NOTICE Maven JAR (NOT legal clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_jaxbapi232_exact_license.py' -v
+          python3 scripts/audit_jaxbapi232_exact_license.py \
+            --inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/jaxbapi232-exact-source-legal-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "jaxbapi232-exact-source-legal-evidence.json").read_text(encoding="utf-8"))
+          assert e["schemaVersion"] == 1
+          assert e["status"] == "EXACT_JAXBAPI232_MAVEN_TAG_LICENSE_NOTICE_PARITY_LEGAL_REVIEW_OPEN"
+          assert e["purl"] == "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@2.3.2"
+          assert e["tag"]["name"] == "2.3.2"
+          assert e["tag"]["commit"] == "18b50028fd7dbd1305c359cd5624b1cddb1724a8"
+          assert e["tag"]["tagObject"] == "6e6292004b760313faf71973a3ccb578d73fe90a"
+          assert e["tag"]["tagCryptographicallySigned"] is False
+          assert e["tag"]["licenseBlobSha1"] == "6fb337cb014d5ae5d406194049b960982e307849"
+          assert e["tag"]["noticeBlobSha1"] == "5aac171d23ff9e49976751b7952759233af8a29e"
+          assert e["tag"]["runtimePomBlobSha1"] == "9415ef692cc29acaa647ced0fae057d8e57e3968"
+          assert e["tag"]["parentPomBlobSha1"] == "979df40b6d322f23dc632bdd59c7f5121eb74fed"
+          assert e["mavenChildPOM"]["tagSourceByteParity"] is True
+          assert e["mavenParentPOM"]["tagSourceByteParity"] is True
+          assert e["mavenJar"]["matchesSelectedLocalGradleCache"] is True
+          assert e["mavenJar"]["embeddedLicenseNoticeTagByteParity"] is True
+          assert e["mavenJar"]["sha256"] == "69156304079bdeed9fc0ae3b39389f19b3cc4ba4443bc80508995394ead742ea"
+          assert e["mavenParentPOM"]["sha256"] == "15a55b7d537c9f9970aead28d2af97c059f65ff6102f76bbd29f1247dd8a6dfb"
+          assert e["tag"]["licenseSha256"] == "dcbbdbb512a272b5f1e01e82225a23eba92406ec28f7b36e490057478d8d1570"
+          assert e["tag"]["noticeSha256"] == "d3ccd50faa835bf6326bb3a093b050892ffe38e5b32c2eba0fb3ee599df073cb"
+          assert e["mavenJar"]["embeddedLicenseSha256"] == e["tag"]["licenseSha256"]
+          assert e["mavenJar"]["embeddedNoticeSha256"] == e["tag"]["noticeSha256"]
+          assert e["mavenParentPOM"]["licenseName"] == "Eclipse Distribution License - v 1.0"
+          assert e["organizationalAncestor"]["effectiveChildLicenseNotInferred"] is True
+          assert e["all42ChildPOMReviewGapsOpen"] is True
+          assert e["licenseOptionSelected"] is False
+          assert e["publisherSignatureVerified"] is False
+          assert e["productRuntimeInclusionVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("JAXBAPI232_EXACT_JAR_SHA256:", e["mavenJar"]["sha256"])
+          print("JAXBAPI232_TAG_LICENSE_SHA256:", e["tag"]["licenseSha256"])
+          print("JAXBAPI232_TAG_NOTICE_SHA256:", e["tag"]["noticeSha256"])
+          print("JAXBAPI232_TAGGED_LEGAL_BYTES_MATCH:", True)
+          print("JAXBAPI232_REVIEW_GAPS_OPEN:", e["all42ChildPOMReviewGapsOpen"])
+          print("NOT VERIFIED: effective child/source licenses, publisher signature, release APK/MSIX file scope or commercial rights")
+          PY
+      - name: Verify FastInfoset 1.2.16 exact unsigned tagged Apache/EDL root/FIME LICENSE/NOTICE Maven JAR (NOT legal clearance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_fastinfoset1216_exact_license.py' -v
+          python3 scripts/audit_fastinfoset1216_exact_license.py \
+            --inventory "${RUNNER_TEMP}/gradle-plugin-artifact-evidence.json" \
+            --review-queue "${RUNNER_TEMP}/gradle-pom-legal-review-queue.json" \
+            --android-runtime "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --output "${RUNNER_TEMP}/fastinfoset1216-exact-source-legal-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "fastinfoset1216-exact-source-legal-evidence.json").read_text(encoding="utf-8"))
+          assert e["schemaVersion"] == 1
+          assert e["status"] == "EXACT_FASTINFOSET1216_MAVEN_TAG_LICENSE_NOTICE_PARITY_LEGAL_REVIEW_OPEN"
+          assert e["purl"] == "pkg:maven/com.sun.xml.fastinfoset/FastInfoset@1.2.16"
+          assert e["tag"]["name"] == "1.2.16"
+          assert e["tag"]["commit"] == "df8b153272fd07a5e584c04a774afc8f4e67905c"
+          assert e["tag"]["tagObject"] == "d7f66b8461f13509f1f3d2763533bfa5a57570ad"
+          assert e["tag"]["tagCryptographicallySigned"] is False
+          assert e["tag"]["licenseBlobSha1"] == "b5c38428d3486cd7c4f8adb0f3824a39a9987372"
+          assert e["tag"]["noticeBlobSha1"] == "85121e7dd8aac65432eec604c6fe12cce454e79c"
+          assert e["tag"]["fimeLicenseBlobSha1"] == "c739f78bc05856bfbfe35a5b76f2d4e6242cea66"
+          assert e["tag"]["runtimePomBlobSha1"] == "4270e413e455d4a34912bce7ce6c34bab6636384"
+          assert e["tag"]["parentPomBlobSha1"] == "ea6296b6dbee1ccb3ae54900399d57cdda24bacf"
+          assert e["mavenChildPOM"]["tagSourceByteParity"] is True
+          assert e["mavenParentPOM"]["tagSourceByteParity"] is True
+          assert e["mavenJar"]["matchesSelectedLocalGradleCache"] is True
+          assert e["mavenJar"]["embeddedLicenseNoticeTagByteParity"] is True
+          assert e["mavenJar"]["sha256"] == "056f3a1e144409f21ed16afc26805f58e9a21f3fce1543c42d400719d250c511"
+          assert e["mavenParentPOM"]["sha256"] == "90582425adc1f40b41362dafb95173931225acaa5e79620d5e6bd52f646292ba"
+          assert e["mavenAncestorPOM"]["sha256"] == "916b4794d8d8220a59a3fdf6a64dbe794aeb23395e888b81ae36a9b5a2c591a6"
+          assert e["tag"]["licenseSha256"] == "415494b00d73c71d210335e63288c1399e288e35c492eb4d7b02cbddbef84221"
+          assert e["tag"]["noticeSha256"] == "f0d964e3984ac60b0aedefe518860f559f1c4b63b0a0cb010f95834ee2d6dc3b"
+          assert e["mavenJar"]["embeddedLicenseSha256"] == e["tag"]["licenseSha256"]
+          assert e["mavenJar"]["embeddedNoticeSha256"] == e["tag"]["noticeSha256"]
+          assert e["mavenParentPOM"]["licenseNames"] == ["Apache License, Version 2.0", "Eclipse Distribution License - v 1.0"]
+          assert e["mavenAncestorPOM"]["supplierMetadataNamesOnly"] == ["Eclipse Public License v. 2.0", "GNU General Public License, version 2 with the GNU Classpath Exception"]
+          assert e["mavenAncestorPOM"]["effectiveChildLicenseNotInferred"] is True
+          assert e["fimeSourceApplicableToJarFilesVerified"] is False
+          assert e["ancestorGPLClasspathApplicableToJarVerified"] is False
+          assert e["organizationalAncestor"]["effectiveChildLicenseNotInferred"] is True
+          assert e["all42ChildPOMReviewGapsOpen"] is True
+          assert e["licenseOptionSelected"] is False
+          assert e["publisherSignatureVerified"] is False
+          assert e["productRuntimeInclusionVerified"] is False
+          assert e["redistributionRightsVerified"] is False
+          assert e["microsoftSDKBuildToolsExactRedistRights"] == "NOT_VERIFIED_SEPARATE_GATE"
+          assert e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("FASTINFOSET1216_EXACT_JAR_SHA256:", e["mavenJar"]["sha256"])
+          print("FASTINFOSET1216_TAG_LICENSE_SHA256:", e["tag"]["licenseSha256"])
+          print("FASTINFOSET1216_TAG_NOTICE_SHA256:", e["tag"]["noticeSha256"])
+          print("FASTINFOSET1216_TAGGED_LEGAL_BYTES_MATCH:", True)
+          print("FASTINFOSET1216_REVIEW_GAPS_OPEN:", e["all42ChildPOMReviewGapsOpen"])
+          print("NOT VERIFIED: effective child/source licenses, publisher signature, release APK/MSIX file scope or commercial rights")
+          PY
+      - name: Hash actual Gradle cached JARs from scoped resolved graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_android_cached_artifacts.py' -v
+          python3 scripts/audit_android_cached_artifacts.py \
+            --inventory "${RUNNER_TEMP}/android-dependency-partial-inventory.json" \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --output "${RUNNER_TEMP}/android-resolved-jar-hashes.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "android-resolved-jar-hashes.json"
+          result = json.loads(p.read_text(encoding="utf-8"))
+          assert result["sourceVerification"] == "LOCAL_SHA256_ONLY"
+          assert result["transitiveLicenseClosure"] == "NOT_VERIFIED"
+          assert result["releaseApproved"] is False
+          print("HASHED_CACHED_MAVEN_ARTIFACTS:", result["artifactCount"])
+          print("NOT VERIFIED: remote Maven publication, binary provenance, package license rights or release")
+          PY
+      - name: Verify four Android runtime/test Maven JARs against official HTTPS source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_maven_release_jar_bytes.py' -v
+          python3 scripts/audit_maven_release_jar_bytes.py \
+            --inventory "${RUNNER_TEMP}/android-resolved-jar-hashes.json" \
+            --output "${RUNNER_TEMP}/android-official-jar-byte-parity.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                               "android-official-jar-byte-parity.json").read_text())
+          assert report["status"] == "SOURCE_BYTE_PARITY_PASS"
+          assert report["sourceByteMatches"] == 4
+          assert report["unverifiedSources"] == 0
+          assert report["originAttributionVerified"] is False
+          assert report["publisherSignatureVerified"] is False
+          assert report["licenseClosure"] == "NOT_VERIFIED"
+          assert report["releaseApproved"] is False
+          for x in report["artifacts"]:
+              print("MAVEN_OFFICIAL_BYTES_MATCH:", x["purl"], x["sourceSha256"], x["sourceUrl"])
+          print("NOT VERIFIED: upstream publisher signatures, legal license closure, SBOM or APK")
+          PY
+      - name: Retain scoped dependency evidence (NOT a verified SBOM)
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-foundation-dependency-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/gradle-plugin-partial-inventory.json
+            ${{ runner.temp }}/gradle-plugin-artifact-evidence.json
+            ${{ runner.temp }}/android-pinned-plugin-jar-byte-parity.json
+            ${{ runner.temp }}/gradle813-other-two-classifier-byte-evidence.json
+            ${{ runner.temp }}/gradle-central-buildtool-jar-byte-evidence.json
+            ${{ runner.temp }}/gradle-missing-pom-source-research.json
+            ${{ runner.temp }}/gradle-pom-legal-review-queue.json
+            ${{ runner.temp }}/jaf120-exact-source-license-evidence.json
+            ${{ runner.temp }}/activation-api121-exact-source-license-evidence.json
+            ${{ runner.temp }}/istack308-exact-source-legal-evidence.json
+            ${{ runner.temp }}/jaxbapi232-exact-source-legal-evidence.json
+            ${{ runner.temp }}/fastinfoset1216-exact-source-legal-evidence.json
+            ${{ runner.temp }}/android-dependency-partial-inventory.json
+            ${{ runner.temp }}/android-resolved-jar-hashes.json
+            ${{ runner.temp }}/android-official-jar-byte-parity.json
+
+      - name: Audit exact Kotlin stdlib 2.3.21 Maven JAR against local Gradle and immutable Kotlin tag (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_kotlin_stdlib_2321_source_review.py' -v
+          python3 scripts/audit_kotlin_stdlib_2321_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/kotlin-stdlib-2321-exact-legal-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "kotlin-stdlib-2321-exact-legal-source-evidence.json"
+          e = json.loads(p.read_text())
+          assert e["purl"] == "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21"
+          assert e["status"] == "EXACT_MAVEN_GRADLE_BYTES_MATCH_LEGAL_OPEN"
+          assert e["mavenJAR"]["gradleByteParity"] is True
+          assert e["taggedNotice"]["appliesToStdlibJar"] == "NOT_VERIFIED_COMPILER_SCOPE"
+          assert e["licenseClosure"] == "NOT_VERIFIED" and e["noticeClosure"] == "NOT_VERIFIED"
+          assert e["independent42GradlePomGapsOpen"] is True
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("KOTLIN_STDLIB_SCOPE: verified Maven/Gradle byte parity; no legal closure or release")
+          PY
+      - name: Retain Kotlin stdlib source probe (NOT SBOM, release or signed provenance)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-kotlin-stdlib-2321-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/kotlin-stdlib-2321-exact-legal-source-evidence.json
+
+      - name: Probe JetBrains annotations 23.0.0 exact Maven JAR and tagged LICENSE/NOTICE tree (LEGAL OPEN)
+        # Intentionally retain the 85-row fail-closed NOTICE error above.
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          E_SCANNER_GITHUB_TREE_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_jetbrains_annotations2300_source_review.py' -v
+          python3 scripts/audit_jetbrains_annotations2300_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/jetbrains-annotations2300-source-evidence.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "jetbrains-annotations2300-source-evidence.json"
+          x = json.loads(p.read_text(encoding="utf-8"))
+          assert x["purl"] == "pkg:maven/org.jetbrains/annotations@23.0.0"
+          assert x["status"] == "SOURCE_BYTE_PARITY_VERIFIED_LEGAL_OPEN"
+          assert x["mavenJAR"]["gradleByteParity"] is True
+          assert x["liveMavenHashPinsVerified"] is True
+          assert x["tagTreeSha"] == "409e01e2a372f76692a4737c007b5ad8719ffb82"
+          assert x["taggedNotice"]["taggedTreeFileStatus"] == "ABSENT_IN_EXACT_TAGGED_TREE"
+          assert x["licenseClosure"] == "NOT_VERIFIED" and x["noticeClosure"] == "NOT_VERIFIED"
+          assert x["independent42GradlePomGapsOpen"] is True and x["full85AndroidNoticeRowsStillOpen"] is True
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("ANNOTATIONS2300_SCOPE: source bytes only; NOTICE and legal release remain blocked")
+          PY
+      - name: Retain annotations 23.0.0 source bytes report (NOT SBOM/release)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-annotations2300-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/jetbrains-annotations2300-source-evidence.json
+
+      - name: Verify AndroidX Interpolator 1.0.0 exact Google Maven POM/AAR, Gradle byte parity, pinned Apache source (LEGAL OPEN)
+        # Diagnostic independent of the deliberately failing 85-row resolved NOTICE gate.
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          E_SCANNER_GITHUB_TREE_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_interpolator100_source_review.py' -v
+          sha256sum --check <<'ANDROIDX_SOURCE_LICENSE'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          ANDROIDX_SOURCE_LICENSE
+          python3 scripts/audit_androidx_interpolator100_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-interpolator100-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                         "androidx-interpolator100-source-evidence.json").read_text())
+          assert e["purl"] == "pkg:maven/androidx.interpolator/interpolator@1.0.0"
+          assert e["status"] == "GOOGLE_MAVEN_GRADLE_AAR_BYTES_MATCH_LEGAL_OPEN"
+          assert e["officialAAR"]["gradleByteParity"] is True
+          assert e["hashPinsVerified"] is True
+          assert e["upstreamModule"]["treeSha"] == "2eea69702006ce32a9832cc5f8f1b7fe7b7143c6"
+          assert e["upstreamModule"]["release2018SourceIdentity"] == "NOT_VERIFIED"
+          assert e["android85NoticeRowsOpen"] is True and e["plugin42PomReviewOpen"] is True
+          assert e["noticeClosure"] == "NOT_VERIFIED" and e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("INTERPOLATOR100_SCOPE: only exact official AAR/Gradle bytes; release rights OPEN")
+          PY
+      - name: Retain independent AndroidX Interpolator 1.0.0 source receipt (NOT an SBOM or release)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-interpolator100-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-interpolator100-source-evidence.json
+
+      - name: Probe AndroidX Startup Runtime 1.1.1 exact Google Maven POM/AAR and Gradle byte parity (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          E_SCANNER_GITHUB_TREE_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_startup111_source_review.py' -v
+          sha256sum --check <<'STARTUP_LICENSE'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          STARTUP_LICENSE
+          python3 scripts/audit_androidx_startup111_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-startup111-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          e = json.loads((Path(os.environ["RUNNER_TEMP"]) / "androidx-startup111-source-evidence.json").read_text())
+          assert e["purl"] == "pkg:maven/androidx.startup/startup-runtime@1.1.1"
+          assert e["status"] == "GOOGLE_MAVEN_GRADLE_AAR_BYTES_MATCH_LEGAL_OPEN"
+          assert e["officialAAR"]["gradleByteParity"] is True
+          assert e["hashPinsVerified"] is True
+          assert e["officialPOM"]["sha256"] == "f4114b5c6859bb1bc3caf281cb6d6f25998fa7f7292c64ceaea74a93210e746b"
+          assert e["officialAAR"]["sha256"] == "e0a6329a371262fe4c450372b70fdaf33b769ef6917094723787cfce896b1dd3"
+          assert e["upstreamLicense"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert e["upstreamModule"]["treeSha"] == "df712df9c71872c5d70a462f2c20be29de662410"
+          assert e["upstreamModule"]["sourceToPublishedAarReproducibility"] == "NOT_VERIFIED"
+          assert e["android85NoticeRowsOpen"] is True and e["plugin42PomReviewOpen"] is True
+          assert e["noticeClosure"] == "NOT_VERIFIED" and e["licenseClosure"] == "NOT_VERIFIED"
+          assert e["sbomComplete"] is False and e["releaseApproved"] is False
+          print("STARTUP111_SCOPE: byte parity does not clear license or NOTICE")
+          PY
+      - name: Retain Startup Runtime 1.1.1 exact source evidence (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-startup111-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-startup111-source-evidence.json
+
+      - name: Audit exact Guava ListenableFuture 1.0 Maven JAR and pinned v27.0 COPYING (LEGAL OPEN)
+        # Post-NOTICE independent diagnostic; never weaken 85-row fail-closed gate.
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          E_SCANNER_GITHUB_TREE_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_guava_listenablefuture100_source_review.py' -v
+          sha256sum --check <<'GUAVA100_LICENSE_COPYING_SHA256'
+          cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  third_party/guava-listenablefuture100-v27-source/COPYING
+          GUAVA100_LICENSE_COPYING_SHA256
+          python3 scripts/audit_guava_listenablefuture100_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/guava-listenablefuture100-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "guava-listenablefuture100-source-evidence.json"
+          x = json.loads(p.read_text(encoding="utf-8"))
+          assert x["purl"] == "pkg:maven/com.google.guava/listenablefuture@1.0"
+          assert x["status"] == "EXACT_MAVEN_GRADLE_JAR_BYTES_MATCH_LEGAL_OPEN"
+          assert x["officialJAR"]["gradleByteParity"] is True
+          assert x["hashPinsVerified"] is True
+          assert x["officialPOM"]["sha256"] == "53873caf26bc1ed8a567ea6c939ab2aaa3f47a5e32d5cade95ddf5080d23238a"
+          assert x["officialJAR"]["sha256"] == "e4ad7607e5c0477c6f890ef26a49cb8d1bb4dffb650bab4502afee64644e3069"
+          assert x["upstreamCopying"]["sha256"] == "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+          assert x["officialJAR"]["classNames"] == ["com/google/common/util/concurrent/ListenableFuture.class"]
+          assert x["upstreamTagModule"]["treeSha"] == "2d264994055c7f26a8e85dbdc31f979a3ccb8445"
+          assert x["upstreamTagModule"]["sourceToPublishedJarReproducibility"] == "NOT_VERIFIED"
+          assert x["full85AndroidNoticeRowsStillOpen"] is True
+          assert x["independent42GradlePomGapsOpen"] is True
+          assert x["noticeClosure"] == "NOT_VERIFIED" and x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("GUAVA100_SCOPE: exact JAR selected/compared, no downstream release/NOTICE closure")
+          PY
+      - name: Retain exact Guava ListenableFuture 1.0 source receipts (NOT release/SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-guava-listenablefuture100-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/guava-listenablefuture100-source-evidence.json
+
+      - name: Audit exact AndroidX concurrent-futures 1.1.0 Google Maven JAR and later source NOTICE (LEGAL OPEN)
+        # This diagnostic runs even after the intentionally failing 85 NOTICE-row gate.
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          E_SCANNER_GITHUB_TREE_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_futures110_source_review.py' -v
+          sha256sum --check <<'FUTURES110_SNAPSHOT_LICENSE'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          FUTURES110_SNAPSHOT_LICENSE
+          sha256sum --check <<'FUTURES110_SNAPSHOT_NOTICE'
+          bbc5cb91e1d3001b0ae4516809602e7698d3694afd6683b29effa8b80ec01de2  third_party/androidx-futures110-later-source/META-INF/NOTICE.txt
+          FUTURES110_SNAPSHOT_NOTICE
+          python3 scripts/audit_androidx_futures110_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-futures110-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "androidx-futures110-source-evidence.json").read_text())
+          assert x["purl"] == "pkg:maven/androidx.concurrent/concurrent-futures@1.1.0"
+          assert x["status"] == "GOOGLE_MAVEN_GRADLE_JAR_BYTES_MATCH_LATER_SOURCE_NOTICE_ONLY"
+          assert x["officialJAR"]["gradleByteParity"] is True
+          assert x["officialJAR"]["callbackClassPresent"] is True
+          assert x["hashPinsVerified"] is True
+          assert x["officialPOM"]["sha256"] == "748a34eb5d13d19d187adecaea82667fded5f1b0b98a655e13ed2e4a8b3d8ae6"
+          assert x["officialJAR"]["sha256"] == "0ce067c514a0d1049d1bebdf709e344ed3266fe9744275682937cdcb13334e9e"
+          assert x["laterSourceNotice"]["sha256"] == "bbc5cb91e1d3001b0ae4516809602e7698d3694afd6683b29effa8b80ec01de2"
+          assert x["upstreamLicense"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert x["laterSourceNotice"]["gitBlob"] == "ff3ce54955d5b1300c096bd5a61a8129597a6122"
+          assert x["laterSourceModule"]["moduleTree"] == "222d6311a75d58ea87e086d1f2f40e7b328ee2a0"
+          assert x["laterSourceModule"]["release110NoticeCorrespondence"] == "NOT_VERIFIED"
+          assert x["android85MissingNoticeRowsOpen"] and x["gradle42PomGapsOpen"]
+          assert x["noticeClosure"] == "NOT_VERIFIED" and x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("FUTURES110_SCOPE: later NOTICE is NOT release 1.1.0 legal clearance")
+          PY
+      - name: Retain exact AndroidX concurrent-futures 1.1.0 source receipt (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-futures110-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-futures110-source-evidence.json
+
+      - name: Audit exact AndroidX core-common 2.2.0 published POM JAR and sources (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_corecommon220_source_review.py' -v
+          sha256sum --check <<'CORECOMMON220_ROOT'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          CORECOMMON220_ROOT
+          python3 scripts/audit_androidx_corecommon220_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-corecommon220-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "androidx-corecommon220-source-evidence.json").read_text())
+          assert x["purl"] == "pkg:maven/androidx.arch.core/core-common@2.2.0"
+          assert x["hashPinsVerified"] is True and x["gradleByteParity"] is True
+          assert x["official"]["pom"]["sha256"] == "1e17d4af8d6425be2a69f8af4d654a87e0456259a9eef1542869bcb023547e28"
+          assert x["official"]["jar"]["sha256"] == "65308a06b1c00ee186cb9e19321383f043b993813f1522c47f4a3e3303bdba41"
+          assert x["official"]["sources"]["sha256"] == "563d430880d847890029234386ef03adb95403c34f3c9dec3a7002e2f4007ae4"
+          assert x["official"]["license"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert x["releaseNoticeClosure"] == "NOT_VERIFIED"
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["android85MissingNoticeRowsOpen"] and x["gradle42PomGapsOpen"]
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("CORECOMMON220_PINNED_SCOPE: exact bytes; legal closure NOT VERIFIED")
+          PY
+      - name: Retain AndroidX core-common 2.2.0 receipt (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-corecommon220-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-corecommon220-source-evidence.json
+
+      - name: Audit exact AndroidX core-runtime 2.2.0 published AAR and sources (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_coreruntime220_source_review.py' -v
+          sha256sum --check <<'CORERUNTIME220_ROOT'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          CORERUNTIME220_ROOT
+          python3 scripts/audit_androidx_coreruntime220_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-coreruntime220-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "androidx-coreruntime220-source-evidence.json").read_text())
+          assert x["purl"] == "pkg:maven/androidx.arch.core/core-runtime@2.2.0"
+          assert x["hashPinsVerified"] is True and x["gradleByteParity"] is True
+          assert x["official"]["pom"]["sha256"] == "0f953706598140d9d8735cdd5aeb1fa35933f4e2f31c0bf3eb81a053a4c8c1a5"
+          assert x["official"]["aar"]["sha256"] == "a1be5e0caa2b07623862af6ae21b3ab0718123245184d0e30dea81b53f990a47"
+          assert x["official"]["sources"]["sha256"] == "4adaab3a8ab711634d566d2e239e199af8b5ac92c1de85540dc34c7040754e96"
+          assert x["official"]["license"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert x["binary"]["markerSha256"] == "c57bea6797743219c1cacafcee2c835f79390996bca44f090f21f9a32810a549"
+          assert x["binary"]["classesJar"]["markerSha256"] == "98de9bb8d7b0ae8d3c46ea000ff114c5393b1f37093e168668159ebabcf16c69"
+          assert x["publishedSources"]["markerSha256"] == "73a7d46a7ca16560afc9d74ae27f5d9b47590cd29133d151bf9d04b2f2f23b15"
+          assert x["releaseNoticeClosure"] == "NOT_VERIFIED"
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["android85MissingNoticeRowsOpen"] and x["gradle42PomGapsOpen"]
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("CORERUNTIME220_PINNED_SCOPE: exact bytes; legal closure NOT VERIFIED")
+          PY
+      - name: Retain AndroidX core-runtime 2.2.0 receipt (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-coreruntime220-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-coreruntime220-source-evidence.json
+
+      - name: Audit exact AndroidX tracing 1.2.0 published AAR and sources (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_tracing120_source_review.py' -v
+          sha256sum --check <<'TRACING120_ROOT'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          TRACING120_ROOT
+          python3 scripts/audit_androidx_tracing120_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-tracing120-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "androidx-tracing120-source-evidence.json").read_text())
+          assert x["purl"] == "pkg:maven/androidx.tracing/tracing@1.2.0"
+          assert x["hashPinsVerified"] is True and x["gradleByteParity"] is True
+          assert x["official"]["pom"]["sha256"] == "f34bec4eb58871d31002901377108aaa1ebfe77fa6d882b8b86200b158e26ea1"
+          assert x["official"]["aar"]["sha256"] == "6faa90390d1fdbf0adb9a99bf99de67b94c6c6f35aea9510593a9d17973736a2"
+          assert x["official"]["sources"]["sha256"] == "3daf3a210e213f1675e6ea9ae2a9c0b9c837b42805835b65d999eca58fbddc90"
+          assert x["official"]["license"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert x["binary"]["markerSha256"] == "ba2884d7e9f4e315fe99de295592280a8846a4c8bb4b7eefa5ed1aa52d6b468b"
+          assert x["binary"]["classesJar"]["markerSha256"] == "921f5da971ede5f673af0333080544d174d3e64bc5500d12adb2237d83e7c731"
+          assert x["publishedSources"]["markerSha256"] == "b9f35358d582748984ac66878577c9d8f9aaf003f309cc076334ec48fdbae831"
+          assert x["releaseNoticeClosure"] == "NOT_VERIFIED"
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["android85MissingNoticeRowsOpen"] and x["gradle42PomGapsOpen"]
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("TRACING120_PINNED_SCOPE: exact bytes; legal closure NOT VERIFIED")
+          PY
+      - name: Retain AndroidX tracing 1.2.0 receipt (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-tracing120-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-tracing120-source-evidence.json
+
+      - name: Audit exact AndroidX customview-poolingcontainer 1.0.0 published AAR and sources (LEGAL OPEN)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_androidx_pooling100_source_review.py' -v
+          sha256sum --check <<'POOLING100_ROOT'
+          809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0  third_party/androidx-interpolator-source-snapshot/LICENSE.txt
+          POOLING100_ROOT
+          python3 scripts/audit_androidx_pooling100_source_review.py \
+            --cache "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1" \
+            --runtime "${RUNNER_TEMP}/android-debug-runtime-deps.txt" \
+            --test "${RUNNER_TEMP}/android-jvm-test-deps.txt" \
+            --output "${RUNNER_TEMP}/androidx-pooling100-source-evidence.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x = json.loads((Path(os.environ["RUNNER_TEMP"]) /
+                          "androidx-pooling100-source-evidence.json").read_text())
+          assert x["purl"] == "pkg:maven/androidx.customview/customview-poolingcontainer@1.0.0"
+          assert x["hashPinsVerified"] is True and x["gradleByteParity"] is True
+          assert x["official"]["pom"]["sha256"] == "9fa62196c4c4e79b6a58dbb38a8c022bef8db21989d7dae2da0f6f5b66289a9c"
+          assert x["official"]["aar"]["sha256"] == "3584102fc49bf399c56e3b7be4bfe12000c46112320cd8cf85cc0a8f93f3e752"
+          assert x["official"]["sources"]["sha256"] == "0715571baa86e8f7683fcc1d59fe2881c5e8603af9ff212c82423ae098d34c62"
+          assert x["official"]["license"]["sha256"] == "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0"
+          assert x["binary"]["markerSha256"] == "0690e2d3b17755c30c52246078e82fa3f448ab652ca0f0f72da00a8c75c81d5f"
+          assert x["binary"]["classesJar"]["markerSha256"] == "13f077958ddffaea733f023cef7cc0e2faa6c23431ba7b0edaaefa2d7c7ae071"
+          assert x["publishedSources"]["markerSha256"] == "0ba62d4635397c5a31b07ef63c0ceeb8befd3808922dd81eefa97f0221476c89"
+          assert x["releaseNoticeClosure"] == "NOT_VERIFIED"
+          assert x["licenseClosure"] == "NOT_VERIFIED"
+          assert x["android85MissingNoticeRowsOpen"] and x["gradle42PomGapsOpen"]
+          assert x["sbomComplete"] is False and x["releaseApproved"] is False
+          print("POOLING100_PINNED_SCOPE: exact bytes; legal closure NOT VERIFIED")
+          PY
+      - name: Retain AndroidX customview-poolingcontainer 1.0.0 receipt (NOT SBOM)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-pooling100-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/androidx-pooling100-source-evidence.json

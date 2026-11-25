@@ -1,0 +1,30 @@
+name: Windows high-resolution synthetic PNG journal (NOT image QA)
+on:
+  push:
+    branches: ['fix/pdf-fixture-selftest-20261018']
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-hires-synthetic-png.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-png-12mp:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build public Windows .NET10 synthetic contracts
+        run: dotnet build windows/Embasic.EScanner.SelfTest/Embasic.EScanner.SelfTest.csproj -c Release
+      - name: Real NTFS staging of 2 valid 12MP PNGs, 32MiB guard, restart and offline corruption
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet run --project windows/Embasic.EScanner.SelfTest/Embasic.EScanner.SelfTest.csproj -c Release --no-build -- --high-resolution-png-ntfs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output 'NOT VERIFIED: decoded images, ImageEngine/OCR/PDF, camera, physical ENOSPC, powercut, signed packages, product SLA'
